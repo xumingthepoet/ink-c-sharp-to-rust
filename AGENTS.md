@@ -198,3 +198,8 @@ After any phase-level change, run `make -C ink-rust gate`. If it passes, the pha
 - Do not revert user changes.
 - Do not delete generated or fixture files from either reference project.
 - Keep commits focused on one porting or compatibility topic.
+- Before every commit, run `make -C ink-rust gate` and only commit if it passes. If the gate cannot run, do not commit unless the user explicitly accepts that state.
+- Commit completed porting work in small batches: 3-5 small files, 2-3 medium files, or 1 large file. Documentation-only changes may be committed separately.
+- When a file is marked `[ported]` or `[partial: ...]` in `PORT_PRIORITY.md`, include that annotation update in the same commit as the code change that made it true.
+- Do not commit a file as ported if it only compiles, only removes a stub, or still hides missing C# behavior behind empty/default logic.
+- If an in-progress change uncovers that a previous commit was only a partial port, make a corrective commit that updates `PORT_PRIORITY.md` and restores visible unfinished markers before continuing.
