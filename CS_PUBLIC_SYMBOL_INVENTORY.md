@@ -6,8 +6,8 @@ Source files: 98
 Public types: 133
 Public members: 1081
 Rust implemented: 41
-Rust skeleton: 56
-Rust partial: 1
+Rust skeleton: 55
+Rust partial: 2
 Rust missing: 0
 
 | C# file | Rust target | Public types | Public members | Rust state |
@@ -92,7 +92,7 @@ Rust missing: 0
 | `ink-c-sharp/ink-engine-runtime/ListDefinition.cs` | `ink-rust/crates/ink-runtime/src/ListDefinition.rs` | 1 | 8 | implemented |
 | `ink-c-sharp/ink-engine-runtime/ListDefinitionsOrigin.cs` | `ink-rust/crates/ink-runtime/src/ListDefinitionsOrigin.rs` | 1 | 4 | implemented |
 | `ink-c-sharp/ink-engine-runtime/NativeFunctionCall.cs` | `ink-rust/crates/ink-runtime/src/NativeFunctionCall.rs` | 1 | 39 | skeleton |
-| `ink-c-sharp/ink-engine-runtime/Object.cs` | `ink-rust/crates/ink-runtime/src/Object.rs` | 1 | 17 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/Object.cs` | `ink-rust/crates/ink-runtime/src/Object.rs` | 1 | 17 | partial |
 | `ink-c-sharp/ink-engine-runtime/Path.cs` | `ink-rust/crates/ink-runtime/src/Path.rs` | 2 | 31 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Pointer.cs` | `ink-rust/crates/ink-runtime/src/Pointer.rs` | 1 | 9 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Profiler.cs` | `ink-rust/crates/ink-runtime/src/Profiler.rs` | 2 | 23 | implemented |

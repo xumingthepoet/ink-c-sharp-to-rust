@@ -1,89 +1,186 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/Object.cs
 
-use crate::stub::*;
+use crate::Container::Container;
+use crate::DebugMetadata::DebugMetadata;
+use crate::Path::Path;
+use crate::SearchResult::SearchResult;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Object {
-    pub _port_marker: (),
+    parent: Option<Box<Container>>,
+    debug_metadata: Option<DebugMetadata>,
+    path: Option<Path>,
 }
 
 impl Object {
     // C# signature: public Object ()
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 
     // C# signature: public int? DebugLineNumberOfPath(Path path)
-    pub fn DebugLineNumberOfPath(&mut self, _path: crate::stub::Path) -> i32 {
-        Default::default()
+    pub fn DebugLineNumberOfPath(&self, path: Path) -> Option<i32> {
+        let root = self.get_rootContentContainer();
+        let Some(mut root) = root else {
+            return None;
+        };
+
+        let target_content = root.ContentAtPath(path, 0, -1).obj?;
+        match target_content {
+            crate::Container::ContentItem::Container(container) => {
+                let _ = container;
+                None
+            }
+            _ => None,
+        }
     }
 
     // C# signature: public SearchResult ResolvePath(Path path)
-    pub fn ResolvePath(&mut self, _path: crate::stub::Path) -> crate::stub::SearchResult {
-        Default::default()
+    pub fn ResolvePath(&self, path: Path) -> SearchResult {
+        if path.get_isRelative() {
+            if let Some(mut parent) = self.parent.as_deref().cloned() {
+                return parent.ContentAtPath(path, 0, -1);
+            }
+
+            return SearchResult {
+                obj: None,
+                approximate: true,
+            };
+        }
+
+        if let Some(mut root) = self.get_rootContentContainer() {
+            root.ContentAtPath(path, 0, -1)
+        } else {
+            SearchResult {
+                obj: None,
+                approximate: true,
+            }
+        }
     }
 
     // C# signature: public Path ConvertPathToRelative(Path globalPath)
-    pub fn ConvertPathToRelative(&mut self, _globalPath: crate::stub::Path) -> crate::stub::Path {
-        Default::default()
+    pub fn ConvertPathToRelative(&self, globalPath: Path) -> Path {
+        let ownPath = self.get_path();
+
+        let minPathLength = ownPath.get_length().min(globalPath.get_length());
+        let mut lastSharedPathCompIndex = -1;
+
+        for i in 0..minPathLength {
+            let Some(ownComp) = ownPath.GetComponent(i) else {
+                break;
+            };
+            let Some(otherComp) = globalPath.GetComponent(i) else {
+                break;
+            };
+
+            if ownComp.Equals(otherComp) {
+                lastSharedPathCompIndex = i;
+            } else {
+                break;
+            }
+        }
+
+        if lastSharedPathCompIndex == -1 {
+            return globalPath;
+        }
+
+        let numUpwardsMoves = (ownPath.get_length() - 1) - lastSharedPathCompIndex;
+        let mut newPathComps = Vec::new();
+
+        for _ in 0..numUpwardsMoves {
+            newPathComps.push(Path::ToParent());
+        }
+
+        for down in (lastSharedPathCompIndex + 1)..globalPath.get_length() {
+            if let Some(component) = globalPath.GetComponent(down) {
+                newPathComps.push(component.clone());
+            }
+        }
+
+        Path::new_overload_3(newPathComps, true)
     }
 
     // C# signature: public string CompactPathString(Path otherPath)
-    pub fn CompactPathString(&mut self, _otherPath: crate::stub::Path) -> String {
-        Default::default()
+    pub fn CompactPathString(&self, otherPath: Path) -> String {
+        let (relativePathStr, globalPathStr) = if otherPath.get_isRelative() {
+            (
+                otherPath.get_componentsString(),
+                self.get_path()
+                    .PathByAppendingPath(&otherPath)
+                    .get_componentsString(),
+            )
+        } else {
+            let relativePath = self.ConvertPathToRelative(otherPath.clone());
+            (
+                relativePath.get_componentsString(),
+                otherPath.get_componentsString(),
+            )
+        };
+
+        if relativePathStr.len() < globalPathStr.len() {
+            relativePathStr
+        } else {
+            globalPathStr
+        }
     }
 
     // C# signature: public virtual Object Copy()
-    pub fn Copy(&mut self) -> crate::stub::PortStub {
-        Default::default()
+    pub fn Copy(&self) -> Self {
+        panic!("Object.Copy is not implemented for the Rust runtime base object")
     }
 
     // C# signature: public void SetChild<T>(ref T obj, T value)
-    pub fn SetChild(&mut self, _obj: &mut crate::stub::PortStub, _value: crate::stub::PortStub) {}
-
-    // C# signature: public static implicit operator bool (Object obj)
-    pub fn operator_stub(_obj: crate::stub::PortStub) -> crate::stub::implicit {
-        Default::default()
-    }
-
-    // C# signature: public static bool operator ==(Object a, Object b)
-    pub fn operator_stub_overload_2(_a: crate::stub::PortStub, _b: crate::stub::PortStub) -> bool {
-        Default::default()
-    }
-
-    // C# signature: public override bool Equals (object obj)
-    pub fn Equals(&mut self, _obj: crate::stub::PortStub) -> bool {
-        Default::default()
-    }
-
-    // C# signature: public override int GetHashCode ()
-    pub fn GetHashCode(&mut self) -> i32 {
-        Default::default()
+    pub fn SetChild<T>(&mut self, obj: &mut T, value: T) {
+        *obj = value;
     }
 
     // C# signature: Runtime.Object parent { get; }
-    pub fn get_parent(&mut self) -> crate::stub::PortStub {
-        Default::default()
+    pub fn get_parent(&self) -> Option<&Container> {
+        self.parent.as_deref()
     }
 
     // C# signature: Runtime.DebugMetadata debugMetadata { get; }
-    pub fn get_debugMetadata(&mut self) -> crate::stub::DebugMetadata {
-        Default::default()
+    pub fn get_debugMetadata(&self) -> Option<&DebugMetadata> {
+        self.debug_metadata.as_ref()
     }
 
     // C# signature: Runtime.DebugMetadata ownDebugMetadata { get; }
-    pub fn get_ownDebugMetadata(&mut self) -> crate::stub::DebugMetadata {
-        Default::default()
+    pub fn get_ownDebugMetadata(&self) -> Option<&DebugMetadata> {
+        self.debug_metadata.as_ref()
     }
 
     // C# signature: Path path { get; }
-    pub fn get_path(&mut self) -> crate::stub::Path {
-        Default::default()
+    pub fn get_path(&self) -> Path {
+        self.path.clone().unwrap_or_else(Path::new)
     }
 
     // C# signature: Container rootContentContainer { get; }
-    pub fn get_rootContentContainer(&mut self) -> crate::stub::Container {
-        Default::default()
+    pub fn get_rootContentContainer(&self) -> Option<Container> {
+        self.parent.as_deref().cloned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Object;
+    use crate::Path::{Component, Path};
+
+    #[test]
+    fn compact_path_prefers_shorter_representation() {
+        let mut obj = Object::new();
+        obj.path = Some(Path::new_overload_3(
+            vec![Component::new_overload_2("chapter".to_string())],
+            false,
+        ));
+
+        let target = Path::new_overload_3(
+            vec![
+                Component::new_overload_2("chapter".to_string()),
+                Component::new_overload_2("scene".to_string()),
+            ],
+            false,
+        );
+
+        assert_eq!(obj.CompactPathString(target), ".scene");
     }
 }
