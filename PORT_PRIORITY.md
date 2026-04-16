@@ -33,7 +33,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 17. `StatePatch.cs` (`deps=2`)
 18. `Choice.cs` (`deps=3`) [partial: reason=CallStack.Thread dependency is still skeleton and Clone uses derived clone; missing=threadAtGeneration.Copy semantics and exact C# copied-field set; next=port CallStack.Thread then fix Choice.Clone]
 19. `InkList.cs` (`deps=3`) [partial: reason=most list algebra and item/origin semantics are ported, but story-backed construction still depends on unported story access; missing=Story-backed constructor, FromString fallback, and any path that needs Story.listDefinitions; next=port Story listDefinitions access and wire those entry points]
-20. `Pointer.cs` (`deps=3`)
+20. `Pointer.cs` (`deps=3`) [ported]
 21. `VariableReference.cs` (`deps=3`)
 22. `ChoicePoint.cs` (`deps=4`)
 23. `Profiler.cs` (`deps=4`)

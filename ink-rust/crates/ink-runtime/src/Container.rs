@@ -55,6 +55,7 @@ pub struct Container {
     content: Vec<ContentItem>,
     named_content: HashMap<String, ContentItem>,
     name: Option<String>,
+    path: Path,
     visitsShouldBeCounted: bool,
     turnIndexShouldBeCounted: bool,
     countingAtStartOnly: bool,
@@ -80,6 +81,7 @@ impl Container {
     pub fn from_content(content: Vec<ContentItem>) -> Self {
         Self {
             content,
+            path: Path::new(),
             ..Default::default()
         }
     }
@@ -161,6 +163,15 @@ impl Container {
     // C# signature: string name { get; }
     pub fn get_name(&self) -> &str {
         self.name.as_deref().unwrap_or("")
+    }
+
+    // C# signature: Path path { get; }
+    pub fn get_path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn set_path(&mut self, path: Path) {
+        self.path = path;
     }
 
     // C# signature: List<Runtime.Object> content { get; }
