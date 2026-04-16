@@ -96,7 +96,7 @@ If a file is too large or difficult to complete in one pass and a partial implem
 After completing a file under this standard:
 
 - Update `PORT_PRIORITY.md` in the same change and annotate that source file's list entry as ported.
-- Update `CS_RUST_FILE_INVENTORY.md` in the same change so the human-readable file inventory stays in sync with the current port status.
+- Update `CS_PUBLIC_SYMBOL_INVENTORY.md` in the same change so the human-readable file inventory stays in sync with the current port status.
 - Only add the annotation after the Rust file has no placeholder behavior for the corresponding C# file and `make -C ink-rust gate` passes.
 - Do not mark a file as ported for partial structure work, type-only wiring, compile-only cleanup, or tests that cover only a small subset of the C# behavior.
 - If later refactoring changes the file without changing behavior, keep the ported annotation. If a later audit finds missing C# behavior, remove or correct the annotation in the same change that records the gap.
@@ -201,6 +201,6 @@ After any phase-level change, run `make -C ink-rust gate`. If it passes, the pha
 - Keep commits focused on one porting or compatibility topic.
 - Before every commit, run `make -C ink-rust gate` and only commit if it passes. If the gate cannot run, do not commit unless the user explicitly accepts that state.
 - Commit completed porting work in small batches: 3-5 small files, 2-3 medium files, or 1 large file. Documentation-only changes may be committed separately.
-- When a file is marked `[ported]` or `[partial: ...]` in `PORT_PRIORITY.md`, include that annotation update in the same commit as the code change that made it true, and update `CS_RUST_FILE_INVENTORY.md` in the same commit if the file's status there changed.
+- When a file is marked `[ported]` or `[partial: ...]` in `PORT_PRIORITY.md`, include that annotation update in the same commit as the code change that made it true, and update `CS_PUBLIC_SYMBOL_INVENTORY.md` in the same commit if the file's status there changed.
 - Do not commit a file as ported if it only compiles, only removes a stub, or still hides missing C# behavior behind empty/default logic.
 - If an in-progress change uncovers that a previous commit was only a partial port, make a corrective commit that updates `PORT_PRIORITY.md` and restores visible unfinished markers before continuing.
