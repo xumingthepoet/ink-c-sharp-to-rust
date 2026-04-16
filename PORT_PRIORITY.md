@@ -38,7 +38,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 22. `ChoicePoint.cs` (`deps=4`)
 23. `Profiler.cs` (`deps=4`)
 24. `Value.cs` (`deps=4`) [partial: reason=the runtime value family now works through a Rust compatibility wrapper rather than the exact C# generic hierarchy; missing=full upstream object/value inheritance surface and later InkList/Object linkage audit; next=port the remaining object hierarchy and reconcile the wrapper with InkList]
-25. `Container.cs` (`deps=5`) [partial: reason=the container now stores real runtime content items and supports add/insert operations, but path resolution, named content traversal, and hierarchy stringification are still incomplete; missing=content-at-path search, parent/path bookkeeping, and full named content semantics; next=port Runtime.Object/Path traversal and finalize container hierarchy behavior]
+25. `Container.cs` (`deps=5`) [partial: reason=the container now stores real runtime content items and supports add/insert operations plus indexed path lookup, but parent/backlink bookkeeping and full named content semantics are still incomplete; missing=parent-path traversal, accurate named-content ownership, and full hierarchy stringification; next=introduce real parent links or an equivalent ownership model, then finish named traversal]
 26. `Divert.cs` (`deps=5`) [partial: reason=target path, variable divert, stack push flags, and stringification are now real, but targetPointer and full path resolution still depend on the unported Runtime.Object.ResolvePath pipeline; missing=targetPointer, relative-path resolution, and target container lookup; next=port Runtime.Object.ResolvePath and container ancestry handling]
 27. `Object.cs` (`deps=5`)
 28. `Flow.cs` (`deps=6`)

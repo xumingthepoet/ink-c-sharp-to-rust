@@ -1,7 +1,8 @@
 // Source: ink-c-sharp/ink-engine-runtime/Container.cs
 
 use crate::ControlCommand::ControlCommand;
-use crate::Path::Path;
+use crate::Path::{Component, Path};
+use crate::SearchResult::{SearchResult, SearchResultObject};
 use crate::Value::{ListValue, StringValue, Value};
 use crate::VariableReference::VariableReference;
 use crate::Void::Void;
@@ -137,21 +138,78 @@ impl Container {
     }
 
     // C# signature: protected Runtime.Object ContentWithPathComponent(Path.Component component)
-    pub fn ContentWithPathComponent(
-        &mut self,
-        _component: crate::stub::Component,
-    ) -> crate::stub::PortStub {
-        Default::default()
+    pub fn ContentWithPathComponent(&mut self, component: Component) -> Option<ContentItem> {
+        if component.get_isIndex() {
+            let index = component.get_index();
+            if index >= 0 {
+                self.content.get(index as usize).cloned()
+            } else {
+                None
+            }
+        } else if component.get_isParent() {
+            None
+        } else {
+            self.named_content
+                .get(component.get_name().unwrap_or(""))
+                .cloned()
+        }
     }
 
     // C# signature: public SearchResult ContentAtPath(Path path, int partialPathStart = 0, int partialPathLength = -1)
     pub fn ContentAtPath(
         &mut self,
-        _path: crate::stub::Path,
-        _partialPathStart: i32,
-        _partialPathLength: i32,
-    ) -> crate::stub::SearchResult {
-        Default::default()
+        path: Path,
+        partialPathStart: i32,
+        partialPathLength: i32,
+    ) -> SearchResult {
+        let partialPathLength = if partialPathLength == -1 {
+            path.get_length()
+        } else {
+            partialPathLength
+        };
+
+        let mut result = SearchResult::new();
+        let mut currentContainer: Option<Container> = Some(self.clone());
+        let mut currentObj: Option<ContentItem> =
+            Some(ContentItem::Container(Box::new(self.clone())));
+
+        for i in partialPathStart..partialPathLength {
+            let Some(mut container) = currentContainer.take() else {
+                result.approximate = true;
+                break;
+            };
+
+            let Some(component) = path.GetComponent(i) else {
+                result.approximate = true;
+                break;
+            };
+
+            let foundObj = container.ContentWithPathComponent(component.clone());
+            let Some(foundObj) = foundObj else {
+                result.approximate = true;
+                break;
+            };
+
+            if i < partialPathLength - 1 {
+                match &foundObj {
+                    ContentItem::Container(nextContainer) => {
+                        currentContainer = Some(nextContainer.as_ref().clone());
+                    }
+                    _ => {
+                        result.approximate = true;
+                        currentObj = Some(foundObj);
+                        break;
+                    }
+                }
+            } else {
+                currentContainer = None;
+            }
+
+            currentObj = Some(foundObj);
+        }
+
+        result.obj = currentObj.map(SearchResultObject::Content);
+        result
     }
 
     // C# signature: public void BuildStringOfHierarchy(StringBuilder sb, int indentation, Runtime.Object pointedObj)
@@ -165,7 +223,52 @@ impl Container {
 
     // C# signature: public virtual string BuildStringOfHierarchy()
     pub fn BuildStringOfHierarchy_overload_2(&mut self) -> String {
-        self.get_name().to_string()
+        let mut result = String::from("[");
+        if self.get_hasValidName() {
+            result.push(' ');
+            result.push('(');
+            result.push_str(self.get_name());
+            result.push(')');
+        }
+
+        result.push('\n');
+
+        for content in &self.content {
+            match content {
+                ContentItem::Container(container) => {
+                    let mut child_container = container.as_ref().clone();
+                    let child = child_container.BuildStringOfHierarchy_overload_2();
+                    for line in child.lines() {
+                        result.push_str("    ");
+                        result.push_str(line);
+                        result.push('\n');
+                    }
+                }
+                ContentItem::Value(value) => {
+                    result.push_str("    ");
+                    result.push_str(&value.ToString());
+                    result.push('\n');
+                }
+                ContentItem::ControlCommand(command) => {
+                    result.push_str("    ");
+                    result.push_str(&command.ToString());
+                    result.push('\n');
+                }
+                ContentItem::Void(value) => {
+                    result.push_str("    ");
+                    result.push_str(&format!("{:?}", value));
+                    result.push('\n');
+                }
+                ContentItem::VariableReference(reference) => {
+                    result.push_str("    ");
+                    result.push_str(&reference.ToString());
+                    result.push('\n');
+                }
+            }
+        }
+
+        result.push(']');
+        result
     }
 
     // C# signature: string name { get; }
@@ -216,6 +319,38 @@ impl Container {
 
     // C# signature: Path pathToFirstLeafContent { get; }
     pub fn get_pathToFirstLeafContent(&self) -> Path {
-        Path::new()
+        let mut path = self.get_path().clone();
+        let mut container = self;
+        while let Some(ContentItem::Container(first_child)) = container.content.first() {
+            path = path.PathByAppendingComponent(crate::Path::Component::new(0));
+            container = first_child.as_ref();
+        }
+        path
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Container, ContentItem};
+    use crate::ControlCommand::ControlCommand;
+    use crate::Path::{Component, Path};
+    use crate::SearchResult::SearchResultObject;
+
+    #[test]
+    fn resolves_indexed_child_container_paths() {
+        let mut child = Container::new();
+        child.AddContent(ControlCommand::BeginString());
+
+        let mut root = Container::new();
+        root.AddContent(child.clone());
+
+        let result =
+            root.ContentAtPath(Path::new_overload_3(vec![Component::new(0)], false), 0, -1);
+        assert!(!result.approximate);
+        assert!(matches!(
+            result.get_correctObj(),
+            Some(SearchResultObject::Content(ContentItem::Container(_)))
+        ));
+        assert_eq!(root.get_pathToFirstLeafContent().ToString(), "0");
     }
 }

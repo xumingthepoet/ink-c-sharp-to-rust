@@ -1,12 +1,14 @@
 // Source: ink-c-sharp/ink-engine-runtime/SearchResult.cs
 
 use crate::Container::Container;
+use crate::Container::ContentItem;
 use crate::Object::Object;
 
 #[derive(Clone, Debug)]
 pub enum SearchResultObject {
     Object(Object),
     Container(Container),
+    Content(ContentItem),
 }
 
 #[derive(Clone, Debug, Default)]
@@ -40,6 +42,9 @@ impl SearchResult {
     pub fn get_container(&self) -> Option<&Container> {
         match self.obj.as_ref() {
             Some(SearchResultObject::Container(container)) => Some(container),
+            Some(SearchResultObject::Content(ContentItem::Container(container))) => {
+                Some(container.as_ref())
+            }
             _ => None,
         }
     }
