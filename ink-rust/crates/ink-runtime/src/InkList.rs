@@ -1,7 +1,8 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/InkList.cs
 
-use crate::stub::*;
+use crate::ListDefinition::ListDefinition;
+use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -21,10 +22,10 @@ impl InkListItem {
 
     // C# signature: public InkListItem (string fullName)
     pub fn new_overload_2(fullName: String) -> Self {
-        let mut name_parts = fullName.split('.');
+        let mut parts = fullName.split('.');
         Self {
-            originName: Some(name_parts.next().unwrap().to_string()),
-            itemName: Some(name_parts.next().unwrap().to_string()),
+            originName: parts.next().map(|s| s.to_string()),
+            itemName: parts.next().map(|s| s.to_string()),
         }
     }
 
@@ -66,196 +67,473 @@ impl std::fmt::Display for InkListItem {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ListBound {
+    Int(i32),
+    List(InkList),
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct InkList {
-    pub _port_marker: (),
+    entries: HashMap<InkListItem, i32>,
+    pub origins: Option<Vec<ListDefinition>>,
+    origin_names: Option<Vec<String>>,
 }
 
 impl InkList {
     // C# signature: public InkList ()
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 
     // C# signature: public InkList(InkList otherList)
-    pub fn new_overload_2(_otherList: crate::stub::InkList) -> Self {
-        Default::default()
+    pub fn new_overload_2(otherList: InkList) -> Self {
+        otherList
     }
 
     // C# signature: public InkList (string singleOriginListName, Story originStory)
-    pub fn new_overload_3(_singleOriginListName: String, _originStory: crate::stub::Story) -> Self {
-        Default::default()
+    pub fn new_overload_3(singleOriginListName: String, _originStory: crate::stub::Story) -> Self {
+        let mut list = Self::new();
+        list.SetInitialOriginName(singleOriginListName);
+        todo!("port InkList story-backed constructor after Story.listDefinitions is ported");
     }
 
     // C# signature: public InkList (KeyValuePair<InkListItem, int> singleElement)
-    pub fn new_overload_4(_singleElement: (crate::stub::InkListItem, i32)) -> Self {
-        Default::default()
+    pub fn new_overload_4(singleElement: (InkListItem, i32)) -> Self {
+        let mut list = Self::new();
+        list.entries.insert(singleElement.0, singleElement.1);
+        list
     }
 
-    // C# signature: public override string ToString ()
-    pub fn ToString(&mut self) -> String {
-        Default::default()
+    fn ordered_items(&self) -> Vec<(InkListItem, i32)> {
+        let mut ordered = self
+            .entries
+            .iter()
+            .map(|(item, value)| (item.clone(), *value))
+            .collect::<Vec<_>>();
+        ordered.sort_by(|left, right| match left.1.cmp(&right.1) {
+            Ordering::Equal => left
+                .0
+                .originName
+                .as_deref()
+                .unwrap_or("")
+                .cmp(right.0.originName.as_deref().unwrap_or("")),
+            other => other,
+        });
+        ordered
     }
 
-    // C# signature: public override bool Equals (object obj)
-    pub fn Equals(&mut self, _obj: crate::stub::PortStub) -> bool {
-        Default::default()
+    fn max_item(&self) -> (InkListItem, i32) {
+        self.entries
+            .iter()
+            .max_by_key(|(_, value)| **value)
+            .map(|(item, value)| (item.clone(), *value))
+            .unwrap_or_else(|| (InkListItem::Null(), 0))
     }
 
-    // C# signature: public bool Equals (InkListItem otherItem)
-    pub fn Equals_overload_2(&mut self, _otherItem: crate::stub::InkListItem) -> bool {
-        Default::default()
+    fn min_item(&self) -> (InkListItem, i32) {
+        self.entries
+            .iter()
+            .min_by_key(|(_, value)| **value)
+            .map(|(item, value)| (item.clone(), *value))
+            .unwrap_or_else(|| (InkListItem::Null(), 0))
     }
 
-    // C# signature: public static bool operator == (InkListItem left, InkListItem right)
-    pub fn operator_stub(
-        _left: crate::stub::InkListItem,
-        _right: crate::stub::InkListItem,
-    ) -> bool {
-        Default::default()
-    }
-
-    // C# signature: public override int GetHashCode ()
-    pub fn GetHashCode(&mut self) -> i32 {
-        Default::default()
+    fn clone_with_same_metadata(&self) -> Self {
+        Self {
+            entries: self.entries.clone(),
+            origins: self.origins.clone(),
+            origin_names: self.origin_names.clone(),
+        }
     }
 
     // C# signature: public static InkList FromString(string myListItem, Story originStory)
-    pub fn FromString(
-        _myListItem: String,
-        _originStory: crate::stub::Story,
-    ) -> crate::stub::InkList {
-        Default::default()
+    pub fn FromString(_myListItem: String, _originStory: crate::stub::Story) -> Self {
+        todo!("port InkList.FromString after Story.listDefinitions is ported");
     }
 
     // C# signature: public void AddItem (InkListItem item)
-    pub fn AddItem(&mut self, _item: crate::stub::InkListItem) {}
+    pub fn AddItem(&mut self, item: InkListItem) {
+        if item.originName.is_none() {
+            self.AddItem_overload_2(item.itemName.unwrap_or_default(), Default::default());
+            return;
+        }
+
+        let origin_name = item.originName.clone().unwrap();
+        if let Some(origins) = self.origins.as_ref() {
+            for origin in origins {
+                if origin.get_name() == origin_name {
+                    let value = origin.ValueForItem(&item);
+                    self.entries.insert(item, value);
+                    return;
+                }
+            }
+        }
+
+        panic!(
+            "Failed to add item to list because the item was from a new list definition that wasn't previously known to this list."
+        );
+    }
 
     // C# signature: public void AddItem(string itemName, Story storyObject = null)
-    pub fn AddItem_overload_2(&mut self, _itemName: String, _storyObject: crate::stub::Story) {}
+    pub fn AddItem_overload_2(&mut self, itemName: String, _storyObject: crate::stub::Story) {
+        let mut foundListDef: Option<ListDefinition> = None;
+
+        if let Some(origins) = self.origins.as_ref() {
+            for origin in origins {
+                if origin.ContainsItemWithName(itemName.clone()) {
+                    if foundListDef.is_some() {
+                        panic!(
+                            "Could not add the item {} to this list because it could come from either {} or {}",
+                            itemName,
+                            origin.get_name(),
+                            foundListDef.as_ref().unwrap().get_name()
+                        );
+                    } else {
+                        foundListDef = Some(origin.clone());
+                    }
+                }
+            }
+        }
+
+        if let Some(foundListDef) = foundListDef {
+            let item = InkListItem::new(Some(foundListDef.get_name().to_string()), Some(itemName));
+            let itemVal = foundListDef.ValueForItem(&item);
+            self.entries.insert(item, itemVal);
+        } else {
+            todo!("port InkList.AddItem(string, Story) fallback after Story.listDefinitions is ported");
+        }
+    }
 
     // C# signature: public bool ContainsItemNamed (string itemName)
-    pub fn ContainsItemNamed(&mut self, _itemName: String) -> bool {
-        Default::default()
+    pub fn ContainsItemNamed(&self, itemName: String) -> bool {
+        self.entries
+            .keys()
+            .any(|item| item.itemName.as_deref() == Some(itemName.as_str()))
     }
 
-    // C# signature: public void SetInitialOriginName (string initialOriginName)
-    pub fn SetInitialOriginName(&mut self, _initialOriginName: String) {}
-
-    // C# signature: public void SetInitialOriginNames (List<string> initialOriginNames)
-    pub fn SetInitialOriginNames(&mut self, _initialOriginNames: Vec<String>) {}
-
-    // C# signature: public InkList Union (InkList otherList)
-    pub fn Union(&mut self, _otherList: crate::stub::InkList) -> crate::stub::InkList {
-        Default::default()
+    // Story has to set this so that the value knows its origin.
+    pub fn SetInitialOriginName(&mut self, initialOriginName: String) {
+        self.origin_names = Some(vec![initialOriginName]);
     }
 
-    // C# signature: public InkList Intersect (InkList otherList)
-    pub fn Intersect(&mut self, _otherList: crate::stub::InkList) -> crate::stub::InkList {
-        Default::default()
+    pub fn SetInitialOriginNames(&mut self, initialOriginNames: Vec<String>) {
+        self.origin_names = Some(initialOriginNames);
     }
 
-    // C# signature: public bool HasIntersection(InkList otherList)
-    pub fn HasIntersection(&mut self, _otherList: crate::stub::InkList) -> bool {
-        Default::default()
-    }
-
-    // C# signature: public InkList Without (InkList listToRemove)
-    pub fn Without(&mut self, _listToRemove: crate::stub::InkList) -> crate::stub::InkList {
-        Default::default()
-    }
-
-    // C# signature: public bool Contains (InkList otherList)
-    pub fn Contains(&mut self, _otherList: crate::stub::InkList) -> bool {
-        Default::default()
-    }
-
-    // C# signature: public bool Contains(string listItemName)
-    pub fn Contains_overload_2(&mut self, _listItemName: String) -> bool {
-        Default::default()
-    }
-
-    // C# signature: public bool GreaterThan (InkList otherList)
-    pub fn GreaterThan(&mut self, _otherList: crate::stub::InkList) -> bool {
-        Default::default()
-    }
-
-    // C# signature: public bool GreaterThanOrEquals (InkList otherList)
-    pub fn GreaterThanOrEquals(&mut self, _otherList: crate::stub::InkList) -> bool {
-        Default::default()
-    }
-
-    // C# signature: public bool LessThan (InkList otherList)
-    pub fn LessThan(&mut self, _otherList: crate::stub::InkList) -> bool {
-        Default::default()
-    }
-
-    // C# signature: public bool LessThanOrEquals (InkList otherList)
-    pub fn LessThanOrEquals(&mut self, _otherList: crate::stub::InkList) -> bool {
-        Default::default()
-    }
-
-    // C# signature: public InkList MaxAsList ()
-    pub fn MaxAsList(&mut self) -> crate::stub::InkList {
-        Default::default()
-    }
-
-    // C# signature: public InkList MinAsList ()
-    pub fn MinAsList(&mut self) -> crate::stub::InkList {
-        Default::default()
-    }
-
-    // C# signature: public InkList ListWithSubRange(object minBound, object maxBound)
-    pub fn ListWithSubRange(
-        &mut self,
-        _minBound: crate::stub::PortStub,
-        _maxBound: crate::stub::PortStub,
-    ) -> crate::stub::InkList {
-        Default::default()
-    }
-
-    // C# signature: public override bool Equals (object other)
-    pub fn Equals_overload_3(&mut self, _other: crate::stub::PortStub) -> bool {
-        Default::default()
-    }
-
-    // C# signature: InkListItem Null { get; }
-    pub fn get_Null() -> crate::stub::InkListItem {
-        Default::default()
-    }
-
-    // C# signature: bool isNull { get; }
-    pub fn get_isNull(&mut self) -> bool {
-        Default::default()
-    }
-
-    // C# signature: string fullName { get; }
-    pub fn get_fullName(&mut self) -> String {
-        Default::default()
+    // C# signature: List<ListDefinition> origins { get; }
+    pub fn get_origins(&self) -> Option<&[ListDefinition]> {
+        self.origins.as_deref()
     }
 
     // C# signature: ListDefinition originOfMaxItem { get; }
-    pub fn get_originOfMaxItem(&mut self) -> crate::stub::ListDefinition {
-        Default::default()
+    pub fn get_originOfMaxItem(&self) -> Option<ListDefinition> {
+        let max_origin_name = self.max_item().0.originName?;
+        self.origins.as_ref().and_then(|origins| {
+            origins
+                .iter()
+                .find(|origin| origin.get_name() == max_origin_name)
+                .cloned()
+        })
     }
 
     // C# signature: List<string> originNames { get; }
-    pub fn get_originNames(&mut self) -> Vec<String> {
-        Default::default()
+    pub fn get_originNames(&mut self) -> Option<Vec<String>> {
+        if self.entries.is_empty() {
+            return self.origin_names.clone();
+        }
+
+        let mut names = Vec::with_capacity(self.entries.len());
+        for item in self.entries.keys() {
+            if let Some(origin_name) = &item.originName {
+                names.push(origin_name.clone());
+            }
+        }
+        self.origin_names = Some(names.clone());
+        Some(names)
     }
 
-    // C# signature: InkList inverse { get; }
-    pub fn get_inverse(&mut self) -> crate::stub::InkList {
-        Default::default()
+    pub fn get_maxItem(&self) -> (InkListItem, i32) {
+        self.max_item()
     }
 
-    // C# signature: InkList all { get; }
-    pub fn get_all(&mut self) -> crate::stub::InkList {
-        Default::default()
+    pub fn get_minItem(&self) -> (InkListItem, i32) {
+        self.min_item()
+    }
+
+    // C# signature: public InkList inverse { get; }
+    pub fn get_inverse(&self) -> InkList {
+        let mut list = InkList::new();
+        if let Some(origins) = self.origins.as_ref() {
+            for origin in origins {
+                let mut origin = origin.clone();
+                for (item, value) in origin.get_items().clone() {
+                    if !self.entries.contains_key(&item) {
+                        list.entries.insert(item, value);
+                    }
+                }
+            }
+        }
+        list
+    }
+
+    // C# signature: public InkList all { get; }
+    pub fn get_all(&self) -> InkList {
+        let mut list = InkList::new();
+        if let Some(origins) = self.origins.as_ref() {
+            for origin in origins {
+                let mut origin = origin.clone();
+                for (item, value) in origin.get_items().clone() {
+                    list.entries.insert(item, value);
+                }
+            }
+        }
+        list
+    }
+
+    // C# signature: public InkList Union (InkList otherList)
+    pub fn Union(&self, otherList: InkList) -> InkList {
+        let mut union = self.clone_with_same_metadata();
+        for (item, value) in otherList.entries {
+            union.entries.insert(item, value);
+        }
+        union
+    }
+
+    // C# signature: public InkList Intersect (InkList otherList)
+    pub fn Intersect(&self, otherList: InkList) -> InkList {
+        let mut intersection = InkList::new();
+        for (item, value) in &self.entries {
+            if otherList.entries.contains_key(item) {
+                intersection.entries.insert(item.clone(), *value);
+            }
+        }
+        intersection
+    }
+
+    // C# signature: public bool HasIntersection(InkList otherList)
+    pub fn HasIntersection(&self, otherList: InkList) -> bool {
+        self.entries
+            .keys()
+            .any(|item| otherList.entries.contains_key(item))
+    }
+
+    // C# signature: public InkList Without (InkList listToRemove)
+    pub fn Without(&self, listToRemove: InkList) -> InkList {
+        let mut result = self.clone_with_same_metadata();
+        for item in listToRemove.entries.keys() {
+            result.entries.remove(item);
+        }
+        result
+    }
+
+    // C# signature: public bool Contains (InkList otherList)
+    pub fn Contains(&self, otherList: InkList) -> bool {
+        if otherList.entries.is_empty() || self.entries.is_empty() {
+            return false;
+        }
+
+        otherList
+            .entries
+            .keys()
+            .all(|item| self.entries.contains_key(item))
+    }
+
+    // C# signature: public bool Contains(string listItemName)
+    pub fn Contains_overload_2(&self, listItemName: String) -> bool {
+        self.entries
+            .keys()
+            .any(|item| item.itemName.as_deref() == Some(listItemName.as_str()))
+    }
+
+    // C# signature: public bool GreaterThan (InkList otherList)
+    pub fn GreaterThan(&self, otherList: InkList) -> bool {
+        if self.entries.is_empty() {
+            return false;
+        }
+        if otherList.entries.is_empty() {
+            return true;
+        }
+
+        self.min_item().1 > otherList.max_item().1
+    }
+
+    // C# signature: public bool GreaterThanOrEquals (InkList otherList)
+    pub fn GreaterThanOrEquals(&self, otherList: InkList) -> bool {
+        if self.entries.is_empty() {
+            return false;
+        }
+        if otherList.entries.is_empty() {
+            return true;
+        }
+
+        self.min_item().1 >= otherList.min_item().1 && self.max_item().1 >= otherList.max_item().1
+    }
+
+    // C# signature: public bool LessThan (InkList otherList)
+    pub fn LessThan(&self, otherList: InkList) -> bool {
+        if otherList.entries.is_empty() {
+            return false;
+        }
+        if self.entries.is_empty() {
+            return true;
+        }
+
+        self.max_item().1 < otherList.min_item().1
+    }
+
+    // C# signature: public bool LessThanOrEquals (InkList otherList)
+    pub fn LessThanOrEquals(&self, otherList: InkList) -> bool {
+        if otherList.entries.is_empty() {
+            return false;
+        }
+        if self.entries.is_empty() {
+            return true;
+        }
+
+        self.max_item().1 <= otherList.max_item().1 && self.min_item().1 <= otherList.min_item().1
+    }
+
+    // C# signature: public InkList MaxAsList ()
+    pub fn MaxAsList(&self) -> InkList {
+        if self.entries.is_empty() {
+            InkList::new()
+        } else {
+            InkList::new_overload_4(self.max_item())
+        }
+    }
+
+    // C# signature: public InkList MinAsList ()
+    pub fn MinAsList(&self) -> InkList {
+        if self.entries.is_empty() {
+            InkList::new()
+        } else {
+            InkList::new_overload_4(self.min_item())
+        }
+    }
+
+    // C# signature: public InkList ListWithSubRange(object minBound, object maxBound)
+    pub fn ListWithSubRange(&self, minBound: ListBound, maxBound: ListBound) -> InkList {
+        if self.entries.is_empty() {
+            return InkList::new();
+        }
+
+        let ordered = self.ordered_items();
+
+        let minValue = match minBound {
+            ListBound::Int(value) => value,
+            ListBound::List(list) if !list.entries.is_empty() => list.min_item().1,
+            ListBound::List(_) => 0,
+        };
+
+        let maxValue = match maxBound {
+            ListBound::Int(value) => value,
+            ListBound::List(list) if !list.entries.is_empty() => list.max_item().1,
+            ListBound::List(_) => i32::MAX,
+        };
+
+        let mut subList = InkList::new();
+        subList.origin_names = self.origin_names.clone();
+        subList.origins = self.origins.clone();
+
+        for (item, value) in ordered {
+            if value >= minValue && value <= maxValue {
+                subList.entries.insert(item, value);
+            }
+        }
+
+        subList
+    }
+
+    // C# signature: public override bool Equals (object other)
+    pub fn Equals(&self, other: &InkList) -> bool {
+        self.entries.len() == other.entries.len()
+            && self
+                .entries
+                .keys()
+                .all(|item| other.entries.contains_key(item))
+    }
+
+    // C# signature: public override int GetHashCode ()
+    pub fn GetHashCode(&self) -> i32 {
+        self.entries
+            .keys()
+            .map(|item| {
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                item.hash(&mut hasher);
+                hasher.finish() as i32
+            })
+            .sum()
     }
 
     // C# signature: InkListItem singleItem { get; }
-    pub fn get_singleItem(&mut self) -> crate::stub::InkListItem {
-        Default::default()
+    pub fn get_singleItem(&self) -> InkListItem {
+        self.entries
+            .keys()
+            .next()
+            .cloned()
+            .unwrap_or_else(InkListItem::Null)
+    }
+
+    // C# signature: public override string ToString ()
+    pub fn ToString(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl std::fmt::Display for InkList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ordered = self.ordered_items();
+        for (index, (item, _)) in ordered.iter().enumerate() {
+            if index > 0 {
+                f.write_str(", ")?;
+            }
+            f.write_str(item.itemName.as_deref().unwrap_or(""))?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{InkList, InkListItem, ListBound};
+    use crate::ListDefinition::ListDefinition;
+    use std::collections::HashMap;
+
+    #[test]
+    fn list_operations_preserve_values_and_names() {
+        let a = InkList::new_overload_4((
+            InkListItem::new(Some("food".into()), Some("apple".into())),
+            2,
+        ));
+        let b = InkList::new_overload_4((
+            InkListItem::new(Some("food".into()), Some("pear".into())),
+            5,
+        ));
+
+        let union = a.Union(b.clone());
+        assert_eq!(union.get_maxItem().1, 5);
+        assert!(union.Contains_overload_2("pear".into()));
+        assert!(union.HasIntersection(b.clone()));
+        assert!(union.GreaterThan(a.clone()) || !a.GreaterThan(b.clone()));
+
+        let sub = union.ListWithSubRange(ListBound::Int(3), ListBound::Int(5));
+        assert!(sub.Contains_overload_2("pear".into()));
+        assert!(!sub.Contains_overload_2("apple".into()));
+    }
+
+    #[test]
+    fn list_definition_based_queries_work() {
+        let mut items = HashMap::new();
+        items.insert("apple".to_string(), 2);
+        let mut def = ListDefinition::new("food".to_string(), items);
+        let mut list = InkList::new();
+        list.origins = Some(vec![def.clone()]);
+        list.AddItem(InkListItem::new(Some("food".into()), Some("apple".into())));
+
+        assert_eq!(list.get_originOfMaxItem().unwrap().get_name(), "food");
+        assert_eq!(list.get_singleItem().itemName.as_deref(), Some("apple"));
+        assert!(list.ContainsItemNamed("apple".into()));
+        assert_eq!(list.GetHashCode(), list.GetHashCode());
     }
 }

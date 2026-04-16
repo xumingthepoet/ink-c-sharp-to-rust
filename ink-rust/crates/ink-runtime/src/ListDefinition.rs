@@ -3,7 +3,7 @@
 use crate::InkList::InkListItem;
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ListDefinition {
     name: String,
     itemNameToValues: HashMap<String, i32>,

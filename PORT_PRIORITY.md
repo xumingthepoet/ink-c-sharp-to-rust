@@ -32,7 +32,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 16. `SearchResult.cs` (`deps=2`) [partial: reason=temporary enum used before Runtime.Object hierarchy is ported; missing=general Runtime.Object reference/downcast semantics; next=finish Object/Container hierarchy then revise SearchResult]
 17. `StatePatch.cs` (`deps=2`)
 18. `Choice.cs` (`deps=3`) [partial: reason=CallStack.Thread dependency is still skeleton and Clone uses derived clone; missing=threadAtGeneration.Copy semantics and exact C# copied-field set; next=port CallStack.Thread then fix Choice.Clone]
-19. `InkList.cs` (`deps=3`) [partial: reason=only InkListItem has been ported; missing=InkList collection constructors, comparisons, set operations, range operations, origin tracking, and derived properties; next=port the remaining InkList members and wire them to the runtime value layer]
+19. `InkList.cs` (`deps=3`) [partial: reason=most list algebra and item/origin semantics are ported, but story-backed construction still depends on unported story access; missing=Story-backed constructor, FromString fallback, and any path that needs Story.listDefinitions; next=port Story listDefinitions access and wire those entry points]
 20. `Pointer.cs` (`deps=3`)
 21. `VariableReference.cs` (`deps=3`)
 22. `ChoicePoint.cs` (`deps=4`)
