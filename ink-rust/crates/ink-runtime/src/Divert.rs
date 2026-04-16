@@ -141,6 +141,10 @@ impl Divert {
         self.pushesToStack = value;
     }
 
+    pub fn get_stackPushType(&self) -> crate::PushPop::PushPopType {
+        self.stackPushType
+    }
+
     // C# signature: bool isExternal { get; }
     pub fn get_isExternal(&self) -> bool {
         self.isExternal

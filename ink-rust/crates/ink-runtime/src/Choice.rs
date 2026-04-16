@@ -3,7 +3,7 @@
 use crate::CallStack::Thread;
 use crate::Path::Path;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Choice {
     pub text: String,
     pub sourcePath: String,

@@ -165,6 +165,10 @@ impl InkList {
         &self.entries
     }
 
+    pub fn insert_entry(&mut self, item: InkListItem, value: i32) {
+        self.entries.insert(item, value);
+    }
+
     // C# signature: public static InkList FromString(string myListItem, Story originStory)
     pub fn FromString(myListItem: String, originStory: crate::Story::Story) -> Self {
         if myListItem.is_empty() {

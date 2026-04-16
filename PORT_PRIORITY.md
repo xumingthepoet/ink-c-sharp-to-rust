@@ -45,7 +45,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 29. `NativeFunctionCall.cs` (`deps=7`) [partial: reason=builtin/operator name detection is now real, but the call evaluator, coercion rules, and native operation table execution are still stubbed; missing=Call parameter validation, type coercion, operation dispatch, and result creation; next=port the native function evaluator and value operation machinery]
 30. `CallStack.cs` (`deps=8`) [partial: reason=the stack/thread mechanics and temporary-variable storage are now real, but story-root initialization and JSON reconstruction still depend on the unported Story/save-state graph; missing=root pointer setup, SetJsonToken/WriteJson parity, and full thread save-load recovery; next=port the runtime Story and Json serialisation plumbing]
 31. `VariablesState.cs` (`deps=9`) [partial: reason=global variable lookup, assignment, patch application, and batch observation are now real, but observer callbacks, JSON state reconstruction, and story-level integration still depend on the unported Story/StoryState plumbing; missing=variableChangedEvent handling, SetJsonToken/WriteJson parity, and full default-global snapshot/load wiring; next=port the runtime Story and StoryState save/load graph]
-32. `JsonSerialisation.cs` (`deps=19`)
+32. `JsonSerialisation.cs` (`deps=19`) [partial: reason=runtime object and choice JSON encoding/decoding are now real, but flow/callstack/story save-load still depend on the unported StoryState/Story graph and several runtime object ancestry paths; missing=full Flow.WriteJson/SetJsonToken, CallStack JSON reconstruction, and story-state roundtrip wiring; next=port the story/save-state graph and remaining runtime ancestry helpers]
 33. `StoryState.cs` (`deps=20`)
 34. `Story.cs` (`deps=29`)
 

@@ -1,9 +1,16 @@
 // Source: ink-c-sharp/ink-engine-runtime/Container.cs
 
+use crate::Choice::Choice;
+use crate::ChoicePoint::ChoicePoint;
 use crate::ControlCommand::ControlCommand;
+use crate::Divert::Divert;
+use crate::Glue::Glue;
+use crate::NativeFunctionCall::NativeFunctionCall;
 use crate::Path::{Component, Path};
 use crate::SearchResult::{SearchResult, SearchResultObject};
+use crate::Tag::Tag;
 use crate::Value::{ListValue, StringValue, Value};
+use crate::VariableAssignment::VariableAssignment;
 use crate::VariableReference::VariableReference;
 use crate::Void::Void;
 use std::collections::HashMap;
@@ -15,6 +22,13 @@ pub enum ContentItem {
     Void(Void),
     Container(Box<Container>),
     VariableReference(VariableReference),
+    Divert(Divert),
+    ChoicePoint(ChoicePoint),
+    Glue(Glue),
+    NativeFunctionCall(NativeFunctionCall),
+    VariableAssignment(VariableAssignment),
+    Tag(Tag),
+    Choice(Choice),
 }
 
 impl From<Value> for ContentItem {
@@ -56,6 +70,48 @@ impl From<Container> for ContentItem {
 impl From<VariableReference> for ContentItem {
     fn from(value: VariableReference) -> Self {
         Self::VariableReference(value)
+    }
+}
+
+impl From<Divert> for ContentItem {
+    fn from(value: Divert) -> Self {
+        Self::Divert(value)
+    }
+}
+
+impl From<ChoicePoint> for ContentItem {
+    fn from(value: ChoicePoint) -> Self {
+        Self::ChoicePoint(value)
+    }
+}
+
+impl From<Glue> for ContentItem {
+    fn from(value: Glue) -> Self {
+        Self::Glue(value)
+    }
+}
+
+impl From<NativeFunctionCall> for ContentItem {
+    fn from(value: NativeFunctionCall) -> Self {
+        Self::NativeFunctionCall(value)
+    }
+}
+
+impl From<VariableAssignment> for ContentItem {
+    fn from(value: VariableAssignment) -> Self {
+        Self::VariableAssignment(value)
+    }
+}
+
+impl From<Tag> for ContentItem {
+    fn from(value: Tag) -> Self {
+        Self::Tag(value)
+    }
+}
+
+impl From<Choice> for ContentItem {
+    fn from(value: Choice) -> Self {
+        Self::Choice(value)
     }
 }
 
@@ -264,6 +320,41 @@ impl Container {
                     result.push_str(&reference.ToString());
                     result.push('\n');
                 }
+                ContentItem::Divert(divert) => {
+                    result.push_str("    ");
+                    result.push_str(&divert.ToString());
+                    result.push('\n');
+                }
+                ContentItem::ChoicePoint(choice) => {
+                    result.push_str("    ");
+                    result.push_str(&choice.ToString());
+                    result.push('\n');
+                }
+                ContentItem::Glue(glue) => {
+                    result.push_str("    ");
+                    result.push_str(&glue.ToString());
+                    result.push('\n');
+                }
+                ContentItem::NativeFunctionCall(call) => {
+                    result.push_str("    ");
+                    result.push_str(&call.ToString());
+                    result.push('\n');
+                }
+                ContentItem::VariableAssignment(var) => {
+                    result.push_str("    ");
+                    result.push_str(&var.ToString());
+                    result.push('\n');
+                }
+                ContentItem::Tag(tag) => {
+                    result.push_str("    ");
+                    result.push_str(&tag.ToString());
+                    result.push('\n');
+                }
+                ContentItem::Choice(choice) => {
+                    result.push_str("    ");
+                    result.push_str(choice.get_pathStringOnChoice().as_deref().unwrap_or(""));
+                    result.push('\n');
+                }
             }
         }
 
@@ -288,6 +379,15 @@ impl Container {
     // C# signature: List<Runtime.Object> content { get; }
     pub fn get_content(&self) -> &[ContentItem] {
         &self.content
+    }
+
+    // C# signature: Dictionary<string, Runtime.Object> namedContent { get; }
+    pub fn get_namedContent(&self) -> &HashMap<String, ContentItem> {
+        &self.named_content
+    }
+
+    pub fn set_namedContent(&mut self, named_content: HashMap<String, ContentItem>) {
+        self.named_content = named_content;
     }
 
     // C# signature: bool visitsShouldBeCounted { get; }
@@ -315,6 +415,16 @@ impl Container {
     // C# signature: bool hasValidName { get; }
     pub fn get_hasValidName(&self) -> bool {
         !self.get_name().is_empty()
+    }
+
+    pub fn set_name(&mut self, name: Option<String>) {
+        self.name = name;
+    }
+
+    pub fn set_countFlags(&mut self, countFlags: i32) {
+        self.visitsShouldBeCounted = (countFlags & 1) != 0;
+        self.turnIndexShouldBeCounted = (countFlags & 2) != 0;
+        self.countingAtStartOnly = (countFlags & 4) != 0;
     }
 
     // C# signature: Path pathToFirstLeafContent { get; }

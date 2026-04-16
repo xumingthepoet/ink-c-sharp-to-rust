@@ -33,7 +33,7 @@ impl ChoicePoint {
     }
 
     // C# signature: public override string ToString ()
-    pub fn ToString(&mut self) -> String {
+    pub fn ToString(&self) -> String {
         match self.pathOnChoice.as_ref() {
             Some(path) => format!("Choice: -> {}", path),
             None => "Choice: -> ".to_string(),
@@ -53,7 +53,7 @@ impl ChoicePoint {
     }
 
     // C# signature: string pathStringOnChoice { get; }
-    pub fn get_pathStringOnChoice(&mut self) -> String {
+    pub fn get_pathStringOnChoice(&self) -> String {
         self.pathOnChoice
             .as_ref()
             .map(ToString::to_string)
