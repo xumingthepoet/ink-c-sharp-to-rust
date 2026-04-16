@@ -20,12 +20,28 @@ impl ConstantDeclaration {
     }
 
     // C# signature: public override Runtime.Object GenerateRuntimeObject ()
-    pub fn GenerateRuntimeObject(&mut self) -> crate::stub::PortStub {
-        crate::stub::PortStub::default()
+    pub fn GenerateRuntimeObject(&mut self) -> Option<()> {
+        None
     }
 
     // C# signature: public override void ResolveReferences (Story context)
-    pub fn ResolveReferences(&mut self, _context: Story) {}
+    pub fn ResolveReferences(&mut self, context: &mut Story) {
+        if let Some(identifier) = self.constantIdentifier.clone() {
+            context.CheckForNamingCollisions(
+                Default::default(),
+                identifier,
+                crate::ParsedHierarchy::Story::SymbolType::Var,
+                String::new(),
+            );
+        }
+
+        if let (Some(name), Some(expression)) = (
+            self.get_constantName().map(|s| s.to_string()),
+            self.expression.clone(),
+        ) {
+            context.register_constant(name, expression);
+        }
+    }
 
     // C# signature: string constantName { get; }
     pub fn get_constantName(&self) -> Option<&str> {

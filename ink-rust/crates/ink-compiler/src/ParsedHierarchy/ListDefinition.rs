@@ -124,12 +124,27 @@ impl ListDefinition {
         )
     }
 
+    // C# signature: string name { get; }
+    pub fn get_name(&self) -> Option<&str> {
+        self.identifier_name()
+    }
+
     // C# signature: string typeName { get; }
     pub fn get_typeName(&self) -> String {
         "List definition".to_string()
     }
 
-    pub fn ResolveReferences(&mut self, _context: Story) {}
+    pub fn ResolveReferences(&mut self, context: &mut Story) {
+        if let Some(identifier) = self.identifier.clone() {
+            context.CheckForNamingCollisions(
+                Default::default(),
+                identifier,
+                crate::ParsedHierarchy::Story::SymbolType::List,
+                String::new(),
+            );
+        }
+        context.register_list_definition(self.clone());
+    }
 }
 
 impl ListElementDefinition {

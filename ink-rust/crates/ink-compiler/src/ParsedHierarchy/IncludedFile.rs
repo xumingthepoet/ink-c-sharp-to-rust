@@ -14,8 +14,8 @@ impl IncludedFile {
     }
 
     // C# signature: public override Runtime.Object GenerateRuntimeObject ()
-    pub fn GenerateRuntimeObject(&mut self) -> crate::stub::PortStub {
-        crate::stub::PortStub::default()
+    pub fn GenerateRuntimeObject(&mut self) -> Option<()> {
+        None
     }
 
     // C# signature: Parsed.Story includedStory { get; }
