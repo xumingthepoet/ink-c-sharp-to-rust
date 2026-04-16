@@ -26,7 +26,39 @@ impl NativeFunctionCall {
 
     // C# signature: public static bool CallExistsWithName(string functionName)
     pub fn CallExistsWithName(_functionName: String) -> bool {
-        Default::default()
+        matches!(
+            _functionName.as_str(),
+            "+" | "-"
+                | "/"
+                | "*"
+                | "%"
+                | "_"
+                | "=="
+                | ">"
+                | "<"
+                | ">="
+                | "<="
+                | "!="
+                | "!"
+                | "&&"
+                | "||"
+                | "MIN"
+                | "MAX"
+                | "POW"
+                | "FLOOR"
+                | "CEILING"
+                | "INT"
+                | "FLOAT"
+                | "?"
+                | "!?"
+                | "^"
+                | "LIST_MIN"
+                | "LIST_MAX"
+                | "LIST_ALL"
+                | "LIST_COUNT"
+                | "LIST_VALUE"
+                | "LIST_INVERT"
+        )
     }
 
     // C# signature: public Runtime.Object Call(List<Runtime.Object> parameters)
@@ -47,5 +79,21 @@ impl NativeFunctionCall {
     // C# signature: int numberOfParameters { get; }
     pub fn get_numberOfParameters(&mut self) -> i32 {
         Default::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NativeFunctionCall;
+
+    #[test]
+    fn recognizes_native_function_names() {
+        assert!(NativeFunctionCall::CallExistsWithName("+".to_string()));
+        assert!(NativeFunctionCall::CallExistsWithName(
+            "LIST_VALUE".to_string()
+        ));
+        assert!(!NativeFunctionCall::CallExistsWithName(
+            "CHOICE_COUNT".to_string()
+        ));
     }
 }

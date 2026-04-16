@@ -42,7 +42,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 26. `Divert.cs` (`deps=5`)
 27. `Object.cs` (`deps=5`)
 28. `Flow.cs` (`deps=6`)
-29. `NativeFunctionCall.cs` (`deps=7`)
+29. `NativeFunctionCall.cs` (`deps=7`) [partial: reason=builtin/operator name detection is now real, but the call evaluator, coercion rules, and native operation table execution are still stubbed; missing=Call parameter validation, type coercion, operation dispatch, and result creation; next=port the native function evaluator and value operation machinery]
 30. `CallStack.cs` (`deps=8`)
 31. `VariablesState.cs` (`deps=9`)
 32. `JsonSerialisation.cs` (`deps=19`)
@@ -111,7 +111,7 @@ Source area: `ink-c-sharp/compiler/`
 48. `ParsedHierarchy/Object.cs` (`deps=8`)
 49. `ParsedHierarchy/Path.cs` (`deps=8`)
 50. `InkParser/InkParser.cs` (`deps=9`)
-51. `ParsedHierarchy/FunctionCall.cs` (`deps=9`)
+51. `ParsedHierarchy/FunctionCall.cs` (`deps=9`) [partial: reason=builtin name detection is now real, but proxy divert generation, native function generation, and special-case argument handling are still stubbed; missing=GenerateIntoContainer, ResolveReferences, and the runtime/linkage-backed properties; next=port the full function-call generation path]
 52. `ParsedHierarchy/VariableReference.cs` (`deps=9`)
 53. `InkParser/InkParser_Statements.cs` (`deps=10`)
 54. `ParsedHierarchy/Divert.cs` (`deps=10`)

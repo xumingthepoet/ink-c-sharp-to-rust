@@ -4,6 +4,7 @@ use crate::ParsedHierarchy::ConstantDeclaration::ConstantDeclaration;
 use crate::ParsedHierarchy::Expression::Expression;
 use crate::ParsedHierarchy::ExternalDeclaration::ExternalDeclaration;
 use crate::ParsedHierarchy::FlowLevel::FlowLevel;
+use crate::ParsedHierarchy::FunctionCall::FunctionCall;
 use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::ListDefinition::{ListDefinition, ListElementDefinition};
 use std::collections::HashMap;
@@ -56,7 +57,7 @@ impl Story {
 
     // C# signature: public ListElementDefinition ResolveListItem (string listName, string itemName, Parsed.Object source = null)
     pub fn ResolveListItem(
-        &self,
+        &mut self,
         listName: String,
         itemName: String,
         _source: crate::stub::PortStub,
@@ -67,16 +68,33 @@ impl Story {
         }
 
         let mut found_item: Option<ListElementDefinition> = None;
+        let mut found_list_name: Option<String> = None;
+        let mut ambiguity: Option<(String, String)> = None;
 
         for (_named_list, list) in &self.listDefs {
             let mut list = list.clone();
+            let list_name = list.get_name().unwrap_or("").to_string();
             if let Some(item) = list.ItemNamed(itemName.clone()) {
                 if found_item.is_some() {
-                    return None;
+                    ambiguity = Some((found_list_name.clone().unwrap_or_default(), list_name));
+                    break;
                 }
 
+                found_list_name = Some(list_name);
                 found_item = Some(item.clone());
             }
+        }
+
+        if let Some((first, second)) = ambiguity {
+            self.Error(
+                format!(
+                    "Ambiguous item name '{}' found in multiple sets, including {} and {}",
+                    itemName, first, second
+                ),
+                Default::default(),
+                false,
+            );
+            return None;
         }
 
         found_item
@@ -160,12 +178,26 @@ impl Story {
                 if self.listDefs.contains_key(&name)
                     || self.constants.contains_key(&name)
                     || self.externals.contains_key(&name)
+                    || FunctionCall::IsBuiltIn(name.clone())
                 {
                     self.Error(
                         format!("name '{}' has already been used", name),
                         Default::default(),
                         false,
                     );
+                }
+
+                for list_def in self.listDefs.values() {
+                    for item in &list_def.itemDefinitions {
+                        if item.get_name() == Some(name.as_str()) {
+                            self.Error(
+                                format!("name '{}' has already been used", name),
+                                Default::default(),
+                                false,
+                            );
+                            return;
+                        }
+                    }
                 }
             }
             SymbolType::Var
@@ -177,12 +209,26 @@ impl Story {
                 if self.constants.contains_key(&name)
                     || self.listDefs.contains_key(&name)
                     || self.externals.contains_key(&name)
+                    || FunctionCall::IsBuiltIn(name.clone())
                 {
                     self.Error(
                         format!("name '{}' has already been used", name),
                         Default::default(),
                         false,
                     );
+                }
+
+                for list_def in self.listDefs.values() {
+                    for item in &list_def.itemDefinitions {
+                        if item.get_name() == Some(name.as_str()) {
+                            self.Error(
+                                format!("name '{}' has already been used", name),
+                                Default::default(),
+                                false,
+                            );
+                            return;
+                        }
+                    }
                 }
             }
         }

@@ -24,8 +24,22 @@ impl FunctionCall {
     pub fn ResolveReferences(&mut self, _context: crate::stub::Story) {}
 
     // C# signature: public static bool IsBuiltIn(string name)
-    pub fn IsBuiltIn(_name: String) -> bool {
-        Default::default()
+    pub fn IsBuiltIn(name: String) -> bool {
+        if ink_runtime::NativeFunctionCall::NativeFunctionCall::CallExistsWithName(name.clone()) {
+            return true;
+        }
+
+        matches!(
+            name.as_str(),
+            "CHOICE_COUNT"
+                | "TURNS_SINCE"
+                | "TURNS"
+                | "RANDOM"
+                | "SEED_RANDOM"
+                | "LIST_VALUE"
+                | "LIST_RANDOM"
+                | "READ_COUNT"
+        )
     }
 
     // C# signature: public override string ToString ()
@@ -91,5 +105,17 @@ impl FunctionCall {
     // C# signature: bool isReadCount { get; }
     pub fn get_isReadCount(&mut self) -> bool {
         Default::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FunctionCall;
+
+    #[test]
+    fn recognizes_builtin_function_names() {
+        assert!(FunctionCall::IsBuiltIn("RANDOM".to_string()));
+        assert!(FunctionCall::IsBuiltIn("LIST_VALUE".to_string()));
+        assert!(!FunctionCall::IsBuiltIn("not_a_builtin".to_string()));
     }
 }
