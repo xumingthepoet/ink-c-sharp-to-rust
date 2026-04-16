@@ -115,6 +115,19 @@ impl From<Choice> for ContentItem {
     }
 }
 
+fn content_item_name(content: &ContentItem) -> Option<String> {
+    match content {
+        ContentItem::Container(container) => {
+            if container.get_hasValidName() {
+                Some(container.get_name().to_string())
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Container {
     content: Vec<ContentItem>,
@@ -153,7 +166,23 @@ impl Container {
 
     // C# signature: public void AddContent(Runtime.Object contentObj)
     pub fn AddContent<T: Into<ContentItem>>(&mut self, contentObj: T) {
-        self.content.push(contentObj.into());
+        let mut content = contentObj.into();
+        if let ContentItem::Container(ref mut container) = content {
+            let index = self.content.len() as i32;
+            let child_path = if container.get_hasValidName() {
+                self.path
+                    .PathByAppendingComponent(Component::new_overload_2(
+                        container.get_name().to_string(),
+                    ))
+            } else {
+                self.path.PathByAppendingComponent(Component::new(index))
+            };
+            container.set_path(child_path);
+        }
+        self.content.push(content.clone());
+        if let Some(name) = content_item_name(&content) {
+            self.named_content.insert(name, content);
+        }
     }
 
     // C# signature: public void AddContent(IList<Runtime.Object> contentList)
@@ -166,11 +195,26 @@ impl Container {
     // C# signature: public void InsertContent(Runtime.Object contentObj, int index)
     pub fn InsertContent<T: Into<ContentItem>>(&mut self, contentObj: T, index: i32) {
         let index = index.max(0) as usize;
-        let content = contentObj.into();
+        let mut content = contentObj.into();
+        if let ContentItem::Container(ref mut container) = content {
+            let child_path = if container.get_hasValidName() {
+                self.path
+                    .PathByAppendingComponent(Component::new_overload_2(
+                        container.get_name().to_string(),
+                    ))
+            } else {
+                self.path
+                    .PathByAppendingComponent(Component::new(index as i32))
+            };
+            container.set_path(child_path);
+        }
         if index >= self.content.len() {
-            self.content.push(content);
+            self.content.push(content.clone());
         } else {
-            self.content.insert(index, content);
+            self.content.insert(index, content.clone());
+        }
+        if let Some(name) = content_item_name(&content) {
+            self.named_content.insert(name, content);
         }
     }
 
@@ -182,15 +226,19 @@ impl Container {
     // C# signature: public void AddToNamedContentOnly(INamedContent namedContentObj)
     pub fn AddToNamedContentOnly<T: Into<ContentItem>>(&mut self, namedContentObj: T) {
         let content = namedContentObj.into();
-        if let Some(name) = self.name.clone() {
+        if let Some(name) = content_item_name(&content) {
             self.named_content.insert(name, content);
         }
     }
 
     // C# signature: public void AddContentsOfContainer(Container otherContainer)
     pub fn AddContentsOfContainer(&mut self, otherContainer: Container) {
-        self.content.extend(otherContainer.content);
-        self.named_content.extend(otherContainer.named_content);
+        for content in otherContainer.content {
+            self.AddContent(content);
+        }
+        for (_, named_content) in otherContainer.named_content {
+            self.AddToNamedContentOnly(named_content);
+        }
     }
 
     // C# signature: protected Runtime.Object ContentWithPathComponent(Path.Component component)

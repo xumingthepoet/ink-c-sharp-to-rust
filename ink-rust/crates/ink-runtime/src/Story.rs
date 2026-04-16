@@ -5,9 +5,14 @@ use crate::stub::*;
 use crate::Container::Container;
 use crate::ListDefinition::ListDefinition;
 use crate::ListDefinitionsOrigin::ListDefinitionsOrigin;
+use crate::Path::Path;
+use crate::Pointer::Pointer;
+use crate::Profiler::Profiler;
+use crate::SearchResult::SearchResult;
 
 #[derive(Clone, Debug, Default)]
 pub struct Story {
+    main_content_container: Container,
     listDefinitions: ListDefinitionsOrigin,
     pub _port_marker: (),
 }
@@ -32,6 +37,7 @@ impl Story {
     // C# signature: public Story (Container contentContainer, List<Runtime.ListDefinition> lists = null)
     pub fn new(_contentContainer: Container, lists: Vec<ListDefinition>) -> Self {
         Self {
+            main_content_container: _contentContainer,
             listDefinitions: ListDefinitionsOrigin::new(lists),
             _port_marker: (),
         }
@@ -43,8 +49,8 @@ impl Story {
     }
 
     // C# signature: public Profiler StartProfiling()
-    pub fn StartProfiling(&mut self) -> crate::stub::Profiler {
-        Default::default()
+    pub fn StartProfiling(&mut self) -> Profiler {
+        Profiler::new()
     }
 
     // C# signature: public void EndProfiling()
@@ -87,18 +93,63 @@ impl Story {
     }
 
     // C# signature: public SearchResult ContentAtPath(Path path)
-    pub fn ContentAtPath(&mut self, _path: crate::stub::Path) -> crate::stub::SearchResult {
-        Default::default()
+    pub fn ContentAtPath(&mut self, _path: Path) -> SearchResult {
+        self.main_content_container.ContentAtPath(_path, 0, -1)
     }
 
     // C# signature: public Runtime.Container KnotContainerWithName (string name)
-    pub fn KnotContainerWithName(&mut self, _name: String) -> crate::stub::Container {
-        Default::default()
+    pub fn KnotContainerWithName(&mut self, _name: String) -> Option<Container> {
+        self.main_content_container
+            .get_namedContent()
+            .get(&_name)
+            .and_then(|content| match content {
+                crate::Container::ContentItem::Container(container) => {
+                    Some(container.as_ref().clone())
+                }
+                _ => None,
+            })
     }
 
     // C# signature: public Pointer PointerAtPath (Path path)
-    pub fn PointerAtPath(&mut self, _path: crate::stub::Path) -> crate::stub::Pointer {
-        Default::default()
+    pub fn PointerAtPath(&mut self, _path: Path) -> Pointer {
+        if _path.get_length() == 0 {
+            return Pointer::Null();
+        }
+
+        let mut path_length_to_use = _path.get_length();
+        let result = if _path
+            .get_lastComponent()
+            .map(|component| component.get_isIndex())
+            .unwrap_or(false)
+        {
+            path_length_to_use -= 1;
+            self.main_content_container
+                .ContentAtPath(_path.clone(), 0, path_length_to_use)
+        } else {
+            self.main_content_container
+                .ContentAtPath(_path.clone(), 0, -1)
+        };
+
+        let mut pointer = if let Some(container) = result.get_container() {
+            Pointer::StartOf(container.clone())
+        } else {
+            Pointer::Null()
+        };
+
+        if _path
+            .get_lastComponent()
+            .map(|component| component.get_isIndex())
+            .unwrap_or(false)
+        {
+            pointer.index = _path
+                .get_lastComponent()
+                .map(|component| component.get_index())
+                .unwrap_or(-1);
+        } else {
+            pointer.index = -1;
+        }
+
+        pointer
     }
 
     // C# signature: public StoryState CopyStateForBackgroundThreadSave()
@@ -126,7 +177,7 @@ impl Story {
 
     // C# signature: public bool HasFunction (string functionName)
     pub fn HasFunction(&mut self, _functionName: String) -> bool {
-        Default::default()
+        self.KnotContainerWithName(_functionName).is_some()
     }
 
     // C# signature: public object EvaluateFunction (string functionName, params object [] arguments)
@@ -325,7 +376,37 @@ impl Story {
     }
 
     // C# signature: Container mainContentContainer { get; }
-    pub fn get_mainContentContainer(&mut self) -> crate::stub::Container {
-        Default::default()
+    pub fn get_mainContentContainer(&mut self) -> Container {
+        self.main_content_container.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Story;
+    use crate::Container::Container;
+    use crate::ControlCommand::ControlCommand;
+    use crate::Path::{Component, Path};
+
+    #[test]
+    fn resolves_root_content_and_named_functions() {
+        let mut root = Container::new();
+        let mut knot = Container::new();
+        knot.set_name(Some("knot".to_string()));
+        knot.AddContent(ControlCommand::BeginString());
+        root.AddContent(knot);
+
+        let mut story = Story::new(root, Vec::new());
+
+        assert!(story.HasFunction("knot".to_string()));
+        assert!(story
+            .ContentAtPath(Path::new_overload_3(vec![Component::new(0)], false))
+            .get_container()
+            .is_some());
+        assert!(story
+            .PointerAtPath(Path::new_overload_3(vec![Component::new(0)], false))
+            .get_path()
+            .is_some());
+        assert!(story.get_mainContentContainer().get_name().is_empty());
     }
 }
