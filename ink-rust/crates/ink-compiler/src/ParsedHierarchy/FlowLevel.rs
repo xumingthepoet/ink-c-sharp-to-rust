@@ -1,17 +1,12 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/compiler/ParsedHierarchy/FlowLevel.cs
 
-use crate::stub::*;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum FlowLevel {
-    PortPlaceholder,
-}
-
-impl Default for FlowLevel {
-    fn default() -> Self {
-        Self::PortPlaceholder
-    }
+    #[default]
+    Story,
+    Knot,
+    Stitch,
+    WeavePoint,
 }
 
 impl FlowLevel {
