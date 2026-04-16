@@ -43,7 +43,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 27. `Object.cs` (`deps=5`)
 28. `Flow.cs` (`deps=6`)
 29. `NativeFunctionCall.cs` (`deps=7`) [partial: reason=builtin/operator name detection is now real, but the call evaluator, coercion rules, and native operation table execution are still stubbed; missing=Call parameter validation, type coercion, operation dispatch, and result creation; next=port the native function evaluator and value operation machinery]
-30. `CallStack.cs` (`deps=8`)
+30. `CallStack.cs` (`deps=8`) [partial: reason=the stack/thread mechanics and temporary-variable storage are now real, but story-root initialization and JSON reconstruction still depend on the unported Story/save-state graph; missing=root pointer setup, SetJsonToken/WriteJson parity, and full thread save-load recovery; next=port the runtime Story and Json serialisation plumbing]
 31. `VariablesState.cs` (`deps=9`)
 32. `JsonSerialisation.cs` (`deps=19`)
 33. `StoryState.cs` (`deps=20`)
