@@ -84,6 +84,15 @@ When moving a file out of skeleton/stub state:
 
 If a file cannot meet this standard yet, keep it as an explicit skeleton/stub. A visible stub is better than a compiling partial port that hides missing logic.
 
+If a file is too large or difficult to complete in one pass and a partial implementation must be committed:
+
+- Treat this as an exception, not the normal workflow.
+- Do not mark the file as `[ported]`.
+- Update `PORT_PRIORITY.md` in the same change with a `[partial: ...]` annotation on that file entry.
+- The annotation must state why it could not be completed, which C# behavior remains unfinished, and what dependency or next step is needed to finish it.
+- Keep the Rust code honest: unfinished methods must remain visibly stubbed or return an explicit error/todo path rather than silently returning plausible but wrong values.
+- Prefer keeping the file as a skeleton when the incomplete sections would make public APIs lie about behavior.
+
 After completing a file under this standard:
 
 - Update `PORT_PRIORITY.md` in the same change and annotate that source file's list entry as ported.
