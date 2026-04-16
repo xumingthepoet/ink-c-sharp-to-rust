@@ -53,7 +53,7 @@ The first pass is structural, not idiomatic. The goal is to use the official C# 
    - C# interfaces become Rust traits.
    - C# enums become Rust enums.
    - C# partial classes become multiple Rust files implementing the same Rust type.
-   - Function bodies may initially return empty objects, default values, `None`, empty collections, or `todo!("port pending")`.
+   - During the initial skeleton phase only, function bodies may return empty objects, default values, `None`, empty collections, or `todo!("port pending")`.
    - Constructors should initialize enough state for `cargo check` to pass, even if behavior is incomplete.
 
 3. Allow temporary non-idiomatic Rust.
@@ -67,6 +67,22 @@ The first pass is structural, not idiomatic. The goal is to use the official C# 
    - Translate behavior in small sections while preserving the original control flow where practical.
    - If Rust ownership requires helper functions or wrapper types, add them locally and keep their purpose obvious.
    - If `blade-ink-rs` suggests a simpler Rust shape, use it only after confirming it preserves official C# behavior.
+
+## File Port Completion Standard
+
+A file is not considered ported just because it compiles. A file is only ported when the corresponding C# file's behavior has been translated completely enough that it should not need another pass except for later Rustification or refactoring.
+
+When moving a file out of skeleton/stub state:
+
+- Do not leave empty logic in place. No method may keep a placeholder body such as an unconditional default value, empty collection, `None`, no-op, or fake success unless the C# implementation itself has equivalent behavior.
+- Do not omit part of a method, property, constructor, nested type, enum value, side effect, validation, exception path, cache behavior, ordering rule, or mutation just to make the file compile.
+- Do not add new logic that is not required by the official C# behavior. Helper functions are allowed only when they faithfully express the C# logic or are necessary for Rust ownership and type safety.
+- Do not replace missing dependencies with invented behavior. If a method cannot be faithfully implemented because required upstream types are still skeletons, leave this file in skeleton/stub state and document it as not ported rather than creating a partial implementation.
+- Preserve meaningful `null` behavior with `Option<T>`, thrown exceptions with `Result<T, E>` or an equivalent error path, and C# collection semantics including ordering, duplicate handling, and mutability.
+- Port nested types and related methods together when the C# file depends on their shared invariants. Avoid splitting a file into "mostly done" and "later" sections unless those sections are genuinely independent and no public method lies about its behavior.
+- Add focused tests for the completed behavior where practical, especially for edge cases, errors, ordering, and mutation.
+
+If a file cannot meet this standard yet, keep it as an explicit skeleton/stub. A visible stub is better than a compiling partial port that hides missing logic.
 
 5. Rustify only after compatibility is complete.
    - Once all ported tests pass, refactor toward idiomatic Rust.
