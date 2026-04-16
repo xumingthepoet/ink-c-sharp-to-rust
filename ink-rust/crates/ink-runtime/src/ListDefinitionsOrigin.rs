@@ -9,6 +9,7 @@ use crate::Value::ListValue;
 #[derive(Clone, Debug, Default)]
 pub struct ListDefinitionsOrigin {
     lists: HashMap<String, ListDefinition>,
+    list_order: Vec<String>,
     allUnambiguousListValueCache: HashMap<String, ListValue>,
 }
 
@@ -19,6 +20,9 @@ impl ListDefinitionsOrigin {
 
         for mut list in lists {
             let list_name = list.get_name().to_string();
+            if !origin.lists.contains_key(&list_name) {
+                origin.list_order.push(list_name.clone());
+            }
             origin.lists.insert(list_name.clone(), list.clone());
 
             for (item, val) in list.get_items().clone() {
@@ -53,7 +57,10 @@ impl ListDefinitionsOrigin {
 
     // C# signature: List<Runtime.ListDefinition> lists { get; }
     pub fn get_lists(&self) -> Vec<ListDefinition> {
-        self.lists.values().cloned().collect()
+        self.list_order
+            .iter()
+            .filter_map(|name| self.lists.get(name).cloned())
+            .collect()
     }
 }
 
@@ -66,8 +73,12 @@ mod tests {
     fn indexes_definitions_and_item_caches() {
         let mut items = HashMap::new();
         items.insert("apples".to_string(), 2);
-        let origin =
-            ListDefinitionsOrigin::new(vec![ListDefinition::new("food".to_string(), items)]);
+        let mut other_items = HashMap::new();
+        other_items.insert("beets".to_string(), 1);
+        let origin = ListDefinitionsOrigin::new(vec![
+            ListDefinition::new("food".to_string(), items),
+            ListDefinition::new("plants".to_string(), other_items),
+        ]);
 
         assert!(origin.TryListGetDefinition("food".to_string()).is_some());
         assert!(origin
@@ -76,6 +87,13 @@ mod tests {
         assert!(origin
             .FindSingleItemListWithName("food.apples".to_string())
             .is_some());
-        assert_eq!(origin.get_lists().len(), 1);
+        assert_eq!(
+            origin
+                .get_lists()
+                .into_iter()
+                .map(|list| list.get_name().to_string())
+                .collect::<Vec<_>>(),
+            vec!["food".to_string(), "plants".to_string()]
+        );
     }
 }
