@@ -6,7 +6,8 @@ Source files: 98
 Public types: 133
 Public members: 1081
 Rust implemented: 41
-Rust skeleton: 57
+Rust skeleton: 56
+Rust partial: 1
 Rust missing: 0
 
 | C# file | Rust target | Public types | Public members | Rust state |
@@ -101,7 +102,7 @@ Rust missing: 0
 | `ink-c-sharp/ink-engine-runtime/StatePatch.cs` | `ink-rust/crates/ink-runtime/src/StatePatch.rs` | 1 | 12 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/Story.cs` | `ink-rust/crates/ink-runtime/src/Story.rs` | 1 | 75 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/StoryException.cs` | `ink-rust/crates/ink-runtime/src/StoryException.rs` | 1 | 3 | implemented |
-| `ink-c-sharp/ink-engine-runtime/StoryState.cs` | `ink-rust/crates/ink-runtime/src/StoryState.rs` | 1 | 63 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/StoryState.cs` | `ink-rust/crates/ink-runtime/src/StoryState.rs` | 1 | 63 | partial |
 | `ink-c-sharp/ink-engine-runtime/StringJoinExtension.cs` | `ink-rust/crates/ink-runtime/src/StringJoinExtension.rs` | 1 | 1 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Tag.cs` | `ink-rust/crates/ink-runtime/src/Tag.rs` | 1 | 3 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Value.cs` | `ink-rust/crates/ink-runtime/src/Value.rs` | 10 | 57 | skeleton |

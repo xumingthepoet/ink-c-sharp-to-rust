@@ -46,7 +46,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 30. `CallStack.cs` (`deps=8`) [ported]
 31. `VariablesState.cs` (`deps=9`) [partial: reason=global variable lookup, assignment, patch application, and batch observation are now real, but observer callbacks, JSON state reconstruction, and story-level integration still depend on the unported Story/StoryState plumbing; missing=variableChangedEvent handling, SetJsonToken/WriteJson parity, and full default-global snapshot/load wiring; next=port the runtime Story and StoryState save/load graph]
 32. `JsonSerialisation.cs` (`deps=19`) [partial: reason=runtime object and choice JSON encoding/decoding are now real, but flow/callstack/story save-load still depend on the unported StoryState/Story graph and several runtime object ancestry paths; missing=full Flow.WriteJson/SetJsonToken, CallStack JSON reconstruction, and story-state roundtrip wiring; next=port the story/save-state graph and remaining runtime ancestry helpers]
-33. `StoryState.cs` (`deps=20`)
+33. `StoryState.cs` (`deps=20`) [partial: reason=save/load, flow switching, output stream, and function-evaluation state are now real, but the full continue/choose/evaluate surface still has unported paths and needs final parity work; missing=Continue, ContinueAsync, ContinueMaximally, ChoosePathString, ChoosePath, ChooseChoiceIndex, EvaluateFunction, external binding flow, and final story lifecycle wiring; next=finish the remaining Story/StoryState APIs and audit against the C# lifecycle]
 34. `Story.cs` (`deps=29`)
 
 Recommended runtime implementation phases:

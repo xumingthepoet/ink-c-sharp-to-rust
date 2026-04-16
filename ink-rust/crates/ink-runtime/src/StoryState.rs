@@ -1,297 +1,1278 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/StoryState.cs
 
-use crate::stub::*;
+use crate::CallStack::{CallStack, Thread};
+use crate::Choice::Choice;
+use crate::Container::{Container, ContentItem};
+use crate::ControlCommand::{CommandType, ControlCommand};
+use crate::Flow::Flow;
+use crate::Glue::Glue;
+use crate::InkList::{InkList, InkListItem};
+use crate::JsonSerialisation::Json;
+use crate::ListDefinition::ListDefinition;
+use crate::ListDefinitionsOrigin::ListDefinitionsOrigin;
+use crate::Path::Path;
+use crate::Pointer::Pointer;
+use crate::PushPop::PushPopType;
+use crate::SimpleJson::{JsonObject, JsonValue, SimpleJson, Writer};
+use crate::StatePatch::StatePatch;
+use crate::Story::Story;
+use crate::Value::{ListValue, StringValue, Value, ValueType, VariablePointerValue};
+use crate::VariablesState::VariablesState;
+use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct StoryState {
-    pub _port_marker: (),
+    story: Story,
+    currentFlow: Flow,
+    namedFlows: Option<HashMap<String, Flow>>,
+    patch: Option<StatePatch>,
+    visitCounts: HashMap<String, i32>,
+    turnIndices: HashMap<String, i32>,
+    currentErrors: Option<Vec<String>>,
+    currentWarnings: Option<Vec<String>>,
+    variablesState: VariablesState,
+    evaluationStack: Vec<ContentItem>,
+    divertedPointer: Pointer,
+    currentTurnIndex: i32,
+    storySeed: i32,
+    previousRandom: i32,
+    didSafeExit: bool,
+    currentTextCache: String,
+    currentTagsCache: Vec<String>,
+    aliveFlowNamesCache: Vec<String>,
+    outputStreamTextDirty: bool,
+    outputStreamTagsDirty: bool,
+    aliveFlowNamesDirty: bool,
+}
+
+impl Default for StoryState {
+    fn default() -> Self {
+        Self::new(Story::default())
+    }
 }
 
 impl StoryState {
+    pub const kInkSaveStateVersion: i32 = 10;
+    const kMinCompatibleLoadVersion: i32 = 8;
+    const kDefaultFlowName: &str = "DEFAULT_FLOW";
+
     // C# signature: public StoryState (Story story)
-    pub fn new(_story: crate::stub::Story) -> Self {
-        Default::default()
+    pub fn new(mut story: Story) -> Self {
+        let listDefinitions = story.get_listDefinitions();
+        let currentFlow = Flow::new(Self::kDefaultFlowName.to_string(), story.clone());
+        let variablesState = VariablesState::new(currentFlow.callStack.clone(), listDefinitions);
+
+        let mut state = Self {
+            story,
+            currentFlow,
+            namedFlows: None,
+            patch: None,
+            visitCounts: HashMap::new(),
+            turnIndices: HashMap::new(),
+            currentErrors: None,
+            currentWarnings: None,
+            variablesState,
+            evaluationStack: Vec::new(),
+            divertedPointer: Pointer::Null(),
+            currentTurnIndex: -1,
+            storySeed: 0,
+            previousRandom: 0,
+            didSafeExit: false,
+            currentTextCache: String::new(),
+            currentTagsCache: Vec::new(),
+            aliveFlowNamesCache: Vec::new(),
+            outputStreamTextDirty: true,
+            outputStreamTagsDirty: true,
+            aliveFlowNamesDirty: true,
+        };
+
+        let time_seed = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.subsec_millis() as i32)
+            .unwrap_or(0);
+        state.storySeed = (time_seed % 100).abs();
+        state.GoToStart();
+        state
     }
 
     // C# signature: public string ToJson()
     pub fn ToJson(&mut self) -> String {
-        Default::default()
+        let mut writer = Writer::new();
+        self.WriteJson(&mut writer);
+        writer.ToString()
     }
 
     // C# signature: public void ToJson(Stream stream)
-    pub fn ToJson_overload_2(&mut self, _stream: crate::stub::Stream) {}
+    pub fn ToJson_overload_2(&mut self, stream: Box<dyn std::io::Write>) {
+        let mut writer = Writer::new_overload_2(stream);
+        self.WriteJson(&mut writer);
+    }
 
     // C# signature: public void LoadJson(string json)
-    pub fn LoadJson(&mut self, _json: String) {}
+    pub fn LoadJson(&mut self, json: String) {
+        let jObject = SimpleJson::TextToDictionary(json)
+            .unwrap_or_else(|err| panic!("Failed to parse story state JSON: {}", err));
+        self.LoadJsonObj(jObject);
+    }
 
     // C# signature: public int VisitCountAtPathString(string pathString)
-    pub fn VisitCountAtPathString(&mut self, _pathString: String) -> i32 {
-        Default::default()
+    pub fn VisitCountAtPathString(&mut self, pathString: String) -> i32 {
+        if let Some(patch) = &self.patch {
+            let result = self
+                .story
+                .ContentAtPath(Path::new_overload_4(pathString.clone()));
+            if let Some(container) = result.get_container().cloned() {
+                let mut visitCountOut = 0;
+                if patch.TryGetVisitCount(container, &mut visitCountOut) {
+                    return visitCountOut;
+                }
+            }
+        }
+
+        self.visitCounts.get(&pathString).copied().unwrap_or(0)
     }
 
     // C# signature: public int VisitCountForContainer(Container container)
-    pub fn VisitCountForContainer(&mut self, _container: crate::stub::Container) -> i32 {
-        Default::default()
+    pub fn VisitCountForContainer(&mut self, container: Container) -> i32 {
+        if !container.get_visitsShouldBeCounted() {
+            self.story.Error(
+                format!(
+                    "Read count for target ({} - on {:?}) unknown.",
+                    container.get_name(),
+                    container
+                ),
+                false,
+            );
+            return 0;
+        }
+
+        if let Some(patch) = &self.patch {
+            let mut count = 0;
+            if patch.TryGetVisitCount(container.clone(), &mut count) {
+                return count;
+            }
+        }
+
+        self.visitCounts
+            .get(&container.get_path().ToString())
+            .copied()
+            .unwrap_or(0)
     }
 
     // C# signature: public void IncrementVisitCountForContainer(Container container)
-    pub fn IncrementVisitCountForContainer(&mut self, _container: crate::stub::Container) {}
+    pub fn IncrementVisitCountForContainer(&mut self, container: Container) {
+        let currCount = self.VisitCountForContainer(container.clone()) + 1;
+        if let Some(patch) = &mut self.patch {
+            patch.SetVisitCount(container, currCount);
+            return;
+        }
+
+        let key = container.get_path().ToString();
+        let count = self.visitCounts.get(&key).copied().unwrap_or(0) + 1;
+        self.visitCounts.insert(key, count);
+    }
 
     // C# signature: public void RecordTurnIndexVisitToContainer(Container container)
-    pub fn RecordTurnIndexVisitToContainer(&mut self, _container: crate::stub::Container) {}
+    pub fn RecordTurnIndexVisitToContainer(&mut self, container: Container) {
+        if let Some(patch) = &mut self.patch {
+            patch.SetTurnIndex(container, self.currentTurnIndex);
+            return;
+        }
+
+        self.turnIndices
+            .insert(container.get_path().ToString(), self.currentTurnIndex);
+    }
 
     // C# signature: public int TurnsSinceForContainer(Container container)
-    pub fn TurnsSinceForContainer(&mut self, _container: crate::stub::Container) -> i32 {
-        Default::default()
+    pub fn TurnsSinceForContainer(&mut self, container: Container) -> i32 {
+        if !container.get_turnIndexShouldBeCounted() {
+            self.story.Error(
+                format!(
+                    "TURNS_SINCE() for target ({} - on {:?}) unknown.",
+                    container.get_name(),
+                    container
+                ),
+                false,
+            );
+        }
+
+        if let Some(patch) = &self.patch {
+            let mut index = 0;
+            if patch.TryGetTurnIndex(container.clone(), &mut index) {
+                return self.currentTurnIndex - index;
+            }
+        }
+
+        let key = container.get_path().ToString();
+        self.turnIndices
+            .get(&key)
+            .map(|index| self.currentTurnIndex - *index)
+            .unwrap_or(-1)
     }
 
     // C# signature: public string CleanOutputWhitespace(string str)
-    pub fn CleanOutputWhitespace(&mut self, _str: String) -> String {
-        Default::default()
+    pub fn CleanOutputWhitespace(&self, str: String) -> String {
+        let mut sb = String::with_capacity(str.len());
+        let mut currentWhitespaceStart = -1;
+        let mut startOfLine = 0;
+
+        for (i, c) in str.chars().enumerate() {
+            let isInlineWhitespace = c == ' ' || c == '\t';
+            if isInlineWhitespace && currentWhitespaceStart == -1 {
+                currentWhitespaceStart = i as i32;
+            }
+
+            if !isInlineWhitespace {
+                if c != '\n' && currentWhitespaceStart > 0 && currentWhitespaceStart != startOfLine
+                {
+                    sb.push(' ');
+                }
+                currentWhitespaceStart = -1;
+            }
+
+            if c == '\n' {
+                startOfLine = i as i32 + 1;
+            }
+
+            if !isInlineWhitespace {
+                sb.push(c);
+            }
+        }
+
+        sb
     }
 
     // C# signature: public void GoToStart()
-    pub fn GoToStart(&mut self) {}
+    pub fn GoToStart(&mut self) {
+        self.currentFlow.callStack.currentThread_mut().callstack[0].currentPointer =
+            Pointer::StartOf(self.story.get_mainContentContainer());
+    }
 
     // C# signature: internal void SwitchFlow_Internal(string flowName)
-    pub fn SwitchFlow_Internal(&mut self, _flowName: String) {}
+    pub fn SwitchFlow_Internal(&mut self, flowName: String) {
+        if flowName.is_empty() {
+            panic!("Must pass a non-null string to Story.SwitchFlow");
+        }
+
+        if self.namedFlows.is_none() {
+            let mut named_flows = HashMap::new();
+            named_flows.insert(Self::kDefaultFlowName.to_string(), self.currentFlow.clone());
+            self.namedFlows = Some(named_flows);
+        }
+
+        if flowName == self.currentFlow.name {
+            return;
+        }
+
+        let flow = if let Some(named) = self.namedFlows.as_mut() {
+            named.entry(flowName.clone()).or_insert_with(|| {
+                self.aliveFlowNamesDirty = true;
+                Flow::new(flowName.clone(), self.story.clone())
+            });
+            named.get(&flowName).cloned().unwrap()
+        } else {
+            Flow::new(flowName.clone(), self.story.clone())
+        };
+
+        self.currentFlow = flow;
+        self.variablesState
+            .set_callStack(self.currentFlow.callStack.clone());
+        self.OutputStreamDirty();
+    }
 
     // C# signature: internal void SwitchToDefaultFlow_Internal()
-    pub fn SwitchToDefaultFlow_Internal(&mut self) {}
+    pub fn SwitchToDefaultFlow_Internal(&mut self) {
+        if self.namedFlows.is_none() {
+            return;
+        }
+        self.SwitchFlow_Internal(Self::kDefaultFlowName.to_string());
+    }
 
     // C# signature: internal void RemoveFlow_Internal(string flowName)
-    pub fn RemoveFlow_Internal(&mut self, _flowName: String) {}
+    pub fn RemoveFlow_Internal(&mut self, flowName: String) {
+        if flowName.is_empty() {
+            panic!("Must pass a non-null string to Story.DestroyFlow");
+        }
+        if flowName == Self::kDefaultFlowName {
+            panic!("Cannot destroy default flow");
+        }
+
+        if self.currentFlow.name == flowName {
+            self.SwitchToDefaultFlow_Internal();
+        }
+
+        if let Some(named) = self.namedFlows.as_mut() {
+            named.remove(&flowName);
+            self.aliveFlowNamesDirty = true;
+        }
+    }
 
     // C# signature: public StoryState CopyAndStartPatching(bool forBackgroundSave)
-    pub fn CopyAndStartPatching(&mut self, _forBackgroundSave: bool) -> crate::stub::StoryState {
-        Default::default()
+    pub fn CopyAndStartPatching(&mut self, _forBackgroundSave: bool) -> StoryState {
+        let mut copy = StoryState::new(self.story.clone());
+        copy.patch = Some(StatePatch::new(self.patch.clone().unwrap_or_default()));
+        copy.currentFlow = self.currentFlow.clone();
+        copy.currentFlow.callStack = CallStack::new_overload_2(self.currentFlow.callStack.clone());
+        copy.currentFlow.outputStream = self.currentFlow.outputStream.clone();
+        copy.currentFlow.currentChoices = self
+            .currentFlow
+            .currentChoices
+            .iter()
+            .map(|choice| choice.Clone())
+            .collect();
+        copy.variablesState = self.variablesState.clone();
+        copy.variablesState
+            .set_callStack(copy.currentFlow.callStack.clone());
+        copy.variablesState.patch = copy.patch.clone();
+        copy.evaluationStack = self.evaluationStack.clone();
+        copy.divertedPointer = self.divertedPointer.clone();
+        copy.currentTurnIndex = self.currentTurnIndex;
+        copy.storySeed = self.storySeed;
+        copy.previousRandom = self.previousRandom;
+        copy.didSafeExit = self.didSafeExit;
+        copy.visitCounts = self.visitCounts.clone();
+        copy.turnIndices = self.turnIndices.clone();
+        if let Some(named) = &self.namedFlows {
+            copy.namedFlows = Some(named.clone());
+        }
+        copy.currentErrors = self.currentErrors.clone();
+        copy.currentWarnings = self.currentWarnings.clone();
+        copy.OutputStreamDirty();
+        copy
     }
 
     // C# signature: public void RestoreAfterPatch()
-    pub fn RestoreAfterPatch(&mut self) {}
+    pub fn RestoreAfterPatch(&mut self) {
+        self.variablesState.set_callStack(self.get_callStack());
+        self.variablesState.patch = self.patch.clone();
+    }
 
     // C# signature: public void ApplyAnyPatch()
-    pub fn ApplyAnyPatch(&mut self) {}
+    pub fn ApplyAnyPatch(&mut self) {
+        if self.patch.is_none() {
+            return;
+        }
+
+        self.variablesState.ApplyPatch();
+
+        if let Some(patch) = &self.patch {
+            for (pathToCount, newCount) in patch.get_visitCounts() {
+                self.visitCounts.insert(pathToCount.ToString(), *newCount);
+            }
+            for (pathToIndex, newCount) in patch.get_turnIndices() {
+                self.turnIndices.insert(pathToIndex.ToString(), *newCount);
+            }
+        }
+
+        self.patch = None;
+    }
 
     // C# signature: public void ResetErrors()
-    pub fn ResetErrors(&mut self) {}
+    pub fn ResetErrors(&mut self) {
+        self.currentErrors = None;
+        self.currentWarnings = None;
+    }
 
     // C# signature: public void ResetOutput(List<Runtime.Object> objs = null)
-    pub fn ResetOutput(&mut self, _objs: Vec<crate::stub::PortStub>) {}
+    pub fn ResetOutput(&mut self, objs: Vec<ContentItem>) {
+        self.currentFlow.outputStream.clear();
+        self.currentFlow.outputStream.extend(objs);
+        self.OutputStreamDirty();
+    }
 
     // C# signature: public void PushToOutputStream(Runtime.Object obj)
-    pub fn PushToOutputStream(&mut self, _obj: crate::stub::PortStub) {}
+    pub fn PushToOutputStream(&mut self, obj: ContentItem) {
+        if let ContentItem::Value(Value::String(text)) = &obj {
+            if let Some(listText) = self.TrySplittingHeadTailWhitespace(text) {
+                for textObj in listText {
+                    self.PushToOutputStreamIndividual(ContentItem::Value(Value::String(
+                        StringValue::new(textObj),
+                    )));
+                }
+                self.OutputStreamDirty();
+                return;
+            }
+        }
+
+        self.PushToOutputStreamIndividual(obj);
+        self.OutputStreamDirty();
+    }
 
     // C# signature: public void PopFromOutputStream (int count)
-    pub fn PopFromOutputStream(&mut self, _count: i32) {}
+    pub fn PopFromOutputStream(&mut self, count: i32) {
+        let len = self.currentFlow.outputStream.len();
+        self.currentFlow
+            .outputStream
+            .truncate(len.saturating_sub(count as usize));
+        self.OutputStreamDirty();
+    }
+
+    fn TrySplittingHeadTailWhitespace(&self, single: &StringValue) -> Option<Vec<String>> {
+        let str = &single.value;
+        let mut headFirstNewlineIdx = -1;
+        let mut headLastNewlineIdx = -1;
+        for (i, c) in str.chars().enumerate() {
+            if c == '\n' {
+                if headFirstNewlineIdx == -1 {
+                    headFirstNewlineIdx = i as i32;
+                }
+                headLastNewlineIdx = i as i32;
+            } else if c == ' ' || c == '\t' {
+                continue;
+            } else {
+                break;
+            }
+        }
+
+        let mut tailLastNewlineIdx = -1;
+        let mut tailFirstNewlineIdx = -1;
+        for (offset, c) in str.chars().rev().enumerate() {
+            let i = str.len().saturating_sub(offset + 1) as i32;
+            if c == '\n' {
+                if tailLastNewlineIdx == -1 {
+                    tailLastNewlineIdx = i;
+                }
+                tailFirstNewlineIdx = i;
+            } else if c == ' ' || c == '\t' {
+                continue;
+            } else {
+                break;
+            }
+        }
+
+        if headFirstNewlineIdx == -1 && tailLastNewlineIdx == -1 {
+            return None;
+        }
+
+        let mut listTexts = Vec::new();
+        let mut innerStrStart = 0usize;
+        let mut innerStrEnd = str.len();
+
+        if headFirstNewlineIdx != -1 {
+            if headFirstNewlineIdx > 0 {
+                listTexts.push(str[..headFirstNewlineIdx as usize].to_string());
+            }
+            listTexts.push("\n".to_string());
+            innerStrStart = (headLastNewlineIdx + 1) as usize;
+        }
+
+        if tailLastNewlineIdx != -1 {
+            innerStrEnd = tailFirstNewlineIdx as usize;
+        }
+
+        if innerStrEnd > innerStrStart {
+            listTexts.push(str[innerStrStart..innerStrEnd].to_string());
+        }
+
+        if tailLastNewlineIdx != -1 && tailFirstNewlineIdx > headLastNewlineIdx {
+            listTexts.push("\n".to_string());
+            if tailLastNewlineIdx < str.len() as i32 - 1 {
+                listTexts.push(str[(tailLastNewlineIdx as usize + 1)..].to_string());
+            }
+        }
+
+        Some(listTexts)
+    }
+
+    fn PushToOutputStreamIndividual(&mut self, obj: ContentItem) {
+        let glue = matches!(obj, ContentItem::Glue(_));
+        let text = match &obj {
+            ContentItem::Value(Value::String(text)) => Some(text.clone()),
+            _ => None,
+        };
+
+        let mut includeInOutput = true;
+
+        if glue {
+            self.TrimNewlinesFromOutputStream();
+            includeInOutput = true;
+        } else if let Some(text) = text.as_ref() {
+            let mut functionTrimIndex = -1;
+            let currEl = self.currentFlow.callStack.currentElement().clone();
+            if currEl.r#type == PushPopType::Function {
+                functionTrimIndex = currEl.functionStartInOuputStream;
+            }
+
+            let mut glueTrimIndex = -1;
+            for i in (0..self.currentFlow.outputStream.len()).rev() {
+                match &self.currentFlow.outputStream[i] {
+                    ContentItem::Glue(_) => {
+                        glueTrimIndex = i as i32;
+                        break;
+                    }
+                    ContentItem::ControlCommand(cmd)
+                        if cmd.get_commandType() == CommandType::BeginString =>
+                    {
+                        if i as i32 >= functionTrimIndex {
+                            functionTrimIndex = -1;
+                        }
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+
+            let trimIndex = if glueTrimIndex != -1 && functionTrimIndex != -1 {
+                glueTrimIndex.min(functionTrimIndex)
+            } else if glueTrimIndex != -1 {
+                glueTrimIndex
+            } else {
+                functionTrimIndex
+            };
+
+            if trimIndex != -1 {
+                let is_newline = text.value == "\n";
+                if is_newline {
+                    includeInOutput = false;
+                } else if !text.value.trim().is_empty() {
+                    if glueTrimIndex > -1 {
+                        self.RemoveExistingGlue();
+                    }
+
+                    if functionTrimIndex > -1 {
+                        let callstack_elements =
+                            &mut self.currentFlow.callStack.currentThread_mut().callstack;
+                        for el in callstack_elements.iter_mut().rev() {
+                            if el.r#type == PushPopType::Function {
+                                el.functionStartInOuputStream = -1;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else if text.value == "\n" {
+                if self.outputStreamEndsInNewline() || !self.outputStreamContainsContent() {
+                    includeInOutput = false;
+                }
+            }
+        }
+
+        if includeInOutput {
+            self.currentFlow.outputStream.push(obj);
+            self.OutputStreamDirty();
+        }
+    }
+
+    fn TrimNewlinesFromOutputStream(&mut self) {
+        let mut removeWhitespaceFrom = None;
+        let mut i = self.currentFlow.outputStream.len();
+        while i > 0 {
+            i -= 1;
+            match &self.currentFlow.outputStream[i] {
+                ContentItem::ControlCommand(_) => break,
+                ContentItem::Value(Value::String(txt))
+                    if !txt.isNewline && !txt.isInlineWhitespace =>
+                {
+                    break
+                }
+                ContentItem::Value(Value::String(txt)) if txt.isNewline => {
+                    removeWhitespaceFrom = Some(i);
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(removeWhitespaceFrom) = removeWhitespaceFrom {
+            let mut i = removeWhitespaceFrom;
+            while i < self.currentFlow.outputStream.len() {
+                if matches!(
+                    self.currentFlow.outputStream[i],
+                    ContentItem::Value(Value::String(_))
+                ) {
+                    self.currentFlow.outputStream.remove(i);
+                } else {
+                    i += 1;
+                }
+            }
+        }
+
+        self.OutputStreamDirty();
+    }
+
+    fn RemoveExistingGlue(&mut self) {
+        for i in (0..self.currentFlow.outputStream.len()).rev() {
+            match self.currentFlow.outputStream.get(i) {
+                Some(ContentItem::Glue(_)) => {
+                    self.currentFlow.outputStream.remove(i);
+                }
+                Some(ContentItem::ControlCommand(_)) => break,
+                _ => {}
+            }
+        }
+
+        self.OutputStreamDirty();
+    }
 
     // C# signature: public void PushEvaluationStack(Runtime.Object obj)
-    pub fn PushEvaluationStack(&mut self, _obj: crate::stub::PortStub) {}
+    pub fn PushEvaluationStack(&mut self, obj: ContentItem) {
+        let mut obj = obj;
+        if let ContentItem::Value(Value::List(listValue)) = &mut obj {
+            if let Some(origin_names) = listValue.originNames.clone() {
+                let list_definitions = self.story.get_listDefinitions();
+                let mut origins = Vec::new();
+                for n in origin_names {
+                    if let Some(def) = list_definitions.TryListGetDefinition(n.clone()) {
+                        if !origins.contains(def) {
+                            origins.push(def.clone());
+                        }
+                    }
+                }
+                listValue.origins = Some(origins);
+            }
+        }
+
+        self.evaluationStack.push(obj);
+    }
 
     // C# signature: public Runtime.Object PopEvaluationStack()
-    pub fn PopEvaluationStack(&mut self) -> crate::stub::PortStub {
-        Default::default()
+    pub fn PopEvaluationStack(&mut self) -> ContentItem {
+        self.evaluationStack
+            .pop()
+            .expect("evaluation stack underflow")
     }
 
     // C# signature: public Runtime.Object PeekEvaluationStack()
-    pub fn PeekEvaluationStack(&mut self) -> crate::stub::PortStub {
-        Default::default()
+    pub fn PeekEvaluationStack(&mut self) -> ContentItem {
+        self.evaluationStack
+            .last()
+            .cloned()
+            .expect("evaluation stack underflow")
     }
 
     // C# signature: public List<Runtime.Object> PopEvaluationStack(int numberOfObjects)
-    pub fn PopEvaluationStack_overload_2(
-        &mut self,
-        _numberOfObjects: i32,
-    ) -> Vec<crate::stub::PortStub> {
-        Default::default()
+    pub fn PopEvaluationStack_overload_2(&mut self, numberOfObjects: i32) -> Vec<ContentItem> {
+        if numberOfObjects as usize > self.evaluationStack.len() {
+            panic!("trying to pop too many objects");
+        }
+
+        let split = self.evaluationStack.len() - numberOfObjects as usize;
+        self.evaluationStack.split_off(split)
     }
 
     // C# signature: public void ForceEnd()
-    pub fn ForceEnd(&mut self) {}
+    pub fn ForceEnd(&mut self) {
+        self.currentFlow.callStack.Reset();
+        self.currentFlow.currentChoices.clear();
+        self.currentPointer_set(Pointer::Null());
+        self.previousPointer_set(Pointer::Null());
+        self.didSafeExit = true;
+    }
+
+    fn TrimWhitespaceFromFunctionEnd(&mut self) {
+        if self.currentFlow.callStack.currentElement().r#type != PushPopType::Function {
+            return;
+        }
+        let mut functionStartPoint = self
+            .currentFlow
+            .callStack
+            .currentElement()
+            .functionStartInOuputStream;
+        if functionStartPoint == -1 {
+            functionStartPoint = 0;
+        }
+
+        let mut i = self.currentFlow.outputStream.len();
+        while i > functionStartPoint as usize {
+            i -= 1;
+            match &self.currentFlow.outputStream[i] {
+                ContentItem::Value(Value::String(txt))
+                    if txt.isNewline || txt.isInlineWhitespace =>
+                {
+                    self.currentFlow.outputStream.remove(i);
+                    self.OutputStreamDirty();
+                }
+                ContentItem::ControlCommand(_) => break,
+                ContentItem::Value(Value::String(_)) => break,
+                _ => {}
+            }
+        }
+    }
 
     // C# signature: public void PopCallstack (PushPopType? popType = null)
-    pub fn PopCallstack(&mut self, _popType: crate::stub::PushPopType) {}
+    pub fn PopCallstack(&mut self, popType: Option<PushPopType>) {
+        if self.currentFlow.callStack.currentElement().r#type == PushPopType::Function {
+            self.TrimWhitespaceFromFunctionEnd();
+        }
+        self.currentFlow.callStack.Pop(popType);
+    }
 
     // C# signature: public void SetChosenPath(Path path, bool incrementingTurnIndex)
-    pub fn SetChosenPath(&mut self, _path: crate::stub::Path, _incrementingTurnIndex: bool) {}
+    pub fn SetChosenPath(&mut self, path: Path, incrementingTurnIndex: bool) {
+        self.currentFlow.currentChoices.clear();
+        let mut newPointer = self.story.PointerAtPath(path);
+        if !newPointer.get_isNull() && newPointer.index == -1 {
+            newPointer.index = 0;
+        }
+        self.currentPointer_set(newPointer);
+        if incrementingTurnIndex {
+            self.currentTurnIndex += 1;
+        }
+    }
 
     // C# signature: public void StartFunctionEvaluationFromGame (Container funcContainer, params object[] arguments)
     pub fn StartFunctionEvaluationFromGame(
         &mut self,
-        _funcContainer: crate::stub::Container,
-        _arguments: Vec<crate::stub::PortStub>,
+        funcContainer: Container,
+        arguments: Vec<ContentItem>,
     ) {
+        self.currentFlow.callStack.Push(
+            PushPopType::FunctionEvaluationFromGame,
+            self.evaluationStack.len() as i32,
+            0,
+        );
+        self.currentFlow
+            .callStack
+            .currentThread_mut()
+            .callstack
+            .last_mut()
+            .unwrap()
+            .currentPointer = Pointer::StartOf(funcContainer);
+        self.PassArgumentsToEvaluationStack(arguments);
     }
 
-    // C# signature: public void PassArgumentsToEvaluationStack (params object [] arguments)
-    pub fn PassArgumentsToEvaluationStack(&mut self, _arguments: Vec<crate::stub::PortStub>) {}
+    pub fn PassArgumentsToEvaluationStack(&mut self, arguments: Vec<ContentItem>) {
+        for arg in arguments {
+            self.PushEvaluationStack(arg);
+        }
+    }
 
-    // C# signature: public bool TryExitFunctionEvaluationFromGame ()
     pub fn TryExitFunctionEvaluationFromGame(&mut self) -> bool {
-        Default::default()
+        if self.currentFlow.callStack.currentElement().r#type
+            == PushPopType::FunctionEvaluationFromGame
+        {
+            self.currentPointer_set(Pointer::Null());
+            self.didSafeExit = true;
+            true
+        } else {
+            false
+        }
     }
 
-    // C# signature: public object CompleteFunctionEvaluationFromGame ()
-    pub fn CompleteFunctionEvaluationFromGame(&mut self) -> crate::stub::PortStub {
-        Default::default()
+    pub fn CompleteFunctionEvaluationFromGame(&mut self) -> Option<Value> {
+        if self.currentFlow.callStack.currentElement().r#type
+            != PushPopType::FunctionEvaluationFromGame
+        {
+            panic!(
+                "Expected external function evaluation to be complete. Stack trace: {}",
+                self.currentFlow.callStack.get_callStackTrace()
+            );
+        }
+
+        let originalEvaluationStackHeight = self
+            .currentFlow
+            .callStack
+            .currentElement()
+            .evaluationStackHeightWhenPushed as usize;
+
+        let mut returnedObj: Option<ContentItem> = None;
+        while self.evaluationStack.len() > originalEvaluationStackHeight {
+            let poppedObj = self.PopEvaluationStack();
+            if returnedObj.is_none() {
+                returnedObj = Some(poppedObj);
+            }
+        }
+
+        self.PopCallstack(Some(PushPopType::FunctionEvaluationFromGame));
+
+        let returnedObj = returnedObj?;
+        match returnedObj {
+            ContentItem::Void(_) => None,
+            ContentItem::Value(Value::DivertTarget(divert)) => {
+                divert.value.map(|path| Value::new_string(path.ToString()))
+            }
+            ContentItem::Value(value) => Some(value),
+            _ => None,
+        }
     }
 
-    // C# signature: public void AddError(string message, bool isWarning)
-    pub fn AddError(&mut self, _message: String, _isWarning: bool) {}
-
-    // C# signature: int callstackDepth { get; }
-    pub fn get_callstackDepth(&mut self) -> i32 {
-        Default::default()
+    pub fn AddError(&mut self, message: String, isWarning: bool) {
+        if isWarning {
+            self.currentWarnings
+                .get_or_insert_with(Vec::new)
+                .push(message);
+        } else {
+            self.currentErrors
+                .get_or_insert_with(Vec::new)
+                .push(message);
+        }
     }
 
-    // C# signature: List<Runtime.Object> outputStream { get; }
-    pub fn get_outputStream(&mut self) -> Vec<crate::stub::PortStub> {
-        Default::default()
+    pub fn get_callstackDepth(&self) -> i32 {
+        self.currentFlow.callStack.currentElementIndex() + 1
     }
 
-    // C# signature: List<Choice> currentChoices { get; }
-    pub fn get_currentChoices(&mut self) -> Vec<crate::stub::Choice> {
-        Default::default()
+    pub fn get_outputStream(&self) -> Vec<ContentItem> {
+        self.currentFlow.outputStream.clone()
     }
 
-    // C# signature: List<Choice> generatedChoices { get; }
-    pub fn get_generatedChoices(&mut self) -> Vec<crate::stub::Choice> {
-        Default::default()
+    pub fn get_currentChoices(&self) -> Vec<Choice> {
+        if self.get_canContinue() {
+            Vec::new()
+        } else {
+            self.currentFlow.currentChoices.clone()
+        }
     }
 
-    // C# signature: List<string> currentErrors { get; }
-    pub fn get_currentErrors(&mut self) -> Vec<String> {
-        Default::default()
+    pub fn get_generatedChoices(&self) -> Vec<Choice> {
+        self.currentFlow.currentChoices.clone()
     }
 
-    // C# signature: List<string> currentWarnings { get; }
-    pub fn get_currentWarnings(&mut self) -> Vec<String> {
-        Default::default()
+    pub fn get_currentErrors(&self) -> Vec<String> {
+        self.currentErrors.clone().unwrap_or_default()
     }
 
-    // C# signature: VariablesState variablesState { get; }
-    pub fn get_variablesState(&mut self) -> crate::stub::VariablesState {
-        Default::default()
+    pub fn get_currentWarnings(&self) -> Vec<String> {
+        self.currentWarnings.clone().unwrap_or_default()
     }
 
-    // C# signature: CallStack callStack { get; }
-    pub fn get_callStack(&mut self) -> crate::stub::CallStack {
-        Default::default()
+    pub fn get_variablesState(&self) -> VariablesState {
+        self.variablesState.clone()
     }
 
-    // C# signature: List<Runtime.Object> evaluationStack { get; }
-    pub fn get_evaluationStack(&mut self) -> Vec<crate::stub::PortStub> {
-        Default::default()
+    pub fn get_callStack(&self) -> CallStack {
+        self.currentFlow.callStack.clone()
     }
 
-    // C# signature: Pointer divertedPointer { get; }
-    pub fn get_divertedPointer(&mut self) -> crate::stub::Pointer {
-        Default::default()
+    pub fn get_evaluationStack(&self) -> Vec<ContentItem> {
+        self.evaluationStack.clone()
     }
 
-    // C# signature: int currentTurnIndex { get; }
-    pub fn get_currentTurnIndex(&mut self) -> i32 {
-        Default::default()
+    pub fn get_divertedPointer(&self) -> Pointer {
+        self.divertedPointer.clone()
     }
 
-    // C# signature: int storySeed { get; }
-    pub fn get_storySeed(&mut self) -> i32 {
-        Default::default()
+    pub fn get_currentTurnIndex(&self) -> i32 {
+        self.currentTurnIndex
     }
 
-    // C# signature: int previousRandom { get; }
-    pub fn get_previousRandom(&mut self) -> i32 {
-        Default::default()
+    pub fn get_storySeed(&self) -> i32 {
+        self.storySeed
     }
 
-    // C# signature: bool didSafeExit { get; }
-    pub fn get_didSafeExit(&mut self) -> bool {
-        Default::default()
+    pub fn get_previousRandom(&self) -> i32 {
+        self.previousRandom
     }
 
-    // C# signature: Story story { get; }
-    pub fn get_story(&mut self) -> crate::stub::Story {
-        Default::default()
+    pub fn get_didSafeExit(&self) -> bool {
+        self.didSafeExit
     }
 
-    // C# signature: string currentPathString { get; }
-    pub fn get_currentPathString(&mut self) -> String {
-        Default::default()
+    pub fn get_story(&self) -> Story {
+        self.story.clone()
     }
 
-    // C# signature: string previousPathString { get; }
-    pub fn get_previousPathString(&mut self) -> String {
-        Default::default()
+    pub fn get_currentPathString(&self) -> String {
+        self.currentPointer()
+            .get_path()
+            .map(|path| path.ToString())
+            .unwrap_or_default()
     }
 
-    // C# signature: Runtime.Pointer currentPointer { get; }
-    pub fn get_currentPointer(&mut self) -> crate::stub::Pointer {
-        Default::default()
+    pub fn get_previousPathString(&self) -> String {
+        self.previousPointer()
+            .get_path()
+            .map(|path| path.ToString())
+            .unwrap_or_default()
     }
 
-    // C# signature: Pointer previousPointer { get; }
-    pub fn get_previousPointer(&mut self) -> crate::stub::Pointer {
-        Default::default()
+    pub fn get_currentPointer(&self) -> Pointer {
+        self.currentPointer()
     }
 
-    // C# signature: bool canContinue { get; }
-    pub fn get_canContinue(&mut self) -> bool {
-        Default::default()
+    pub fn get_previousPointer(&self) -> Pointer {
+        self.previousPointer()
     }
 
-    // C# signature: bool hasError { get; }
-    pub fn get_hasError(&mut self) -> bool {
-        Default::default()
+    pub fn get_canContinue(&self) -> bool {
+        !self.currentPointer().get_isNull() && !self.get_hasError()
     }
 
-    // C# signature: bool hasWarning { get; }
-    pub fn get_hasWarning(&mut self) -> bool {
-        Default::default()
+    pub fn get_hasError(&self) -> bool {
+        self.currentErrors
+            .as_ref()
+            .map(|errs| !errs.is_empty())
+            .unwrap_or(false)
     }
 
-    // C# signature: string currentText { get; }
+    pub fn get_hasWarning(&self) -> bool {
+        self.currentWarnings
+            .as_ref()
+            .map(|warns| !warns.is_empty())
+            .unwrap_or(false)
+    }
+
     pub fn get_currentText(&mut self) -> String {
-        Default::default()
+        if self.outputStreamTextDirty {
+            let mut sb = String::new();
+            let mut inTag = false;
+            for outputObj in &self.currentFlow.outputStream {
+                match outputObj {
+                    ContentItem::Value(Value::String(textContent)) if !inTag => {
+                        sb.push_str(&textContent.value);
+                    }
+                    ContentItem::ControlCommand(controlCommand) => {
+                        if controlCommand.commandType == CommandType::BeginTag {
+                            inTag = true;
+                        } else if controlCommand.commandType == CommandType::EndTag {
+                            inTag = false;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            self.currentTextCache = self.CleanOutputWhitespace(sb);
+            self.outputStreamTextDirty = false;
+        }
+        self.currentTextCache.clone()
     }
 
-    // C# signature: List<string> currentTags { get; }
     pub fn get_currentTags(&mut self) -> Vec<String> {
-        Default::default()
+        if self.outputStreamTagsDirty {
+            self.currentTagsCache = Vec::new();
+            let mut inTag = false;
+            let mut sb = String::new();
+            for outputObj in &self.currentFlow.outputStream {
+                match outputObj {
+                    ContentItem::ControlCommand(controlCommand) => {
+                        if controlCommand.commandType == CommandType::BeginTag {
+                            if inTag && !sb.is_empty() {
+                                let cleaned = self.CleanOutputWhitespace(sb.clone());
+                                self.currentTagsCache.push(cleaned);
+                                sb.clear();
+                            }
+                            inTag = true;
+                        } else if controlCommand.commandType == CommandType::EndTag {
+                            if !sb.is_empty() {
+                                let cleaned = self.CleanOutputWhitespace(sb.clone());
+                                self.currentTagsCache.push(cleaned);
+                                sb.clear();
+                            }
+                            inTag = false;
+                        }
+                    }
+                    ContentItem::Value(Value::String(strVal)) if inTag => {
+                        sb.push_str(&strVal.value);
+                    }
+                    ContentItem::Tag(tag) => {
+                        if !tag.get_text().is_empty() {
+                            self.currentTagsCache.push(tag.get_text().to_string());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if !sb.is_empty() {
+                let cleaned = self.CleanOutputWhitespace(sb.clone());
+                self.currentTagsCache.push(cleaned);
+            }
+            self.outputStreamTagsDirty = false;
+        }
+        self.currentTagsCache.clone()
     }
 
-    // C# signature: string currentFlowName { get; }
-    pub fn get_currentFlowName(&mut self) -> String {
-        Default::default()
+    pub fn get_currentFlowName(&self) -> String {
+        self.currentFlow.name.clone()
     }
 
-    // C# signature: bool currentFlowIsDefaultFlow { get; }
-    pub fn get_currentFlowIsDefaultFlow(&mut self) -> bool {
-        Default::default()
+    pub fn get_currentFlowIsDefaultFlow(&self) -> bool {
+        self.currentFlow.name == Self::kDefaultFlowName
     }
 
-    // C# signature: List<string> aliveFlowNames { get; }
     pub fn get_aliveFlowNames(&mut self) -> Vec<String> {
-        Default::default()
+        if self.aliveFlowNamesDirty {
+            self.aliveFlowNamesCache = Vec::new();
+            if let Some(named) = &self.namedFlows {
+                for flowName in named.keys() {
+                    if flowName != Self::kDefaultFlowName {
+                        self.aliveFlowNamesCache.push(flowName.clone());
+                    }
+                }
+            }
+            self.aliveFlowNamesDirty = false;
+        }
+        self.aliveFlowNamesCache.clone()
     }
 
-    // C# signature: bool inExpressionEvaluation { get; }
-    pub fn get_inExpressionEvaluation(&mut self) -> bool {
-        Default::default()
+    pub fn get_inExpressionEvaluation(&self) -> bool {
+        self.currentFlow
+            .callStack
+            .currentElement()
+            .inExpressionEvaluation
     }
 
-    // C# signature: bool outputStreamEndsInNewline { get; }
-    pub fn get_outputStreamEndsInNewline(&mut self) -> bool {
-        Default::default()
+    pub fn set_inExpressionEvaluation(&mut self, value: bool) {
+        self.currentFlow
+            .callStack
+            .currentThread_mut()
+            .callstack
+            .last_mut()
+            .unwrap()
+            .inExpressionEvaluation = value;
     }
 
-    // C# signature: bool outputStreamContainsContent { get; }
-    pub fn get_outputStreamContainsContent(&mut self) -> bool {
-        Default::default()
+    pub fn get_outputStreamEndsInNewline(&self) -> bool {
+        for obj in self.currentFlow.outputStream.iter().rev() {
+            match obj {
+                ContentItem::ControlCommand(_) => break,
+                ContentItem::Value(Value::String(text)) => {
+                    if text.isNewline {
+                        return true;
+                    } else if text.get_isNonWhitespace() {
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        false
     }
 
-    // C# signature: bool inStringEvaluation { get; }
-    pub fn get_inStringEvaluation(&mut self) -> bool {
-        Default::default()
+    pub fn get_outputStreamContainsContent(&self) -> bool {
+        self.currentFlow
+            .outputStream
+            .iter()
+            .any(|content| matches!(content, ContentItem::Value(Value::String(_))))
+    }
+
+    pub fn get_inStringEvaluation(&self) -> bool {
+        self.currentFlow.outputStream.iter().rev().any(|obj| {
+            matches!(obj, ContentItem::ControlCommand(cmd) if cmd.commandType == CommandType::BeginString)
+        })
+    }
+
+    fn WriteJson(&mut self, writer: &mut Writer) {
+        writer
+            .WriteObject(|writer| {
+                writer.WritePropertyStart("flows".to_string())?;
+                writer.WriteObjectStart()?;
+                if let Some(namedFlows) = &self.namedFlows {
+                    for (name, flow) in namedFlows {
+                        writer.WriteProperty(name.clone(), |writer| {
+                            let mut flow = flow.clone();
+                            flow.WriteJson(writer);
+                            Ok(())
+                        })?;
+                    }
+                } else {
+                    let mut flow = self.currentFlow.clone();
+                    writer.WriteProperty(self.currentFlow.name.clone(), |writer| {
+                        flow.WriteJson(writer);
+                        Ok(())
+                    })?;
+                }
+                writer.WriteObjectEnd()?;
+                writer.WritePropertyEnd()?;
+
+                writer.WriteProperty_overload_3(
+                    "currentFlowName".to_string(),
+                    self.currentFlow.name.clone(),
+                )?;
+
+                writer.WritePropertyStart("variablesState".to_string())?;
+                self.variablesState.WriteJson(writer);
+                writer.WritePropertyEnd()?;
+
+                writer.WritePropertyStart("evalStack".to_string())?;
+                Json::WriteListRuntimeObjs(writer, &self.evaluationStack);
+                writer.WritePropertyEnd()?;
+
+                if !self.divertedPointer.get_isNull() {
+                    if let Some(path) = self.divertedPointer.get_path() {
+                        writer.WriteProperty_overload_3(
+                            "currentDivertTarget".to_string(),
+                            path.get_componentsString(),
+                        )?;
+                    }
+                }
+
+                writer.WritePropertyStart("visitCounts".to_string())?;
+                writer.WriteObjectStart()?;
+                for (k, v) in &self.visitCounts {
+                    writer.WriteProperty_overload_4(k.clone(), *v)?;
+                }
+                writer.WriteObjectEnd()?;
+                writer.WritePropertyEnd()?;
+
+                writer.WritePropertyStart("turnIndices".to_string())?;
+                writer.WriteObjectStart()?;
+                for (k, v) in &self.turnIndices {
+                    writer.WriteProperty_overload_4(k.clone(), *v)?;
+                }
+                writer.WriteObjectEnd()?;
+                writer.WritePropertyEnd()?;
+
+                writer.WriteProperty_overload_4("turnIdx".to_string(), self.currentTurnIndex)?;
+                writer.WriteProperty_overload_4("storySeed".to_string(), self.storySeed)?;
+                writer
+                    .WriteProperty_overload_4("previousRandom".to_string(), self.previousRandom)?;
+                writer.WriteProperty_overload_4(
+                    "inkSaveVersion".to_string(),
+                    Self::kInkSaveStateVersion,
+                )?;
+
+                Ok(())
+            })
+            .unwrap_or_else(|err| panic!("{}", err));
+    }
+
+    fn LoadJsonObj(&mut self, jObject: JsonObject) {
+        let jSaveVersion = match jObject.get("inkSaveVersion") {
+            Some(JsonValue::Int(value)) => *value,
+            _ => panic!("ink save format incorrect, can't load."),
+        };
+        if jSaveVersion < Self::kMinCompatibleLoadVersion {
+            panic!(
+                "Ink save format isn't compatible with the current version (saw '{}', but minimum is {}), so can't load.",
+                jSaveVersion,
+                Self::kMinCompatibleLoadVersion
+            );
+        }
+
+        if let Some(JsonValue::Object(flowsObj)) = jObject.get("flows") {
+            if flowsObj.len() == 1 {
+                self.namedFlows = None;
+            } else if self.namedFlows.is_none() {
+                self.namedFlows = Some(HashMap::new());
+            } else if let Some(named) = self.namedFlows.as_mut() {
+                named.clear();
+            }
+
+            for (name, flowObj) in flowsObj {
+                if let JsonValue::Object(flowObj) = flowObj {
+                    let flow =
+                        Flow::new_overload_2(name.clone(), self.story.clone(), flowObj.clone());
+                    if flowsObj.len() == 1 {
+                        self.currentFlow = flow.clone();
+                    } else {
+                        self.namedFlows.as_mut().unwrap().insert(name.clone(), flow);
+                    }
+                }
+            }
+
+            if let Some(named) = &self.namedFlows {
+                if named.len() > 1 {
+                    if let Some(JsonValue::String(currFlowName)) = jObject.get("currentFlowName") {
+                        self.currentFlow = named
+                            .get(currFlowName)
+                            .cloned()
+                            .unwrap_or_else(|| self.currentFlow.clone());
+                    }
+                }
+            }
+        } else {
+            self.namedFlows = None;
+            self.currentFlow.name = Self::kDefaultFlowName.to_string();
+            if let Some(JsonValue::Object(callstackThreads)) = jObject.get("callstackThreads") {
+                self.currentFlow
+                    .callStack
+                    .SetJsonToken(callstackThreads.clone(), self.story.clone());
+            }
+            if let Some(JsonValue::Array(outputStream)) = jObject.get("outputStream") {
+                self.currentFlow.outputStream =
+                    Json::JArrayToRuntimeObjList_overload_2(outputStream.clone(), false);
+            }
+            if let Some(JsonValue::Array(currentChoices)) = jObject.get("currentChoices") {
+                self.currentFlow.currentChoices =
+                    Json::JArrayToRuntimeObjList::<Choice>(currentChoices.clone(), false);
+            }
+            let mut jChoiceThreadsObj = None;
+            if let Some(obj) = jObject.get("choiceThreads") {
+                jChoiceThreadsObj = Some(obj.clone());
+            }
+            if let Some(JsonValue::Object(choiceThreads)) = jChoiceThreadsObj {
+                self.currentFlow
+                    .LoadFlowChoiceThreads(choiceThreads, self.story.clone());
+            }
+        }
+
+        self.OutputStreamDirty();
+        self.aliveFlowNamesDirty = true;
+
+        if let Some(JsonValue::Object(vars)) = jObject.get("variablesState") {
+            self.variablesState.SetJsonToken(vars.clone());
+        }
+        self.variablesState
+            .set_callStack(self.currentFlow.callStack.clone());
+
+        if let Some(JsonValue::Array(evalStack)) = jObject.get("evalStack") {
+            self.evaluationStack =
+                Json::JArrayToRuntimeObjList_overload_2(evalStack.clone(), false);
+        }
+
+        if let Some(currentDivertTargetPath) = jObject.get("currentDivertTarget") {
+            self.divertedPointer = Pointer::Null();
+            if let JsonValue::String(path) = currentDivertTargetPath {
+                self.divertedPointer = self.story.PointerAtPath(Path::new_overload_4(path.clone()));
+            }
+        }
+
+        if let Some(JsonValue::Object(visitCounts)) = jObject.get("visitCounts") {
+            self.visitCounts = Json::JObjectToIntDictionary(visitCounts.clone());
+        }
+        if let Some(JsonValue::Object(turnIndices)) = jObject.get("turnIndices") {
+            self.turnIndices = Json::JObjectToIntDictionary(turnIndices.clone());
+        }
+
+        self.currentTurnIndex = match jObject.get("turnIdx") {
+            Some(JsonValue::Int(value)) => *value,
+            _ => 0,
+        };
+        self.storySeed = match jObject.get("storySeed") {
+            Some(JsonValue::Int(value)) => *value,
+            _ => self.storySeed,
+        };
+        self.previousRandom = match jObject.get("previousRandom") {
+            Some(JsonValue::Int(value)) => *value,
+            _ => 0,
+        };
+    }
+
+    fn currentPointer(&self) -> Pointer {
+        self.currentFlow
+            .callStack
+            .currentElement()
+            .currentPointer
+            .clone()
+    }
+
+    fn currentPointer_set(&mut self, pointer: Pointer) {
+        self.currentFlow
+            .callStack
+            .currentThread_mut()
+            .callstack
+            .last_mut()
+            .unwrap()
+            .currentPointer = pointer;
+    }
+
+    fn previousPointer(&self) -> Pointer {
+        self.currentFlow
+            .callStack
+            .currentThread()
+            .previousPointer
+            .clone()
+            .unwrap_or_else(Pointer::Null)
+    }
+
+    fn previousPointer_set(&mut self, pointer: Pointer) {
+        self.currentFlow
+            .callStack
+            .currentThread_mut()
+            .previousPointer = Some(pointer);
+    }
+
+    fn OutputStreamDirty(&mut self) {
+        self.outputStreamTextDirty = true;
+        self.outputStreamTagsDirty = true;
+    }
+
+    fn outputStreamEndsInNewline(&self) -> bool {
+        self.get_outputStreamEndsInNewline()
+    }
+
+    fn outputStreamContainsContent(&self) -> bool {
+        self.get_outputStreamContainsContent()
     }
 }

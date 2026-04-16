@@ -377,6 +377,10 @@ impl VariablesState {
     pub fn get_callStack(&self) -> CallStack {
         self.callStack.clone()
     }
+
+    pub fn set_callStack(&mut self, callStack: CallStack) {
+        self.callStack = callStack;
+    }
 }
 
 impl Default for VariablesState {
