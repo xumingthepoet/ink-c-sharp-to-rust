@@ -1,7 +1,10 @@
 // Source: ink-c-sharp/ink-engine-runtime/CallStack.cs
 
+use crate::JsonSerialisation::Json;
+use crate::Path::Path;
 use crate::Pointer::Pointer;
 use crate::PushPop::PushPopType;
+use crate::SimpleJson::{JsonObject, JsonValue, Writer};
 use crate::Story::Story;
 use crate::Value::{ListValue, Value};
 use std::collections::HashMap;
@@ -56,11 +59,92 @@ impl Thread {
         }
     }
 
-    pub fn new_overload_2(
-        _jThreadObj: HashMap<String, crate::stub::PortStub>,
-        _storyContext: Story,
-    ) -> Self {
-        todo!("port runtime CallStack.Thread JSON reconstruction after Story path resolution is translated");
+    pub fn new_overload_2(jThreadObj: JsonObject, mut storyContext: Story) -> Self {
+        let threadIndex = match jThreadObj.get("threadIndex") {
+            Some(JsonValue::Int(value)) => *value,
+            _ => 0,
+        };
+
+        let mut thread = Thread::new();
+        thread.threadIndex = threadIndex;
+
+        if let Some(JsonValue::Array(jThreadCallstack)) = jThreadObj.get("callstack") {
+            for jElementTok in jThreadCallstack {
+                let jElementObj = match jElementTok {
+                    JsonValue::Object(obj) => obj,
+                    _ => continue,
+                };
+
+                let pushPopType = match jElementObj.get("type") {
+                    Some(JsonValue::Int(value)) => match *value {
+                        0 => PushPopType::Tunnel,
+                        1 => PushPopType::Function,
+                        _ => PushPopType::FunctionEvaluationFromGame,
+                    },
+                    _ => PushPopType::Tunnel,
+                };
+
+                let mut pointer = Pointer::Null();
+
+                if let Some(JsonValue::String(currentContainerPathStr)) = jElementObj.get("cPath") {
+                    let threadPointerResult = storyContext
+                        .ContentAtPath(Path::new_overload_4(currentContainerPathStr.clone()));
+                    pointer.container = threadPointerResult.get_container().cloned();
+                    pointer.index = match jElementObj.get("idx") {
+                        Some(JsonValue::Int(value)) => *value,
+                        _ => -1,
+                    };
+
+                    if threadPointerResult.obj.is_none() {
+                        panic!(
+                            "When loading state, internal story location couldn't be found: {}. Has the story changed since this save data was created?",
+                            currentContainerPathStr
+                        );
+                    } else if threadPointerResult.approximate {
+                        if let Some(container) = &pointer.container {
+                            storyContext.Warning(format!(
+                                "When loading state, exact internal story location couldn't be found: '{}', so it was approximated to '{}' to recover. Has the story changed since this save data was created?",
+                                currentContainerPathStr,
+                                container.get_path().ToString()
+                            ));
+                        } else {
+                            storyContext.Warning(format!(
+                                "When loading state, exact internal story location couldn't be found: '{}' and it may not be recoverable. Has the story changed since this save data was created?",
+                                currentContainerPathStr
+                            ));
+                        }
+                    }
+                }
+
+                let inExpressionEvaluation = match jElementObj.get("exp") {
+                    Some(JsonValue::Bool(value)) => *value,
+                    _ => false,
+                };
+
+                let mut el = Element::new(pushPopType, pointer, inExpressionEvaluation);
+
+                if let Some(JsonValue::Object(temps)) = jElementObj.get("temp") {
+                    el.temporaryVariables = Json::JObjectToDictionaryRuntimeObjs(temps.clone())
+                        .into_iter()
+                        .filter_map(|(name, item)| match item {
+                            crate::Container::ContentItem::Value(value) => Some((name, value)),
+                            _ => None,
+                        })
+                        .collect();
+                }
+
+                thread.callstack.push(el);
+            }
+        }
+
+        if let Some(JsonValue::String(prev_content_obj_path)) =
+            jThreadObj.get("previousContentObject")
+        {
+            let prevPath = Path::new_overload_4(prev_content_obj_path.clone());
+            thread.previousPointer = Some(storyContext.PointerAtPath(prevPath));
+        }
+
+        thread
     }
 
     pub fn Copy(&self) -> Self {
@@ -71,8 +155,69 @@ impl Thread {
         copy
     }
 
-    pub fn WriteJson(&self, _writer: crate::stub::Writer) {
-        todo!("port runtime CallStack.Thread.WriteJson after Json serialisation is translated");
+    pub fn WriteJson(&self, writer: &mut Writer) {
+        writer
+            .WriteObject(|writer| {
+                writer.WritePropertyStart("callstack".to_string())?;
+                writer.WriteArrayStart()?;
+                for el in &self.callstack {
+                    writer.WriteObjectStart()?;
+                    if !el.currentPointer.get_isNull() {
+                        if let Some(path) = el.currentPointer.get_path() {
+                            writer.WriteProperty_overload_3(
+                                "cPath".to_string(),
+                                path.get_componentsString(),
+                            )?;
+                        }
+                        writer
+                            .WriteProperty_overload_4("idx".to_string(), el.currentPointer.index)?;
+                    }
+
+                    writer
+                        .WriteProperty_overload_5("exp".to_string(), el.inExpressionEvaluation)?;
+                    let type_int = match el.r#type {
+                        PushPopType::Tunnel => 0,
+                        PushPopType::Function => 1,
+                        PushPopType::FunctionEvaluationFromGame => 2,
+                    };
+                    writer.WriteProperty_overload_4("type".to_string(), type_int)?;
+
+                    if !el.temporaryVariables.is_empty() {
+                        writer.WritePropertyStart("temp".to_string())?;
+                        Json::WriteDictionaryRuntimeObjs(
+                            writer,
+                            &el.temporaryVariables
+                                .iter()
+                                .map(|(name, value)| {
+                                    (
+                                        name.clone(),
+                                        crate::Container::ContentItem::Value(value.clone()),
+                                    )
+                                })
+                                .collect::<HashMap<_, _>>(),
+                        );
+                        writer.WritePropertyEnd()?;
+                    }
+
+                    writer.WriteObjectEnd()?;
+                }
+                writer.WriteArrayEnd()?;
+                writer.WritePropertyEnd()?;
+
+                writer.WriteProperty_overload_4("threadIndex".to_string(), self.threadIndex)?;
+
+                if let Some(previousPointer) = &self.previousPointer {
+                    if let Some(path) = previousPointer.get_path() {
+                        writer.WriteProperty_overload_3(
+                            "previousContentObject".to_string(),
+                            path.ToString(),
+                        )?;
+                    }
+                }
+
+                Ok(())
+            })
+            .unwrap_or_else(|err| panic!("{}", err));
     }
 }
 
@@ -83,14 +228,25 @@ pub struct CallStack {
     pub startOfRoot: Pointer,
 }
 
+impl Default for CallStack {
+    fn default() -> Self {
+        Self {
+            threads: Vec::new(),
+            threadCounter: 0,
+            startOfRoot: Pointer::Null(),
+        }
+    }
+}
+
 impl CallStack {
     // C# signature: public CallStack (Story storyContext)
-    pub fn new(_storyContext: Story) -> Self {
+    pub fn new(mut storyContext: Story) -> Self {
         let mut callstack = Self {
             threads: Vec::new(),
             threadCounter: 0,
             startOfRoot: Pointer::Null(),
         };
+        callstack.startOfRoot = Pointer::StartOf(storyContext.get_mainContentContainer());
         callstack.Reset();
         callstack
     }
@@ -119,8 +275,21 @@ impl CallStack {
     }
 
     // C# signature: public void WriteJson(SimpleJson.Writer writer)
-    pub fn WriteJson(&self, _writer: crate::stub::Writer) {
-        todo!("port runtime CallStack.WriteJson after Json serialisation is translated");
+    pub fn WriteJson(&self, writer: &mut Writer) {
+        writer
+            .WriteObject(|writer| {
+                writer.WritePropertyStart("threads".to_string())?;
+                writer.WriteArrayStart()?;
+                for thread in &self.threads {
+                    thread.WriteJson(writer);
+                }
+                writer.WriteArrayEnd()?;
+                writer.WritePropertyEnd()?;
+
+                writer.WriteProperty_overload_4("threadCounter".to_string(), self.threadCounter)?;
+                Ok(())
+            })
+            .unwrap_or_else(|err| panic!("{}", err));
     }
 
     // C# signature: public void Reset()
@@ -136,17 +305,30 @@ impl CallStack {
     }
 
     // C# signature: public void SetJsonToken(Dictionary<string, object> jObject, Story storyContext)
-    pub fn SetJsonToken(
-        &mut self,
-        _jObject: HashMap<String, crate::stub::PortStub>,
-        _storyContext: Story,
-    ) {
-        todo!("port runtime CallStack.SetJsonToken after Json serialisation is translated");
+    pub fn SetJsonToken(&mut self, jObject: JsonObject, mut storyContext: Story) {
+        self.threads.clear();
+
+        if let Some(JsonValue::Array(jThreads)) = jObject.get("threads") {
+            for jThreadTok in jThreads {
+                let jThreadObj = match jThreadTok {
+                    JsonValue::Object(obj) => obj.clone(),
+                    _ => continue,
+                };
+                let thread = Thread::new_overload_2(jThreadObj, storyContext.clone());
+                self.threads.push(thread);
+            }
+        }
+
+        self.threadCounter = match jObject.get("threadCounter") {
+            Some(JsonValue::Int(value)) => *value,
+            _ => 0,
+        };
+        self.startOfRoot = Pointer::StartOf(storyContext.get_mainContentContainer());
     }
 
     // C# signature: public void WriteJson(SimpleJson.Writer w)
-    pub fn WriteJson_overload_2(&self, _w: crate::stub::Writer) {
-        todo!("port runtime CallStack.WriteJson overload after Json serialisation is translated");
+    pub fn WriteJson_overload_2(&self, w: &mut Writer) {
+        self.WriteJson(w);
     }
 
     // C# signature: public void PushThread()
