@@ -32,3 +32,16 @@ impl std::fmt::Display for Identifier {
         f.write_str(self.name.as_deref().unwrap_or(""))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Identifier;
+
+    #[test]
+    fn done_identifier_matches_csharp_default() {
+        let done = Identifier::Done();
+        assert_eq!(done.name.as_deref(), Some("DONE"));
+        assert_eq!(done.ToString(), "DONE");
+        assert!(done.debugMetadata.is_none());
+    }
+}

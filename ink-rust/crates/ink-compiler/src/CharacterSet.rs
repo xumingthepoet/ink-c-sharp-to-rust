@@ -61,3 +61,24 @@ impl CharacterSet {
         self.characters.contains(&c)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::CharacterSet;
+
+    #[test]
+    fn builds_sets_from_ranges_and_strings() {
+        let mut from_range = CharacterSet::FromRange('a', 'c');
+        assert!(from_range.Contains('a'));
+        assert!(from_range.Contains('b'));
+        assert!(from_range.Contains('c'));
+        assert!(!from_range.Contains('d'));
+
+        from_range.AddCharacters_overload_2("de".to_string());
+        assert!(from_range.Contains('d'));
+        assert!(from_range.Contains('e'));
+
+        let copied = CharacterSet::new_overload_3(&from_range);
+        assert_eq!(copied, from_range);
+    }
+}

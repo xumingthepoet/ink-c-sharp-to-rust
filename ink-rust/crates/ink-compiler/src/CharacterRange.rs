@@ -52,3 +52,21 @@ impl CharacterRange {
         self.end
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::CharacterRange;
+
+    #[test]
+    fn materializes_character_sets_with_exclusions() {
+        let mut range = CharacterRange::Define('a', 'd', Some(vec!['b']));
+        let set = range.ToCharacterSet();
+
+        assert!(set.Contains('a'));
+        assert!(!set.Contains('b'));
+        assert!(set.Contains('c'));
+        assert!(set.Contains('d'));
+        assert_eq!(range.get_start(), 'a');
+        assert_eq!(range.get_end(), 'd');
+    }
+}

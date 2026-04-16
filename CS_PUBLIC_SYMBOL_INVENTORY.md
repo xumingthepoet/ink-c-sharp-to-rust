@@ -5,14 +5,14 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 35
-Rust skeleton: 63
+Rust implemented: 42
+Rust skeleton: 56
 Rust missing: 0
 
 | C# file | Rust target | Public types | Public members | Rust state |
 | --- | --- | ---: | ---: | --- |
-| `ink-c-sharp/compiler/CharacterRange.cs` | `ink-rust/crates/ink-compiler/src/CharacterRange.rs` | 1 | 4 | skeleton |
-| `ink-c-sharp/compiler/CharacterSet.cs` | `ink-rust/crates/ink-compiler/src/CharacterSet.rs` | 1 | 7 | skeleton |
+| `ink-c-sharp/compiler/CharacterRange.cs` | `ink-rust/crates/ink-compiler/src/CharacterRange.rs` | 1 | 4 | implemented |
+| `ink-c-sharp/compiler/CharacterSet.cs` | `ink-rust/crates/ink-compiler/src/CharacterSet.rs` | 1 | 7 | implemented |
 | `ink-c-sharp/compiler/CommandLineInput.cs` | `ink-rust/crates/ink-compiler/src/CommandLineInput.rs` | 1 | 6 | skeleton |
 | `ink-c-sharp/compiler/Compiler.cs` | `ink-rust/crates/ink-compiler/src/Compiler.rs` | 4 | 21 | skeleton |
 | `ink-c-sharp/compiler/FileHandler.cs` | `ink-rust/crates/ink-compiler/src/FileHandler.rs` | 2 | 2 | skeleton |
@@ -48,7 +48,7 @@ Rust missing: 0
 | `ink-c-sharp/compiler/ParsedHierarchy/FlowLevel.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/FlowLevel.rs` | 1 | 0 | implemented |
 | `ink-c-sharp/compiler/ParsedHierarchy/FunctionCall.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/FunctionCall.rs` | 1 | 18 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/Gather.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Gather.rs` | 1 | 7 | skeleton |
-| `ink-c-sharp/compiler/ParsedHierarchy/Identifier.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Identifier.rs` | 1 | 4 | skeleton |
+| `ink-c-sharp/compiler/ParsedHierarchy/Identifier.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Identifier.rs` | 1 | 4 | implemented |
 | `ink-c-sharp/compiler/ParsedHierarchy/INamedContent.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/INamedContent.rs` | 1 | 0 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/IncludedFile.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/IncludedFile.rs` | 1 | 3 | implemented |
 | `ink-c-sharp/compiler/ParsedHierarchy/IWeavePoint.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/IWeavePoint.rs` | 1 | 0 | implemented |
@@ -80,7 +80,7 @@ Rust missing: 0
 | `ink-c-sharp/ink-engine-runtime/ChoicePoint.cs` | `ink-rust/crates/ink-runtime/src/ChoicePoint.rs` | 1 | 12 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/Container.cs` | `ink-rust/crates/ink-runtime/src/Container.rs` | 2 | 21 | implemented |
 | `ink-c-sharp/ink-engine-runtime/ControlCommand.cs` | `ink-rust/crates/ink-runtime/src/ControlCommand.rs` | 2 | 32 | skeleton |
-| `ink-c-sharp/ink-engine-runtime/DebugMetadata.cs` | `ink-rust/crates/ink-runtime/src/DebugMetadata.rs` | 1 | 9 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/DebugMetadata.cs` | `ink-rust/crates/ink-runtime/src/DebugMetadata.rs` | 1 | 9 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Divert.cs` | `ink-rust/crates/ink-runtime/src/Divert.rs` | 1 | 15 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Error.cs` | `ink-rust/crates/ink-runtime/src/Error.rs` | 1 | 0 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Flow.cs` | `ink-rust/crates/ink-runtime/src/Flow.rs` | 1 | 8 | skeleton |
@@ -100,12 +100,12 @@ Rust missing: 0
 | `ink-c-sharp/ink-engine-runtime/SimpleJson.cs` | `ink-rust/crates/ink-runtime/src/SimpleJson.rs` | 2 | 31 | implemented |
 | `ink-c-sharp/ink-engine-runtime/StatePatch.cs` | `ink-rust/crates/ink-runtime/src/StatePatch.rs` | 1 | 12 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Story.cs` | `ink-rust/crates/ink-runtime/src/Story.rs` | 1 | 75 | skeleton |
-| `ink-c-sharp/ink-engine-runtime/StoryException.cs` | `ink-rust/crates/ink-runtime/src/StoryException.rs` | 1 | 3 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/StoryException.cs` | `ink-rust/crates/ink-runtime/src/StoryException.rs` | 1 | 3 | implemented |
 | `ink-c-sharp/ink-engine-runtime/StoryState.cs` | `ink-rust/crates/ink-runtime/src/StoryState.rs` | 1 | 63 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/StringJoinExtension.cs` | `ink-rust/crates/ink-runtime/src/StringJoinExtension.rs` | 1 | 1 | implemented |
-| `ink-c-sharp/ink-engine-runtime/Tag.cs` | `ink-rust/crates/ink-runtime/src/Tag.rs` | 1 | 3 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/Tag.cs` | `ink-rust/crates/ink-runtime/src/Tag.rs` | 1 | 3 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Value.cs` | `ink-rust/crates/ink-runtime/src/Value.rs` | 10 | 57 | implemented |
 | `ink-c-sharp/ink-engine-runtime/VariableAssignment.cs` | `ink-rust/crates/ink-runtime/src/VariableAssignment.rs` | 1 | 6 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/VariableReference.cs` | `ink-rust/crates/ink-runtime/src/VariableReference.rs` | 1 | 7 | implemented |
 | `ink-c-sharp/ink-engine-runtime/VariablesState.cs` | `ink-rust/crates/ink-runtime/src/VariablesState.rs` | 1 | 22 | implemented |
-| `ink-c-sharp/ink-engine-runtime/Void.cs` | `ink-rust/crates/ink-runtime/src/Void.rs` | 1 | 1 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/Void.cs` | `ink-rust/crates/ink-runtime/src/Void.rs` | 1 | 1 | implemented |
