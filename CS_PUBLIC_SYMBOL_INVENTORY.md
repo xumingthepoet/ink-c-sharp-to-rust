@@ -5,8 +5,8 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 39
-Rust skeleton: 59
+Rust implemented: 41
+Rust skeleton: 57
 Rust missing: 0
 
 | C# file | Rust target | Public types | Public members | Rust state |
@@ -75,7 +75,7 @@ Rust missing: 0
 | `ink-c-sharp/compiler/Stats.cs` | `ink-rust/crates/ink-compiler/src/Stats.rs` | 1 | 8 | skeleton |
 | `ink-c-sharp/compiler/StringParser/StringParser.cs` | `ink-rust/crates/ink-compiler/src/StringParser/StringParser.rs` | 2 | 39 | skeleton |
 | `ink-c-sharp/compiler/StringParser/StringParserState.cs` | `ink-rust/crates/ink-compiler/src/StringParser/StringParserState.rs` | 2 | 23 | implemented |
-| `ink-c-sharp/ink-engine-runtime/CallStack.cs` | `ink-rust/crates/ink-runtime/src/CallStack.rs` | 3 | 41 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/CallStack.cs` | `ink-rust/crates/ink-runtime/src/CallStack.rs` | 3 | 41 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Choice.cs` | `ink-rust/crates/ink-runtime/src/Choice.rs` | 1 | 11 | implemented |
 | `ink-c-sharp/ink-engine-runtime/ChoicePoint.cs` | `ink-rust/crates/ink-runtime/src/ChoicePoint.rs` | 1 | 12 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/Container.cs` | `ink-rust/crates/ink-runtime/src/Container.rs` | 2 | 21 | skeleton |
@@ -83,7 +83,7 @@ Rust missing: 0
 | `ink-c-sharp/ink-engine-runtime/DebugMetadata.cs` | `ink-rust/crates/ink-runtime/src/DebugMetadata.rs` | 1 | 9 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Divert.cs` | `ink-rust/crates/ink-runtime/src/Divert.rs` | 1 | 15 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/Error.cs` | `ink-rust/crates/ink-runtime/src/Error.rs` | 1 | 0 | implemented |
-| `ink-c-sharp/ink-engine-runtime/Flow.cs` | `ink-rust/crates/ink-runtime/src/Flow.rs` | 1 | 8 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/Flow.cs` | `ink-rust/crates/ink-runtime/src/Flow.rs` | 1 | 8 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Glue.cs` | `ink-rust/crates/ink-runtime/src/Glue.rs` | 1 | 2 | implemented |
 | `ink-c-sharp/ink-engine-runtime/INamedContent.cs` | `ink-rust/crates/ink-runtime/src/INamedContent.rs` | 1 | 0 | implemented |
 | `ink-c-sharp/ink-engine-runtime/InkList.cs` | `ink-rust/crates/ink-runtime/src/InkList.rs` | 2 | 47 | skeleton |
