@@ -7,7 +7,6 @@ use crate::ParsedHierarchy::Story::Story;
 pub struct ExternalDeclaration {
     pub identifier: Option<Identifier>,
     pub argumentNames: Vec<String>,
-    story: Option<Story>,
 }
 
 impl ExternalDeclaration {
@@ -16,24 +15,16 @@ impl ExternalDeclaration {
         Self {
             identifier: Some(identifier),
             argumentNames,
-            story: None,
         }
     }
 
     // C# signature: public override Ink.Runtime.Object GenerateRuntimeObject ()
     pub fn GenerateRuntimeObject(&mut self) -> Option<()> {
-        let decl = self.clone();
-        let name = decl.get_name().map(|name| name.to_string());
-        if let Some(story) = self.story.as_mut() {
-            if name.is_some() {
-                story.AddExternal(decl);
-            }
-        }
         None
     }
 
     pub fn ResolveReferences(&mut self, context: &mut Story) {
-        self.story = Some(context.clone());
+        context.AddExternal(self.clone());
     }
 
     // C# signature: string name { get; }
@@ -51,5 +42,30 @@ impl ExternalDeclaration {
     // C# signature: List<string> argumentNames { get; }
     pub fn get_argumentNames(&self) -> &[String] {
         &self.argumentNames
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ExternalDeclaration;
+    use crate::ParsedHierarchy::Identifier::Identifier;
+    use crate::ParsedHierarchy::Story::Story;
+
+    #[test]
+    fn registers_with_story_during_resolution() {
+        let mut story = Story::default();
+        let mut decl = ExternalDeclaration::new(
+            Identifier {
+                name: Some("my_external".to_string()),
+                debugMetadata: None,
+            },
+            vec!["arg".to_string()],
+        );
+
+        decl.ResolveReferences(&mut story);
+
+        assert!(story.IsExternal("my_external".to_string()));
+        assert_eq!(decl.get_name(), Some("my_external"));
+        assert_eq!(decl.get_argumentNames(), &["arg".to_string()]);
     }
 }
