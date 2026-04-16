@@ -18,3 +18,19 @@ impl CommandLineInput {
         Self::default()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::CommandLineInput;
+
+    #[test]
+    fn defaults_match_csharp_data_shape() {
+        let input = CommandLineInput::new();
+        assert!(!input.isHelp);
+        assert!(!input.isExit);
+        assert!(input.choiceInput.is_none());
+        assert!(input.debugSource.is_none());
+        assert!(input.debugPathLookup.is_none());
+        assert!(input.userImmediateModeStatement.is_none());
+    }
+}

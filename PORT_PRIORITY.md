@@ -1,135 +1,135 @@
-# Rust Port Priority
+# Port Priority
 
-Single canonical progress list for all Rust files under `ink-rust/`.
+This file orders the official C# source files for implementation work in `ink-rust/`.
 
-Ordering rule: files with fewer direct runtime/compiler dependencies come first. Keep this list top-to-bottom in implementation priority order.
+Ordering rule: files with fewer direct references to types defined in the same area come first. The `deps=N` value is an approximate static count of directly referenced source files in the same list. It is a guide for implementation order, not a hard architectural rule. Cycles and C# partial classes still require judgement.
 
-Status tags: `[ported]`, `[partial: ...]`, `[skeleton]`, `[infra]`.
+Reference projects remain read-only. Implement work in `ink-rust/`.
+
+Completion annotations: append `[ported]` to a file entry only after that file's corresponding Rust implementation fully matches the C# source file according to `AGENTS.md`'s file port completion standard and `make -C ink-rust gate` passes. Do not mark partial type wiring, compile-only cleanup, or skeleton removal as ported.
+
+Partial annotations: if a file is too large or difficult to finish in one pass and a partial implementation must be committed, append `[partial: reason=<why>; missing=<unfinished C# behavior>; next=<dependency or next step>]`. Keep this short but concrete enough that a later agent can finish the file without rediscovering the gap. Remove the partial annotation or replace it with `[ported]` when the file is completed.
 
 ## Runtime
 
-1. `ink-rust/crates/ink-runtime/src/DebugMetadata.rs` [ported]
-2. `ink-rust/crates/ink-runtime/src/Error.rs` [ported]
-3. `ink-rust/crates/ink-runtime/src/INamedContent.rs` [ported]
-4. `ink-rust/crates/ink-runtime/src/PushPop.rs` [ported]
-5. `ink-rust/crates/ink-runtime/src/StoryException.rs` [ported]
-6. `ink-rust/crates/ink-runtime/src/StringJoinExtension.rs` [ported]
-7. `ink-rust/crates/ink-runtime/src/ControlCommand.rs` [ported]
-8. `ink-rust/crates/ink-runtime/src/Glue.rs` [ported]
-9. `ink-rust/crates/ink-runtime/src/Path.rs` [ported]
-10. `ink-rust/crates/ink-runtime/src/SimpleJson.rs` [ported]
-11. `ink-rust/crates/ink-runtime/src/Tag.rs` [ported]
-12. `ink-rust/crates/ink-runtime/src/VariableAssignment.rs` [ported]
-13. `ink-rust/crates/ink-runtime/src/Void.rs` [ported]
-14. `ink-rust/crates/ink-runtime/src/ListDefinition.rs` [ported]
-15. `ink-rust/crates/ink-runtime/src/ListDefinitionsOrigin.rs` [ported]
-16. `ink-rust/crates/ink-runtime/src/SearchResult.rs` [partial: reason=temporary enum used before Runtime.Object hierarchy is ported; missing=general Runtime.Object reference/downcast semantics; next=finish Object/Container hierarchy then revise SearchResult]
-17. `ink-rust/crates/ink-runtime/src/StatePatch.rs` [partial: reason=global-variable patching and visit/turn bookkeeping are real, but container identity is tracked through path keys rather than the exact upstream object-reference map; missing=object-identity-based patch lookups and the remaining save-state integration; next=port the Story/Container save graph and decide whether to keep path-keyed patches or reintroduce identity tracking]
-18. `ink-rust/crates/ink-runtime/src/Choice.rs` [partial: reason=CallStack.Thread dependency is still skeleton and Clone uses derived clone; missing=threadAtGeneration.Copy semantics and exact C# copied-field set; next=port CallStack.Thread then fix Choice.Clone]
-19. `ink-rust/crates/ink-runtime/src/InkList.rs` [partial: reason=most list algebra and item/origin semantics are ported, and story-backed construction is now wired through runtime Story listDefinitions, but the compatibility layer still differs from upstream's exact InkList/ListValue shape; missing=exact value/origin object parity and a final audit of the list construction paths; next=continue reconciling runtime list value representation with upstream InkList semantics]
-20. `ink-rust/crates/ink-runtime/src/Pointer.rs` [ported]
-21. `ink-rust/crates/ink-runtime/src/VariableReference.rs` [partial: reason=the runtime reference now carries named and read-count paths, but the container resolution depends on the unported Runtime.Object path search pipeline; missing=containerForCount and full reference-resolution parity; next=port Runtime.Object.ResolvePath and linked container lookup]
-22. `ink-rust/crates/ink-runtime/src/ChoicePoint.rs` [partial: reason=choice state, flags, and path-string handling are real, but target resolution still depends on the unported Runtime.Object.ResolvePath/parent chain; missing=choiceTarget, relative path normalization, and line-number-aware ToString output; next=port Runtime.Object ancestry/path resolution]
-23. `ink-rust/crates/ink-runtime/src/Profiler.rs` [skeleton]
-24. `ink-rust/crates/ink-runtime/src/Value.rs` [partial: reason=the runtime value family now works through a Rust compatibility wrapper rather than the exact C# generic hierarchy; missing=full upstream object/value inheritance surface and later InkList/Object linkage audit; next=port the remaining object hierarchy and reconcile the wrapper with InkList]
-25. `ink-rust/crates/ink-runtime/src/Container.rs` [partial: reason=the container now stores real runtime content items and supports add/insert operations plus indexed path lookup, but parent/backlink bookkeeping and full named content semantics are still incomplete; missing=parent-path traversal, accurate named-content ownership, and full hierarchy stringification; next=introduce real parent links or an equivalent ownership model, then finish named traversal]
-26. `ink-rust/crates/ink-runtime/src/Divert.rs` [partial: reason=target path, variable divert, stack push flags, and stringification are now real, but targetPointer and full path resolution still depend on the unported Runtime.Object.ResolvePath pipeline; missing=targetPointer, relative-path resolution, and target container lookup; next=port Runtime.Object.ResolvePath and container ancestry handling]
-27. `ink-rust/crates/ink-runtime/src/Object.rs` [skeleton]
-28. `ink-rust/crates/ink-runtime/src/Flow.rs` [skeleton]
-29. `ink-rust/crates/ink-runtime/src/NativeFunctionCall.rs` [partial: reason=builtin/operator name detection is now real, but the call evaluator, coercion rules, and native operation table execution are still stubbed; missing=Call parameter validation, type coercion, operation dispatch, and result creation; next=port the native function evaluator and value operation machinery]
-30. `ink-rust/crates/ink-runtime/src/CallStack.rs` [partial: reason=the stack/thread mechanics and temporary-variable storage are now real, but story-root initialization and JSON reconstruction still depend on the unported Story/save-state graph; missing=root pointer setup, SetJsonToken/WriteJson parity, and full thread save-load recovery; next=port the runtime Story and Json serialisation plumbing]
-31. `ink-rust/crates/ink-runtime/src/VariablesState.rs` [partial: reason=global variable lookup, assignment, patch application, and batch observation are now real, but observer callbacks, JSON state reconstruction, and story-level integration still depend on the unported Story/StoryState plumbing; missing=variableChangedEvent handling, SetJsonToken/WriteJson parity, and full default-global snapshot/load wiring; next=port the runtime Story and StoryState save/load graph]
-32. `ink-rust/crates/ink-runtime/src/JsonSerialisation.rs` [partial: reason=runtime object and choice JSON encoding/decoding are now real, but flow/callstack/story save-load still depend on the unported StoryState/Story graph and several runtime object ancestry paths; missing=full Flow.WriteJson/SetJsonToken, CallStack JSON reconstruction, and story-state roundtrip wiring; next=port the story/save-state graph and remaining runtime ancestry helpers]
-33. `ink-rust/crates/ink-runtime/src/StoryState.rs` [skeleton]
-34. `ink-rust/crates/ink-runtime/src/Story.rs` [skeleton]
+Source area: `ink-c-sharp/ink-engine-runtime/`
 
-Runtime infrastructure
+1. `DebugMetadata.cs` (`deps=0`) [ported]
+2. `Error.cs` (`deps=0`) [ported]
+3. `INamedContent.cs` (`deps=0`) [ported]
+4. `PushPop.cs` (`deps=0`) [ported]
+5. `StoryException.cs` (`deps=0`) [ported]
+6. `StringJoinExtension.cs` (`deps=0`) [ported]
+7. `ControlCommand.cs` (`deps=1`) [ported]
+8. `Glue.cs` (`deps=1`) [ported]
+9. `Path.cs` (`deps=1`) [ported]
+10. `SimpleJson.cs` (`deps=1`) [ported]
+11. `Tag.cs` (`deps=1`) [ported]
+12. `VariableAssignment.cs` (`deps=1`) [ported]
+13. `Void.cs` (`deps=1`) [ported]
+14. `ListDefinition.cs` (`deps=2`) [ported]
+15. `ListDefinitionsOrigin.cs` (`deps=2`) [ported]
+16. `SearchResult.cs` (`deps=2`) [partial: reason=temporary enum used before Runtime.Object hierarchy is ported; missing=general Runtime.Object reference/downcast semantics; next=finish Object/Container hierarchy then revise SearchResult]
+17. `StatePatch.cs` (`deps=2`) [partial: reason=global-variable patching and visit/turn bookkeeping are real, but container identity is tracked through path keys rather than the exact upstream object-reference map; missing=object-identity-based patch lookups and the remaining save-state integration; next=port the Story/Container save graph and decide whether to keep path-keyed patches or reintroduce identity tracking]
+18. `Choice.cs` (`deps=3`) [partial: reason=CallStack.Thread dependency is still skeleton and Clone uses derived clone; missing=threadAtGeneration.Copy semantics and exact C# copied-field set; next=port CallStack.Thread then fix Choice.Clone]
+19. `InkList.cs` (`deps=3`) [partial: reason=most list algebra and item/origin semantics are ported, and story-backed construction is now wired through runtime Story listDefinitions, but the compatibility layer still differs from upstream's exact InkList/ListValue shape; missing=exact value/origin object parity and a final audit of the list construction paths; next=continue reconciling runtime list value representation with upstream InkList semantics]
+20. `Pointer.cs` (`deps=3`) [ported]
+21. `VariableReference.cs` (`deps=3`) [partial: reason=the runtime reference now carries named and read-count paths, but the container resolution depends on the unported Runtime.Object path search pipeline; missing=containerForCount and full reference-resolution parity; next=port Runtime.Object.ResolvePath and linked container lookup]
+22. `ChoicePoint.cs` (`deps=4`) [partial: reason=choice state, flags, and path-string handling are real, but target resolution still depends on the unported Runtime.Object.ResolvePath/parent chain; missing=choiceTarget, relative path normalization, and line-number-aware ToString output; next=port Runtime.Object ancestry/path resolution]
+23. `Profiler.cs` (`deps=4`)
+24. `Value.cs` (`deps=4`) [partial: reason=the runtime value family now works through a Rust compatibility wrapper rather than the exact C# generic hierarchy; missing=full upstream object/value inheritance surface and later InkList/Object linkage audit; next=port the remaining object hierarchy and reconcile the wrapper with InkList]
+25. `Container.cs` (`deps=5`) [partial: reason=the container now stores real runtime content items and supports add/insert operations plus indexed path lookup, but parent/backlink bookkeeping and full named content semantics are still incomplete; missing=parent-path traversal, accurate named-content ownership, and full hierarchy stringification; next=introduce real parent links or an equivalent ownership model, then finish named traversal]
+26. `Divert.cs` (`deps=5`) [partial: reason=target path, variable divert, stack push flags, and stringification are now real, but targetPointer and full path resolution still depend on the unported Runtime.Object.ResolvePath pipeline; missing=targetPointer, relative-path resolution, and target container lookup; next=port Runtime.Object.ResolvePath and container ancestry handling]
+27. `Object.cs` (`deps=5`)
+28. `Flow.cs` (`deps=6`)
+29. `NativeFunctionCall.cs` (`deps=7`) [partial: reason=builtin/operator name detection is now real, but the call evaluator, coercion rules, and native operation table execution are still stubbed; missing=Call parameter validation, type coercion, operation dispatch, and result creation; next=port the native function evaluator and value operation machinery]
+30. `CallStack.cs` (`deps=8`) [partial: reason=the stack/thread mechanics and temporary-variable storage are now real, but story-root initialization and JSON reconstruction still depend on the unported Story/save-state graph; missing=root pointer setup, SetJsonToken/WriteJson parity, and full thread save-load recovery; next=port the runtime Story and Json serialisation plumbing]
+31. `VariablesState.cs` (`deps=9`) [partial: reason=global variable lookup, assignment, patch application, and batch observation are now real, but observer callbacks, JSON state reconstruction, and story-level integration still depend on the unported Story/StoryState plumbing; missing=variableChangedEvent handling, SetJsonToken/WriteJson parity, and full default-global snapshot/load wiring; next=port the runtime Story and StoryState save/load graph]
+32. `JsonSerialisation.cs` (`deps=19`) [partial: reason=runtime object and choice JSON encoding/decoding are now real, but flow/callstack/story save-load still depend on the unported StoryState/Story graph and several runtime object ancestry paths; missing=full Flow.WriteJson/SetJsonToken, CallStack JSON reconstruction, and story-state roundtrip wiring; next=port the story/save-state graph and remaining runtime ancestry helpers]
+33. `StoryState.cs` (`deps=20`)
+34. `Story.cs` (`deps=29`)
 
-- `ink-rust/crates/ink-runtime/Cargo.toml` [infra]
-- `ink-rust/crates/ink-runtime/src/lib.rs` [infra]
-- `ink-rust/crates/ink-runtime/src/stub.rs` [infra]
+Recommended runtime implementation phases:
+
+- Phase R1: `DebugMetadata.cs` through `Void.cs`
+- Phase R2: `ListDefinition.cs` through `VariableReference.cs`
+- Phase R3: `ChoicePoint.cs` through `Object.cs`
+- Phase R4: `Flow.cs` through `VariablesState.cs`
+- Phase R5: `JsonSerialisation.cs`, `StoryState.cs`, `Story.cs`
 
 ## Compiler
 
-1. `ink-rust/crates/ink-compiler/src/CharacterSet.rs` [ported]
-2. `ink-rust/crates/ink-compiler/src/CommandLineInput.rs` [ported]
-3. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/INamedContent.rs` [ported]
-4. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Identifier.rs` [ported]
-5. `ink-rust/crates/ink-compiler/src/StringParser/StringParserState.rs` [ported]
-6. `ink-rust/crates/ink-compiler/src/CharacterRange.rs` [ported]
-7. `ink-rust/crates/ink-compiler/src/FileHandler.rs` [ported]
-8. `ink-rust/crates/ink-compiler/src/InkStringConversionExtensions.rs` [ported]
-9. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/AuthorWarning.rs` [partial: reason=Parsed.Object warning plumbing is not ported; missing=GenerateRuntimeObject must call Warning(warningMessage); next=port ParsedHierarchy/Object error-warning context]
-10. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Number.rs` [ported]
-11. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Tag.rs` [ported]
-12. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Text.rs` [ported]
-13. `ink-rust/crates/ink-compiler/src/Plugins/Plugin.rs` [ported]
-14. `ink-rust/crates/ink-compiler/src/InkParser/CommentEliminator.rs` [ported]
-15. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_AuthorWarning.rs` [skeleton]
-16. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/IncludedFile.rs` [ported]
-17. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Return.rs` [skeleton]
-18. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Wrap.rs` [ported]
-19. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Include.rs` [skeleton]
-20. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Whitespace.rs` [skeleton]
-21. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/ContentList.rs` [skeleton]
-22. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/FlowLevel.rs` [ported]
-23. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/IWeavePoint.rs` [ported]
-24. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/List.rs` [skeleton]
-25. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_CharacterRanges.rs` [skeleton]
-26. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_CommandLineInput.rs` [skeleton]
-27. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/ConstantDeclaration.rs` [ported]
-28. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/ExternalDeclaration.rs` [partial: reason=external registration now happens during ResolveReferences, but the parser-side story ancestry chain is still incomplete and the call-order parity with upstream has not been audited end-to-end; missing=full AST parent/story wiring and a final timing audit against upstream GenerateRuntimeObject registration; next=port ParsedHierarchy/Object parent links and verify the registration timing against the C# pipeline]
-29. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/StringExpression.rs` [skeleton]
-30. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/TunnelOnwards.rs` [skeleton]
-31. `ink-rust/crates/ink-compiler/src/Plugins/PluginManager.rs` [skeleton]
-32. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Conditional.rs` [skeleton]
-33. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Gather.rs` [skeleton]
-34. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/ListDefinition.rs` [ported]
-35. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Stitch.rs` [skeleton]
-36. `ink-rust/crates/ink-compiler/src/StringParser/StringParser.rs` [skeleton]
-37. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Tags.rs` [skeleton]
-38. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Sequence.rs` [skeleton]
-39. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Divert.rs` [skeleton]
-40. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/ConditionalSingleBranch.rs` [skeleton]
-41. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Knot.rs` [skeleton]
-42. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/VariableAssignment.rs` [skeleton]
-43. `ink-rust/crates/ink-compiler/src/Stats.rs` [skeleton]
-44. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Choices.rs` [skeleton]
-45. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Conditional.rs` [skeleton]
-46. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Content.rs` [skeleton]
-47. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Sequences.rs` [skeleton]
-48. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Object.rs` [skeleton]
-49. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Path.rs` [partial: reason=path component storage and string formatting are real, but ancestry-based resolution still depends on the unported ParsedHierarchy.Object/FlowBase tree; missing=ResolveFromContext and child lookup through the parser hierarchy; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase]
-50. `ink-rust/crates/ink-compiler/src/InkParser/InkParser.rs` [skeleton]
-51. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/FunctionCall.rs` [partial: reason=builtin name detection is now real, but proxy divert generation, native function generation, and special-case argument handling are still stubbed; missing=GenerateIntoContainer, ResolveReferences, and the runtime/linkage-backed properties; next=port the full function-call generation path]
-52. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/VariableReference.rs` [partial: reason=constant and list-item recognition are now wired, but read-count resolution and full ancestry-based variable lookup still depend on the unported parser object tree; missing=read-count resolution, ResolveReferences parity, and runtime variable reference generation for the remaining cases; next=port ParsedHierarchy/Object and ParsedHierarchy/Path resolution]
-53. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Statements.rs` [skeleton]
-54. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Divert.rs` [skeleton]
-55. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/DivertTarget.rs` [skeleton]
-56. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Expression.rs` [skeleton]
-57. `ink-rust/crates/ink-compiler/src/Compiler.rs` [skeleton]
-58. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Knot.rs` [skeleton]
-59. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Choice.rs` [skeleton]
-60. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Expressions.rs` [skeleton]
-61. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/FlowBase.rs` [skeleton]
-62. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Story.rs` [partial: reason=the parser-side story now handles symbol registration and list/external lookup, but top-level object processing, runtime export, and the full variable-resolution / weave-processing pipeline are still skeletons; missing=top-level AST traversal, runtime export, flattening, and variable resolution; next=port ParsedHierarchy/FlowBase, ParsedHierarchy/Object, and the remaining export pipeline]
-63. `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Weave.rs` [skeleton]
-64. `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Logic.rs` [skeleton]
+Source area: `ink-c-sharp/compiler/`
 
-Compiler infrastructure
+1. `CharacterSet.cs` (`deps=0`) [ported]
+2. `CommandLineInput.cs` (`deps=0`) [ported]
+3. `ParsedHierarchy/INamedContent.cs` (`deps=0`) [ported]
+4. `ParsedHierarchy/Identifier.cs` (`deps=0`) [ported]
+5. `StringParser/StringParserState.cs` (`deps=0`) [ported]
+6. `CharacterRange.cs` (`deps=1`) [ported]
+7. `FileHandler.cs` (`deps=1`) [ported]
+8. `InkStringConversionExtensions.cs` (`deps=1`) [ported]
+9. `ParsedHierarchy/AuthorWarning.cs` (`deps=1`) [partial: reason=Parsed.Object warning plumbing is not ported; missing=GenerateRuntimeObject must call Warning(warningMessage); next=port ParsedHierarchy/Object error-warning context]
+10. `ParsedHierarchy/Number.cs` (`deps=1`) [ported]
+11. `ParsedHierarchy/Tag.cs` (`deps=1`) [ported]
+12. `ParsedHierarchy/Text.cs` (`deps=1`) [ported]
+13. `Plugins/Plugin.cs` (`deps=1`) [ported]
+14. `InkParser/CommentEliminator.cs` (`deps=2`) [ported]
+15. `InkParser/InkParser_AuthorWarning.cs` (`deps=2`)
+16. `ParsedHierarchy/IncludedFile.cs` (`deps=2`) [ported]
+17. `ParsedHierarchy/Return.cs` (`deps=2`)
+18. `ParsedHierarchy/Wrap.cs` (`deps=2`) [ported]
+19. `InkParser/InkParser_Include.cs` (`deps=3`)
+20. `InkParser/InkParser_Whitespace.cs` (`deps=3`)
+21. `ParsedHierarchy/ContentList.cs` (`deps=3`)
+22. `ParsedHierarchy/FlowLevel.cs` (`deps=3`) [ported]
+23. `ParsedHierarchy/IWeavePoint.cs` (`deps=3`) [ported]
+24. `ParsedHierarchy/List.cs` (`deps=3`)
+25. `InkParser/InkParser_CharacterRanges.cs` (`deps=4`)
+26. `InkParser/InkParser_CommandLineInput.cs` (`deps=4`)
+27. `ParsedHierarchy/ConstantDeclaration.cs` (`deps=4`) [ported]
+28. `ParsedHierarchy/ExternalDeclaration.cs` (`deps=4`) [partial: reason=external registration now happens during ResolveReferences, but the parser-side story ancestry chain is still incomplete and the call-order parity with upstream has not been audited end-to-end; missing=full AST parent/story wiring and a final timing audit against upstream GenerateRuntimeObject registration; next=port ParsedHierarchy/Object parent links and verify the registration timing against the C# pipeline]
+29. `ParsedHierarchy/StringExpression.cs` (`deps=4`)
+30. `ParsedHierarchy/TunnelOnwards.cs` (`deps=4`)
+31. `Plugins/PluginManager.cs` (`deps=4`)
+32. `ParsedHierarchy/Conditional.cs` (`deps=5`)
+33. `ParsedHierarchy/Gather.cs` (`deps=5`)
+34. `ParsedHierarchy/ListDefinition.cs` (`deps=5`) [ported]
+35. `ParsedHierarchy/Stitch.cs` (`deps=5`)
+36. `StringParser/StringParser.cs` (`deps=5`)
+37. `InkParser/InkParser_Tags.cs` (`deps=6`)
+38. `ParsedHierarchy/Sequence.cs` (`deps=6`)
+39. `InkParser/InkParser_Divert.cs` (`deps=7`)
+40. `ParsedHierarchy/ConditionalSingleBranch.cs` (`deps=7`)
+41. `ParsedHierarchy/Knot.cs` (`deps=7`)
+42. `ParsedHierarchy/VariableAssignment.cs` (`deps=7`)
+43. `Stats.cs` (`deps=7`)
+44. `InkParser/InkParser_Choices.cs` (`deps=8`)
+45. `InkParser/InkParser_Conditional.cs` (`deps=8`)
+46. `InkParser/InkParser_Content.cs` (`deps=8`)
+47. `InkParser/InkParser_Sequences.cs` (`deps=8`)
+48. `ParsedHierarchy/Object.cs` (`deps=8`)
+49. `ParsedHierarchy/Path.cs` (`deps=8`) [partial: reason=path component storage and string formatting are real, but ancestry-based resolution still depends on the unported ParsedHierarchy.Object/FlowBase tree; missing=ResolveFromContext and child lookup through the parser hierarchy; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase]
+50. `InkParser/InkParser.cs` (`deps=9`)
+51. `ParsedHierarchy/FunctionCall.cs` (`deps=9`) [partial: reason=builtin name detection is now real, but proxy divert generation, native function generation, and special-case argument handling are still stubbed; missing=GenerateIntoContainer, ResolveReferences, and the runtime/linkage-backed properties; next=port the full function-call generation path]
+52. `ParsedHierarchy/VariableReference.cs` (`deps=9`) [partial: reason=constant and list-item recognition are now wired, but read-count resolution and full ancestry-based variable lookup still depend on the unported parser object tree; missing=read-count resolution, ResolveReferences parity, and runtime variable reference generation for the remaining cases; next=port ParsedHierarchy/Object and ParsedHierarchy/Path resolution]
+53. `InkParser/InkParser_Statements.cs` (`deps=10`)
+54. `ParsedHierarchy/Divert.cs` (`deps=10`)
+55. `ParsedHierarchy/DivertTarget.cs` (`deps=10`)
+56. `ParsedHierarchy/Expression.cs` (`deps=10`)
+57. `Compiler.cs` (`deps=11`)
+58. `InkParser/InkParser_Knot.cs` (`deps=11`)
+59. `ParsedHierarchy/Choice.cs` (`deps=11`)
+60. `InkParser/InkParser_Expressions.cs` (`deps=15`)
+61. `ParsedHierarchy/FlowBase.cs` (`deps=16`)
+62. `ParsedHierarchy/Story.cs` (`deps=16`) [partial: reason=the parser-side story now handles symbol registration and list/external lookup, but top-level object processing, runtime export, and the full variable-resolution / weave-processing pipeline are still skeletons; missing=top-level AST traversal, runtime export, flattening, and variable resolution; next=port ParsedHierarchy/FlowBase, ParsedHierarchy/Object, and the remaining export pipeline]
+63. `ParsedHierarchy/Weave.cs` (`deps=16`)
+64. `InkParser/InkParser_Logic.cs` (`deps=19`)
 
-- `ink-rust/crates/ink-compiler/Cargo.toml` [infra]
-- `ink-rust/crates/ink-compiler/src/lib.rs` [infra]
-- `ink-rust/crates/ink-compiler/src/stub.rs` [infra]
-- `ink-rust/crates/ink-compiler/src/InkParser/mod.rs` [infra]
-- `ink-rust/crates/ink-compiler/src/ParsedHierarchy/mod.rs` [infra]
-- `ink-rust/crates/ink-compiler/src/Plugins/mod.rs` [infra]
-- `ink-rust/crates/ink-compiler/src/StringParser/mod.rs` [infra]
+Recommended compiler implementation phases:
 
-## Tests And CLI
-
-- `ink-rust/crates/ink-tests/Cargo.toml` [infra]
-- `ink-rust/crates/ink-tests/src/lib.rs` [infra]
-- `ink-rust/crates/inklecate/Cargo.toml` [infra]
-- `ink-rust/crates/inklecate/src/main.rs` [infra]
-
+- Phase C1: `CharacterSet.cs` through `Plugins/Plugin.cs`
+- Phase C2: `InkParser/CommentEliminator.cs` through `Plugins/PluginManager.cs`
+- Phase C3: `ParsedHierarchy/Conditional.cs` through `Stats.cs`
+- Phase C4: `InkParser/InkParser_Choices.cs` through `ParsedHierarchy/VariableReference.cs`
+- Phase C5: `InkParser/InkParser_Statements.cs` through `InkParser/InkParser_Logic.cs`
