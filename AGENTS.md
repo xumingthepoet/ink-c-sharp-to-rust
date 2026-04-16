@@ -63,6 +63,7 @@ The first pass is structural, not idiomatic. The goal is to use the official C# 
 
 4. Fill implementation holes file by file.
    - For each Rust file, read the corresponding C# file first.
+   - Translate by symbol, not by whole file: one class/interface/enum first, then one method group, then the surrounding module.
    - Translate behavior in small sections while preserving the original control flow where practical.
    - If Rust ownership requires helper functions or wrapper types, add them locally and keep their purpose obvious.
    - If `blade-ink-rs` suggests a simpler Rust shape, use it only after confirming it preserves official C# behavior.
@@ -71,6 +72,27 @@ The first pass is structural, not idiomatic. The goal is to use the official C# 
    - Once all ported tests pass, refactor toward idiomatic Rust.
    - Each Rustification step must preserve behavior and rerun the relevant tests.
    - Renaming files to snake_case, reducing `Rc<RefCell<_>>`, improving error types, and simplifying APIs belong in this final phase.
+
+## Symbol Translation Contract
+
+When implementing a symbol, gather the following before writing Rust:
+
+- The C# code for the class, interface, enum, or method group being translated.
+- Referenced types and signatures needed by that symbol.
+- Nullability expectations, including where C# uses `null` as a meaningful state.
+- Exceptions thrown or propagated by the C# code.
+- Collection types and their mutability/ordering semantics.
+- The target Rust module skeleton in `ink-rust/`.
+
+Use this fixed translation contract unless an explicit compatibility reason requires otherwise:
+
+- C# class -> Rust struct plus impl blocks.
+- C# interface -> Rust trait.
+- C# sum-like type or discriminated state -> Rust enum.
+- C# nullable/reference-null state -> `Option<T>`.
+- C# APIs that throw for expected failure paths -> `Result<T, E>`.
+- Do not use `unsafe` unless it is necessary and justified.
+- Prefer `&T` and `&mut T` over cloning; clone only when ownership requires it or C# value semantics require a copy.
 
 ## Useful Source Areas
 
