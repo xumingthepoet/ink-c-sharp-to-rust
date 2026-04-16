@@ -604,7 +604,11 @@ impl Json {
         let value = raw_list.get_entries().clone();
         let originNames = raw_list.get_originNames();
 
-        Some(ListValue { value, originNames })
+        Some(ListValue {
+            value,
+            originNames,
+            origins: None,
+        })
     }
 
     fn JArrayToTags(jObj: &JsonObject) -> Option<Vec<String>> {

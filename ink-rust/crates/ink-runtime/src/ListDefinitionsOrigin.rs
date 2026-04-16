@@ -26,7 +26,8 @@ impl ListDefinitionsOrigin {
             origin.lists.insert(list_name.clone(), list.clone());
 
             for (item, val) in list.get_items().clone() {
-                let list_value = ListValue::new_overload_3(item.clone(), val);
+                let mut list_value = ListValue::new_overload_3(item.clone(), val);
+                list_value.origins = Some(vec![list.clone()]);
                 if let Some(item_name) = item.itemName.clone() {
                     origin
                         .allUnambiguousListValueCache

@@ -1,6 +1,7 @@
 // Source: ink-c-sharp/ink-engine-runtime/Value.cs
 
 use crate::InkList::InkListItem;
+use crate::ListDefinition::ListDefinition;
 use crate::Path::Path;
 use crate::StoryException::StoryException;
 use std::collections::HashMap;
@@ -83,6 +84,7 @@ pub struct VariablePointerValue {
 pub struct ListValue {
     pub value: HashMap<InkListItem, i32>,
     pub originNames: Option<Vec<String>>,
+    pub origins: Option<Vec<ListDefinition>>,
 }
 
 impl Default for StringValue {
@@ -417,6 +419,7 @@ impl ListValue {
         Self {
             value: HashMap::new(),
             originNames: None,
+            origins: None,
         }
     }
 
@@ -424,6 +427,7 @@ impl ListValue {
         Self {
             value,
             originNames: None,
+            origins: None,
         }
     }
 
@@ -433,6 +437,7 @@ impl ListValue {
         Self {
             value,
             originNames: None,
+            origins: None,
         }
     }
 
@@ -481,6 +486,10 @@ impl ListValue {
         self.originNames.as_deref()
     }
 
+    pub fn get_origins(&self) -> Option<&[ListDefinition]> {
+        self.origins.as_deref()
+    }
+
     pub fn get_maxItem(&self) -> Option<(&InkListItem, i32)> {
         self.max_item()
     }
@@ -490,6 +499,7 @@ impl ListValue {
             if let Value::List(newList) = newValue {
                 if newList.value.is_empty() {
                     newList.originNames = oldList.originNames.clone();
+                    newList.origins = oldList.origins.clone();
                 }
             }
         }

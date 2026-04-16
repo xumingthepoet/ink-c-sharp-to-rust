@@ -1,11 +1,15 @@
 // Source: ink-c-sharp/ink-engine-runtime/VariablesState.cs
 
 use crate::CallStack::CallStack;
+use crate::JsonSerialisation::Json;
 use crate::ListDefinitionsOrigin::ListDefinitionsOrigin;
+use crate::SimpleJson::{JsonObject, Writer};
 use crate::StatePatch::StatePatch;
 use crate::StoryException::StoryException;
 use crate::Value::{ListValue, Value, VariablePointerValue};
 use std::collections::{HashMap, HashSet};
+
+const DONT_SAVE_DEFAULT_VALUES: bool = true;
 
 #[derive(Clone, Debug)]
 pub struct VariablesState {
@@ -101,17 +105,59 @@ impl VariablesState {
     }
 
     // C# signature: public void SetJsonToken(Dictionary<string, object> jToken)
-    pub fn SetJsonToken(&mut self, _jToken: HashMap<String, crate::stub::PortStub>) {
-        todo!("port runtime VariablesState.SetJsonToken after StoryState/Json serialisation are translated");
+    pub fn SetJsonToken(&mut self, jToken: JsonObject) {
+        self.globalVariables.clear();
+
+        for (name, default_value) in &self.defaultGlobalVariables {
+            if let Some(loaded_token) = jToken.get(name) {
+                if let Some(runtime_obj) = Json::JTokenToRuntimeObject(loaded_token.clone()) {
+                    match runtime_obj {
+                        crate::Container::ContentItem::Value(value) => {
+                            self.globalVariables.insert(name.clone(), value);
+                        }
+                        _ => panic!(
+                            "Unexpected non-value runtime object when loading global variable {}",
+                            name
+                        ),
+                    }
+                } else {
+                    self.globalVariables
+                        .insert(name.clone(), default_value.clone());
+                }
+            } else {
+                self.globalVariables
+                    .insert(name.clone(), default_value.clone());
+            }
+        }
     }
 
     // C# signature: public void WriteJson(SimpleJson.Writer writer)
-    pub fn WriteJson(&mut self, _writer: crate::stub::Writer) {
-        todo!("port runtime VariablesState.WriteJson after StoryState/Json serialisation are translated");
+    pub fn WriteJson(&mut self, writer: &mut Writer) {
+        writer
+            .WriteObject(|writer| {
+                for (name, value) in &self.globalVariables {
+                    if DONT_SAVE_DEFAULT_VALUES {
+                        if let Some(default_value) = self.defaultGlobalVariables.get(name) {
+                            if self.RuntimeObjectsEqual(value, default_value) {
+                                continue;
+                            }
+                        }
+                    }
+
+                    writer.WritePropertyStart(name.clone())?;
+                    Json::WriteRuntimeObject(
+                        writer,
+                        &crate::Container::ContentItem::Value(value.clone()),
+                    );
+                    writer.WritePropertyEnd()?;
+                }
+                Ok(())
+            })
+            .unwrap_or_else(|err| panic!("{}", err));
     }
 
     // C# signature: public bool RuntimeObjectsEqual(Runtime.Object obj1, Runtime.Object obj2)
-    pub fn RuntimeObjectsEqual(&mut self, obj1: &Value, obj2: &Value) -> bool {
+    pub fn RuntimeObjectsEqual(&self, obj1: &Value, obj2: &Value) -> bool {
         match (obj1, obj2) {
             (Value::Bool(a), Value::Bool(b)) => a.value == b.value,
             (Value::Int(a), Value::Int(b)) => a.value == b.value,

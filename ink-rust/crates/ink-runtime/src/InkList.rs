@@ -183,7 +183,7 @@ impl InkList {
         {
             let mut list = Self {
                 entries: list_value.value.clone(),
-                origins: None,
+                origins: list_value.origins.clone(),
                 origin_names: list_value.originNames.clone(),
             };
             if let Some(origin_name) = list_value
