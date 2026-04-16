@@ -29,7 +29,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 13. `Void.cs` (`deps=1`) [ported]
 14. `ListDefinition.cs` (`deps=2`) [ported]
 15. `ListDefinitionsOrigin.cs` (`deps=2`) [ported]
-16. `SearchResult.cs` (`deps=2`) [partial: reason=temporary enum used before Runtime.Object hierarchy is ported; missing=general Runtime.Object reference/downcast semantics; next=finish Object/Container hierarchy then revise SearchResult]
+16. `SearchResult.cs` (`deps=2`) [ported]
 17. `StatePatch.cs` (`deps=2`) [partial: reason=global-variable patching and visit/turn bookkeeping are real, but container identity is tracked through path keys rather than the exact upstream object-reference map; missing=object-identity-based patch lookups and the remaining save-state integration; next=port the Story/Container save graph and decide whether to keep path-keyed patches or reintroduce identity tracking]
 18. `Choice.cs` (`deps=3`) [ported]
 19. `InkList.cs` (`deps=3`) [partial: reason=most list algebra and item/origin semantics are ported, and story-backed construction is now wired through runtime Story listDefinitions, but the compatibility layer still differs from upstream's exact InkList/ListValue shape; missing=exact value/origin object parity and a final audit of the list construction paths; next=continue reconciling runtime list value representation with upstream InkList semantics]

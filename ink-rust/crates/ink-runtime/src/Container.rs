@@ -7,7 +7,7 @@ use crate::Divert::Divert;
 use crate::Glue::Glue;
 use crate::NativeFunctionCall::NativeFunctionCall;
 use crate::Path::{Component, Path};
-use crate::SearchResult::{SearchResult, SearchResultObject};
+use crate::SearchResult::SearchResult;
 use crate::Tag::Tag;
 use crate::Value::{ListValue, StringValue, Value};
 use crate::VariableAssignment::VariableAssignment;
@@ -264,7 +264,7 @@ impl Container {
             currentObj = Some(foundObj);
         }
 
-        result.obj = currentObj.map(SearchResultObject::Content);
+        result.obj = currentObj;
         result
     }
 
@@ -444,7 +444,6 @@ mod tests {
     use super::{Container, ContentItem};
     use crate::ControlCommand::ControlCommand;
     use crate::Path::{Component, Path};
-    use crate::SearchResult::SearchResultObject;
 
     #[test]
     fn resolves_indexed_child_container_paths() {
@@ -459,7 +458,7 @@ mod tests {
         assert!(!result.approximate);
         assert!(matches!(
             result.get_correctObj(),
-            Some(SearchResultObject::Content(ContentItem::Container(_)))
+            Some(ContentItem::Container(_))
         ));
         assert_eq!(root.get_pathToFirstLeafContent().ToString(), "0");
     }

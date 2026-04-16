@@ -5,8 +5,8 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 37
-Rust skeleton: 61
+Rust implemented: 38
+Rust skeleton: 60
 Rust missing: 0
 
 | C# file | Rust target | Public types | Public members | Rust state |
@@ -96,7 +96,7 @@ Rust missing: 0
 | `ink-c-sharp/ink-engine-runtime/Pointer.cs` | `ink-rust/crates/ink-runtime/src/Pointer.rs` | 1 | 9 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Profiler.cs` | `ink-rust/crates/ink-runtime/src/Profiler.rs` | 2 | 23 | implemented |
 | `ink-c-sharp/ink-engine-runtime/PushPop.cs` | `ink-rust/crates/ink-runtime/src/PushPop.rs` | 1 | 0 | implemented |
-| `ink-c-sharp/ink-engine-runtime/SearchResult.cs` | `ink-rust/crates/ink-runtime/src/SearchResult.rs` | 1 | 4 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/SearchResult.cs` | `ink-rust/crates/ink-runtime/src/SearchResult.rs` | 1 | 4 | implemented |
 | `ink-c-sharp/ink-engine-runtime/SimpleJson.cs` | `ink-rust/crates/ink-runtime/src/SimpleJson.rs` | 2 | 31 | implemented |
 | `ink-c-sharp/ink-engine-runtime/StatePatch.cs` | `ink-rust/crates/ink-runtime/src/StatePatch.rs` | 1 | 12 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/Story.cs` | `ink-rust/crates/ink-runtime/src/Story.rs` | 1 | 75 | skeleton |
