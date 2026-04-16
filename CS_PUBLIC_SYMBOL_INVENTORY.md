@@ -5,8 +5,8 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 36
-Rust skeleton: 62
+Rust implemented: 37
+Rust skeleton: 61
 Rust missing: 0
 
 | C# file | Rust target | Public types | Public members | Rust state |
@@ -76,7 +76,7 @@ Rust missing: 0
 | `ink-c-sharp/compiler/StringParser/StringParser.cs` | `ink-rust/crates/ink-compiler/src/StringParser/StringParser.rs` | 2 | 39 | skeleton |
 | `ink-c-sharp/compiler/StringParser/StringParserState.cs` | `ink-rust/crates/ink-compiler/src/StringParser/StringParserState.rs` | 2 | 23 | implemented |
 | `ink-c-sharp/ink-engine-runtime/CallStack.cs` | `ink-rust/crates/ink-runtime/src/CallStack.rs` | 3 | 41 | skeleton |
-| `ink-c-sharp/ink-engine-runtime/Choice.cs` | `ink-rust/crates/ink-runtime/src/Choice.rs` | 1 | 11 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/Choice.cs` | `ink-rust/crates/ink-runtime/src/Choice.rs` | 1 | 11 | implemented |
 | `ink-c-sharp/ink-engine-runtime/ChoicePoint.cs` | `ink-rust/crates/ink-runtime/src/ChoicePoint.rs` | 1 | 12 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/Container.cs` | `ink-rust/crates/ink-runtime/src/Container.rs` | 2 | 21 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/ControlCommand.cs` | `ink-rust/crates/ink-runtime/src/ControlCommand.rs` | 2 | 32 | implemented |

@@ -66,6 +66,8 @@ impl Choice {
 #[cfg(test)]
 mod tests {
     use super::Choice;
+    use crate::CallStack::Thread;
+    use crate::Pointer::Pointer;
 
     #[test]
     fn path_string_updates_target_path() {
@@ -82,5 +84,21 @@ mod tests {
             cloned.get_pathStringOnChoice(),
             Some("knot.stitch".to_string())
         );
+    }
+
+    #[test]
+    fn clone_copies_generation_thread() {
+        let mut choice = Choice::new();
+        choice.set_threadAtGeneration(Some(Thread {
+            callstack: Vec::new(),
+            threadIndex: 7,
+            previousPointer: Some(Pointer::Null()),
+        }));
+
+        let cloned = choice.Clone();
+
+        let thread = cloned.get_threadAtGeneration().expect("thread copied");
+        assert_eq!(thread.threadIndex, 7);
+        assert!(thread.previousPointer.as_ref().unwrap().get_isNull());
     }
 }
