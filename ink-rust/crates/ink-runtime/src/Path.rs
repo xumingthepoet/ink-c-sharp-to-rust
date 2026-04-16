@@ -82,7 +82,7 @@ impl std::fmt::Display for Component {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Path {
     components: Vec<Component>,
     pub isRelative: bool,
