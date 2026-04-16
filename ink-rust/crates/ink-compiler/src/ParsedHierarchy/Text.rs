@@ -16,7 +16,7 @@ impl Text {
 
     // C# signature: public override Runtime.Object GenerateRuntimeObject ()
     pub fn GenerateRuntimeObject(&self) -> StringValue {
-        StringValue::default()
+        StringValue::new(self.text.clone())
     }
 
     // C# signature: public override string ToString ()

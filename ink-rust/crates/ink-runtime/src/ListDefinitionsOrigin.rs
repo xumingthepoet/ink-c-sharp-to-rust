@@ -4,23 +4,7 @@ use std::collections::HashMap;
 
 use crate::InkList::InkListItem;
 use crate::ListDefinition::ListDefinition;
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ListValue {
-    pub value: HashMap<InkListItem, i32>,
-}
-
-impl ListValue {
-    pub fn new(value: HashMap<InkListItem, i32>) -> Self {
-        Self { value }
-    }
-
-    pub fn new_overload_2(item: InkListItem, val: i32) -> Self {
-        let mut value = HashMap::new();
-        value.insert(item, val);
-        Self { value }
-    }
-}
+use crate::Value::ListValue;
 
 #[derive(Clone, Debug, Default)]
 pub struct ListDefinitionsOrigin {
@@ -38,7 +22,7 @@ impl ListDefinitionsOrigin {
             origin.lists.insert(list_name.clone(), list.clone());
 
             for (item, val) in list.get_items().clone() {
-                let list_value = ListValue::new_overload_2(item.clone(), val);
+                let list_value = ListValue::new_overload_3(item.clone(), val);
                 if let Some(item_name) = item.itemName.clone() {
                     origin
                         .allUnambiguousListValueCache

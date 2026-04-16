@@ -37,7 +37,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 21. `VariableReference.cs` (`deps=3`)
 22. `ChoicePoint.cs` (`deps=4`)
 23. `Profiler.cs` (`deps=4`)
-24. `Value.cs` (`deps=4`)
+24. `Value.cs` (`deps=4`) [partial: reason=the runtime value family now works through a Rust compatibility wrapper rather than the exact C# generic hierarchy; missing=full upstream object/value inheritance surface and later InkList/Object linkage audit; next=port the remaining object hierarchy and reconcile the wrapper with InkList]
 25. `Container.cs` (`deps=5`)
 26. `Divert.cs` (`deps=5`)
 27. `Object.cs` (`deps=5`)
@@ -72,7 +72,7 @@ Source area: `ink-c-sharp/compiler/`
 9. `ParsedHierarchy/AuthorWarning.cs` (`deps=1`) [partial: reason=Parsed.Object warning plumbing is not ported; missing=GenerateRuntimeObject must call Warning(warningMessage); next=port ParsedHierarchy/Object error-warning context]
 10. `ParsedHierarchy/Number.cs` (`deps=1`)
 11. `ParsedHierarchy/Tag.cs` (`deps=1`) [ported]
-12. `ParsedHierarchy/Text.cs` (`deps=1`) [partial: reason=Runtime.Value/StringValue is still skeleton; missing=GenerateRuntimeObject must create Runtime.StringValue(text); next=port runtime Value/StringValue]
+12. `ParsedHierarchy/Text.cs` (`deps=1`) [ported]
 13. `Plugins/Plugin.cs` (`deps=1`) [ported]
 14. `InkParser/CommentEliminator.cs` (`deps=2`) [ported]
 15. `InkParser/InkParser_AuthorWarning.cs` (`deps=2`)
