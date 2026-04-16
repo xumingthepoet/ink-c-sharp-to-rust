@@ -1,22 +1,17 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/StringJoinExtension.cs
 
-#[derive(Clone, Debug, Default)]
-pub struct StringExt {
-    pub _port_marker: (),
-}
+pub fn Join<T: ToString>(separator: String, objects: Vec<T>) -> String {
+    let mut result = String::new();
+    let mut first = true;
 
-impl StringExt {
-    pub fn new() -> Self {
-        Self::default()
+    for o in objects {
+        if !first {
+            result.push_str(&separator);
+        }
+
+        result.push_str(&o.to_string());
+        first = false;
     }
 
-    // C# signature: public static string Join<T>(string separator, List<T> objects)
-    pub fn Join<T: ToString>(_separator: String, _objects: Vec<T>) -> String {
-        _objects
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join(&_separator)
-    }
+    result
 }

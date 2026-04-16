@@ -200,7 +200,7 @@ impl Path {
         components.push(_c);
         Path {
             components,
-            isRelative: self.isRelative,
+            isRelative: false,
         }
     }
 
