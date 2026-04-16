@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::io::Write;
 
 pub type JsonObject = HashMap<String, JsonValue>;
 pub type JsonArray = Vec<JsonValue>;
@@ -33,9 +34,10 @@ pub struct Reader {
     rootObject: JsonValue,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Default)]
 pub struct Writer {
     output: String,
+    stream: Option<Box<dyn Write>>,
     stateStack: Vec<StateElement>,
 }
 
@@ -374,11 +376,30 @@ impl Reader {
 
 impl Writer {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            output: String::new(),
+            stream: None,
+            stateStack: Vec::new(),
+        }
+    }
+
+    // C# signature: public Writer(Stream stream)
+    pub fn new_overload_2(stream: Box<dyn Write>) -> Self {
+        Self {
+            output: String::new(),
+            stream: Some(stream),
+            stateStack: Vec::new(),
+        }
     }
 
     // C# signature: public void Clear()
     pub fn Clear(&mut self) {
+        if self.stream.is_some() {
+            panic!(
+                "Writer.Clear() is only supported for the StringWriter variant, not for streams"
+            );
+        }
+
         self.output.clear();
     }
 
@@ -399,15 +420,18 @@ impl Writer {
             type_: State::Object,
             childCount: 0,
         });
-        self.output.push('{');
+        self.push_char('{')?;
         Ok(())
     }
 
     // C# signature: public void WriteObjectEnd()
     pub fn WriteObjectEnd(&mut self) -> Result<(), String> {
         self.Assert(self.state() == State::Object)?;
-        self.output.push('}');
+        self.push_char('}')?;
         self.stateStack.pop();
+        if self.state() == State::None {
+            self.flush_stream()?;
+        }
         Ok(())
     }
 
@@ -479,10 +503,10 @@ impl Writer {
         self.Assert(self.state() == State::Object)?;
 
         if self.childCount() > 0 {
-            self.output.push(',');
+            self.push_char(',')?;
         }
 
-        self.output.push('"');
+        self.push_char('"')?;
         self.IncrementChildCount()?;
         self.stateStack.push(StateElement {
             type_: State::Property,
@@ -499,7 +523,7 @@ impl Writer {
     // C# signature: public void WritePropertyNameEnd()
     pub fn WritePropertyNameEnd(&mut self) -> Result<(), String> {
         self.Assert(self.state() == State::PropertyName)?;
-        self.output.push_str("\":");
+        self.push_str("\":")?;
         self.stateStack.pop();
         Ok(())
     }
@@ -507,7 +531,7 @@ impl Writer {
     // C# signature: public void WritePropertyNameInner(string str)
     pub fn WritePropertyNameInner(&mut self, str: String) -> Result<(), String> {
         self.Assert(self.state() == State::PropertyName)?;
-        self.output.push_str(&str);
+        self.push_str(&str)?;
         Ok(())
     }
 
@@ -518,14 +542,14 @@ impl Writer {
             type_: State::Array,
             childCount: 0,
         });
-        self.output.push('[');
+        self.push_char('[')?;
         Ok(())
     }
 
     // C# signature: public void WriteArrayEnd()
     pub fn WriteArrayEnd(&mut self) -> Result<(), String> {
         self.Assert(self.state() == State::Array)?;
-        self.output.push(']');
+        self.push_char(']')?;
         self.stateStack.pop();
         Ok(())
     }
@@ -533,7 +557,7 @@ impl Writer {
     // C# signature: public void Write(int i)
     pub fn Write(&mut self, i: i32) -> Result<(), String> {
         self.StartNewObject(false)?;
-        self.output.push_str(&i.to_string());
+        self.push_str(&i.to_string())?;
         Ok(())
     }
 
@@ -543,23 +567,23 @@ impl Writer {
 
         if f.is_infinite() {
             if f.is_sign_positive() {
-                self.output.push_str("3.4E+38");
+                self.push_str("3.4E+38")?;
             } else {
-                self.output.push_str("-3.4E+38");
+                self.push_str("-3.4E+38")?;
             }
             return Ok(());
         }
 
         if f.is_nan() {
-            self.output.push_str("0.0");
+            self.push_str("0.0")?;
             return Ok(());
         }
 
         let mut floatStr = f.to_string();
-        self.output.push_str(&floatStr);
+        self.push_str(&floatStr)?;
 
         if !floatStr.contains('.') && !floatStr.contains('E') && !floatStr.contains('e') {
-            self.output.push_str(".0");
+            self.push_str(".0")?;
         }
 
         floatStr.clear();
@@ -570,23 +594,23 @@ impl Writer {
     // C# signature: public void Write(string str, bool escape = true)
     pub fn Write_overload_3(&mut self, str: String, escape: bool) -> Result<(), String> {
         self.StartNewObject(false)?;
-        self.output.push('"');
-        self.WriteEscapedStringOrRaw(&str, escape);
-        self.output.push('"');
+        self.push_char('"')?;
+        self.WriteEscapedStringOrRaw(&str, escape)?;
+        self.push_char('"')?;
         Ok(())
     }
 
     // C# signature: public void Write(bool b)
     pub fn Write_overload_4(&mut self, b: bool) -> Result<(), String> {
         self.StartNewObject(false)?;
-        self.output.push_str(if b { "true" } else { "false" });
+        self.push_str(if b { "true" } else { "false" })?;
         Ok(())
     }
 
     // C# signature: public void WriteNull()
     pub fn WriteNull(&mut self) -> Result<(), String> {
         self.StartNewObject(false)?;
-        self.output.push_str("null");
+        self.push_str("null")?;
         Ok(())
     }
 
@@ -597,14 +621,14 @@ impl Writer {
             type_: State::String,
             childCount: 0,
         });
-        self.output.push('"');
+        self.push_char('"')?;
         Ok(())
     }
 
     // C# signature: public void WriteStringEnd()
     pub fn WriteStringEnd(&mut self) -> Result<(), String> {
         self.Assert(self.state() == State::String)?;
-        self.output.push('"');
+        self.push_char('"')?;
         self.stateStack.pop();
         Ok(())
     }
@@ -612,7 +636,7 @@ impl Writer {
     // C# signature: public void WriteStringInner(string str, bool escape = true)
     pub fn WriteStringInner(&mut self, str: String, escape: bool) -> Result<(), String> {
         self.Assert(self.state() == State::String)?;
-        self.WriteEscapedStringOrRaw(&str, escape);
+        self.WriteEscapedStringOrRaw(&str, escape)?;
         Ok(())
     }
 
@@ -628,12 +652,12 @@ impl Writer {
         self.Assert(self.state() == State::Object)?;
 
         if self.childCount() > 0 {
-            self.output.push(',');
+            self.push_char(',')?;
         }
 
-        self.output.push('"');
-        self.output.push_str(&name.to_string());
-        self.output.push_str("\":");
+        self.push_char('"')?;
+        self.push_str(&name.to_string())?;
+        self.push_str("\":")?;
         self.IncrementChildCount()?;
         self.stateStack.push(StateElement {
             type_: State::Property,
@@ -642,32 +666,34 @@ impl Writer {
         Ok(())
     }
 
-    fn WriteEscapedStringOrRaw(&mut self, str: &str, escape: bool) {
+    fn WriteEscapedStringOrRaw(&mut self, str: &str, escape: bool) -> Result<(), String> {
         if escape {
-            self.WriteEscapedString(str);
+            self.WriteEscapedString(str)?;
         } else {
-            self.output.push_str(str);
+            self.push_str(str)?;
         }
+        Ok(())
     }
 
-    fn WriteEscapedString(&mut self, str: &str) {
+    fn WriteEscapedString(&mut self, str: &str) -> Result<(), String> {
         for c in str.chars() {
             if c < ' ' {
                 match c {
-                    '\n' => self.output.push_str("\\n"),
-                    '\t' => self.output.push_str("\\t"),
+                    '\n' => self.push_str("\\n")?,
+                    '\t' => self.push_str("\\t")?,
                     _ => {}
                 }
             } else {
                 match c {
                     '\\' | '"' => {
-                        self.output.push('\\');
-                        self.output.push(c);
+                        self.push_char('\\')?;
+                        self.push_char(c)?;
                     }
-                    _ => self.output.push(c),
+                    _ => self.push_char(c)?,
                 }
             }
         }
+        Ok(())
     }
 
     fn StartNewObject(&mut self, container: bool) -> Result<(), String> {
@@ -680,7 +706,7 @@ impl Writer {
         }
 
         if state == State::Array && self.childCount() > 0 {
-            self.output.push(',');
+            self.push_char(',')?;
         }
 
         if state == State::Property {
@@ -724,6 +750,29 @@ impl Writer {
             Err("Assert failed while writing JSON".to_string())
         }
     }
+
+    fn push_str(&mut self, text: &str) -> Result<(), String> {
+        self.output.push_str(text);
+        if let Some(stream) = self.stream.as_mut() {
+            stream
+                .write_all(text.as_bytes())
+                .map_err(|err| err.to_string())?;
+        }
+        Ok(())
+    }
+
+    fn push_char(&mut self, c: char) -> Result<(), String> {
+        let mut buffer = [0; 4];
+        let text = c.encode_utf8(&mut buffer);
+        self.push_str(text)
+    }
+
+    fn flush_stream(&mut self) -> Result<(), String> {
+        if let Some(stream) = self.stream.as_mut() {
+            stream.flush().map_err(|err| err.to_string())?;
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Display for Writer {
@@ -735,6 +784,22 @@ impl fmt::Display for Writer {
 #[cfg(test)]
 mod tests {
     use super::{JsonValue, SimpleJson, Writer};
+    use std::cell::RefCell;
+    use std::io::{self, Write};
+    use std::rc::Rc;
+
+    struct SharedSink(Rc<RefCell<Vec<u8>>>);
+
+    impl Write for SharedSink {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.0.borrow_mut().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
 
     #[test]
     fn reads_dictionary_with_nested_values() {
@@ -777,5 +842,22 @@ mod tests {
             writer.ToString(),
             "{\"count\":3,\"ok\":true,\"nested\":[1,\"x\\\"y\"]}"
         );
+    }
+
+    #[test]
+    fn writes_json_object_to_stream() {
+        let sink = Rc::new(RefCell::new(Vec::new()));
+        let mut writer = Writer::new_overload_2(Box::new(SharedSink(sink.clone())));
+
+        writer
+            .WriteObject(|w| {
+                w.WriteProperty_overload_4("count".to_string(), 3)?;
+                w.WriteProperty_overload_5("ok".to_string(), true)
+            })
+            .unwrap();
+
+        let output = String::from_utf8(sink.borrow().clone()).unwrap();
+        assert_eq!(output, "{\"count\":3,\"ok\":true}");
+        assert_eq!(writer.ToString(), "{\"count\":3,\"ok\":true}");
     }
 }

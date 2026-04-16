@@ -23,7 +23,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 7. `ControlCommand.cs` (`deps=1`) [ported]
 8. `Glue.cs` (`deps=1`) [ported]
 9. `Path.cs` (`deps=1`) [ported]
-10. `SimpleJson.cs` (`deps=1`) [partial: reason=stream writer constructor and sink behavior not represented; missing=Writer(Stream), stream Clear error behavior, flush behavior, and full reader/writer parity audit; next=add writer sink abstraction or explicit unsupported-stream decision]
+10. `SimpleJson.cs` (`deps=1`) [ported]
 11. `Tag.cs` (`deps=1`) [ported]
 12. `VariableAssignment.cs` (`deps=1`) [ported]
 13. `Void.cs` (`deps=1`) [ported]
