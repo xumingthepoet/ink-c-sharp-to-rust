@@ -1,41 +1,59 @@
 // Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/VariableAssignment.cs
 
-use crate::stub::*;
-
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct VariableAssignment {
-    pub _port_marker: (),
+    pub variableName: Option<String>,
+    pub isNewDeclaration: bool,
+    pub isGlobal: bool,
 }
 
 impl VariableAssignment {
     // C# signature: public VariableAssignment (string variableName, bool isNewDeclaration)
     pub fn new(_variableName: String, _isNewDeclaration: bool) -> Self {
-        Default::default()
+        Self {
+            variableName: Some(_variableName),
+            isNewDeclaration: _isNewDeclaration,
+            isGlobal: false,
+        }
     }
 
     // C# signature: public VariableAssignment()
     pub fn new_overload_2() -> Self {
-        Default::default()
+        Self::default()
     }
 
     // C# signature: public override string ToString ()
-    pub fn ToString(&mut self) -> String {
-        Default::default()
+    pub fn ToString(&self) -> String {
+        self.to_string()
     }
 
     // C# signature: string variableName { get; }
-    pub fn get_variableName(&mut self) -> String {
-        Default::default()
+    pub fn get_variableName(&self) -> Option<&str> {
+        self.variableName.as_deref()
     }
 
     // C# signature: bool isNewDeclaration { get; }
-    pub fn get_isNewDeclaration(&mut self) -> bool {
-        Default::default()
+    pub fn get_isNewDeclaration(&self) -> bool {
+        self.isNewDeclaration
     }
 
     // C# signature: bool isGlobal { get; }
-    pub fn get_isGlobal(&mut self) -> bool {
-        Default::default()
+    pub fn get_isGlobal(&self) -> bool {
+        self.isGlobal
+    }
+
+    pub fn set_isGlobal(&mut self, is_global: bool) {
+        self.isGlobal = is_global;
+    }
+}
+
+impl std::fmt::Display for VariableAssignment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "VarAssign to {}",
+            self.variableName.as_deref().unwrap_or("")
+        )
     }
 }

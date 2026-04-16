@@ -1,21 +1,23 @@
 // Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/Glue.cs
 
-use crate::stub::*;
-
 #[derive(Clone, Debug, Default)]
-pub struct Glue {
-    pub _port_marker: (),
-}
+pub struct Glue;
 
 impl Glue {
     // C# signature: public Glue()
     pub fn new() -> Self {
-        Default::default()
+        Self
     }
 
     // C# signature: public override string ToString ()
-    pub fn ToString(&mut self) -> String {
-        Default::default()
+    pub fn ToString(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl std::fmt::Display for Glue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Glue")
     }
 }
