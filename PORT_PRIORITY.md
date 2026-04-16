@@ -14,24 +14,24 @@ Partial annotations: if a file is too large or difficult to finish in one pass a
 
 Source area: `ink-c-sharp/ink-engine-runtime/`
 
-1. `DebugMetadata.cs` (`deps=0`)
-2. `Error.cs` (`deps=0`)
-3. `INamedContent.cs` (`deps=0`)
-4. `PushPop.cs` (`deps=0`)
-5. `StoryException.cs` (`deps=0`)
-6. `StringJoinExtension.cs` (`deps=0`)
-7. `ControlCommand.cs` (`deps=1`)
-8. `Glue.cs` (`deps=1`)
-9. `Path.cs` (`deps=1`)
-10. `SimpleJson.cs` (`deps=1`)
-11. `Tag.cs` (`deps=1`)
-12. `VariableAssignment.cs` (`deps=1`)
-13. `Void.cs` (`deps=1`)
+1. `DebugMetadata.cs` (`deps=0`) [ported]
+2. `Error.cs` (`deps=0`) [ported]
+3. `INamedContent.cs` (`deps=0`) [ported]
+4. `PushPop.cs` (`deps=0`) [ported]
+5. `StoryException.cs` (`deps=0`) [ported]
+6. `StringJoinExtension.cs` (`deps=0`) [partial: reason=static-class skeleton wrapper still exposes placeholder state; missing=remove placeholder struct/new API while preserving Join behavior; next=replace with namespace-style unit shim or free function]
+7. `ControlCommand.cs` (`deps=1`) [ported]
+8. `Glue.cs` (`deps=1`) [ported]
+9. `Path.cs` (`deps=1`) [partial: reason=known behavior drift from C# path append semantics; missing=PathByAppendingComponent should return a non-relative path and path error/hash parity needs audit; next=fix Path methods and add parity tests]
+10. `SimpleJson.cs` (`deps=1`) [partial: reason=stream writer constructor and sink behavior not represented; missing=Writer(Stream), stream Clear error behavior, flush behavior, and full reader/writer parity audit; next=add writer sink abstraction or explicit unsupported-stream decision]
+11. `Tag.cs` (`deps=1`) [ported]
+12. `VariableAssignment.cs` (`deps=1`) [ported]
+13. `Void.cs` (`deps=1`) [ported]
 14. `ListDefinition.cs` (`deps=2`)
 15. `ListDefinitionsOrigin.cs` (`deps=2`)
-16. `SearchResult.cs` (`deps=2`)
+16. `SearchResult.cs` (`deps=2`) [partial: reason=temporary enum used before Runtime.Object hierarchy is ported; missing=general Runtime.Object reference/downcast semantics; next=finish Object/Container hierarchy then revise SearchResult]
 17. `StatePatch.cs` (`deps=2`)
-18. `Choice.cs` (`deps=3`)
+18. `Choice.cs` (`deps=3`) [partial: reason=CallStack.Thread dependency is still skeleton and Clone uses derived clone; missing=threadAtGeneration.Copy semantics and exact C# copied-field set; next=port CallStack.Thread then fix Choice.Clone]
 19. `InkList.cs` (`deps=3`)
 20. `Pointer.cs` (`deps=3`)
 21. `VariableReference.cs` (`deps=3`)
@@ -61,29 +61,29 @@ Recommended runtime implementation phases:
 
 Source area: `ink-c-sharp/compiler/`
 
-1. `CharacterSet.cs` (`deps=0`)
-2. `CommandLineInput.cs` (`deps=0`)
-3. `ParsedHierarchy/INamedContent.cs` (`deps=0`)
-4. `ParsedHierarchy/Identifier.cs` (`deps=0`)
-5. `StringParser/StringParserState.cs` (`deps=0`)
-6. `CharacterRange.cs` (`deps=1`)
-7. `FileHandler.cs` (`deps=1`)
-8. `InkStringConversionExtensions.cs` (`deps=1`)
-9. `ParsedHierarchy/AuthorWarning.cs` (`deps=1`)
+1. `CharacterSet.cs` (`deps=0`) [ported]
+2. `CommandLineInput.cs` (`deps=0`) [ported]
+3. `ParsedHierarchy/INamedContent.cs` (`deps=0`) [ported]
+4. `ParsedHierarchy/Identifier.cs` (`deps=0`) [ported]
+5. `StringParser/StringParserState.cs` (`deps=0`) [ported]
+6. `CharacterRange.cs` (`deps=1`) [ported]
+7. `FileHandler.cs` (`deps=1`) [ported]
+8. `InkStringConversionExtensions.cs` (`deps=1`) [partial: reason=static-class skeleton wrapper still exposes placeholder state; missing=remove placeholder struct/new API while preserving ToStringsArray behavior; next=replace with namespace-style unit shim or free function]
+9. `ParsedHierarchy/AuthorWarning.cs` (`deps=1`) [partial: reason=Parsed.Object warning plumbing is not ported; missing=GenerateRuntimeObject must call Warning(warningMessage); next=port ParsedHierarchy/Object error-warning context]
 10. `ParsedHierarchy/Number.cs` (`deps=1`)
-11. `ParsedHierarchy/Tag.cs` (`deps=1`)
-12. `ParsedHierarchy/Text.cs` (`deps=1`)
-13. `Plugins/Plugin.cs` (`deps=1`)
-14. `InkParser/CommentEliminator.cs` (`deps=2`)
+11. `ParsedHierarchy/Tag.cs` (`deps=1`) [ported]
+12. `ParsedHierarchy/Text.cs` (`deps=1`) [partial: reason=Runtime.Value/StringValue is still skeleton; missing=GenerateRuntimeObject must create Runtime.StringValue(text); next=port runtime Value/StringValue]
+13. `Plugins/Plugin.cs` (`deps=1`) [ported]
+14. `InkParser/CommentEliminator.cs` (`deps=2`) [ported]
 15. `InkParser/InkParser_AuthorWarning.cs` (`deps=2`)
 16. `ParsedHierarchy/IncludedFile.cs` (`deps=2`)
 17. `ParsedHierarchy/Return.cs` (`deps=2`)
-18. `ParsedHierarchy/Wrap.cs` (`deps=2`)
+18. `ParsedHierarchy/Wrap.cs` (`deps=2`) [ported]
 19. `InkParser/InkParser_Include.cs` (`deps=3`)
 20. `InkParser/InkParser_Whitespace.cs` (`deps=3`)
 21. `ParsedHierarchy/ContentList.cs` (`deps=3`)
-22. `ParsedHierarchy/FlowLevel.cs` (`deps=3`)
-23. `ParsedHierarchy/IWeavePoint.cs` (`deps=3`)
+22. `ParsedHierarchy/FlowLevel.cs` (`deps=3`) [ported]
+23. `ParsedHierarchy/IWeavePoint.cs` (`deps=3`) [ported]
 24. `ParsedHierarchy/List.cs` (`deps=3`)
 25. `InkParser/InkParser_CharacterRanges.cs` (`deps=4`)
 26. `InkParser/InkParser_CommandLineInput.cs` (`deps=4`)
