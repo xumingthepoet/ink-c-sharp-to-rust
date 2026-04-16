@@ -1,46 +1,63 @@
 // Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/compiler/CharacterSet.cs
 
-use crate::stub::*;
+use std::collections::HashSet;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CharacterSet {
-    pub _port_marker: (),
+    pub characters: HashSet<char>,
 }
 
 impl CharacterSet {
     // C# signature: public CharacterSet ()
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 
     // C# signature: public CharacterSet(string str)
     pub fn new_overload_2(_str: String) -> Self {
-        Default::default()
+        let mut set = Self::new();
+        set.AddCharacters_overload_2(_str);
+        set
     }
 
     // C# signature: public CharacterSet(CharacterSet charSetToCopy)
-    pub fn new_overload_3(_charSetToCopy: crate::stub::CharacterSet) -> Self {
-        Default::default()
+    pub fn new_overload_3(_charSetToCopy: &CharacterSet) -> Self {
+        _charSetToCopy.clone()
     }
 
     // C# signature: public static CharacterSet FromRange(char start, char end)
-    pub fn FromRange(_start: char, _end: char) -> crate::stub::CharacterSet {
-        Default::default()
+    pub fn FromRange(_start: char, _end: char) -> CharacterSet {
+        let mut set = Self::new();
+        set.AddRange(_start, _end);
+        set
     }
 
     // C# signature: public CharacterSet AddRange(char start, char end)
-    pub fn AddRange(&mut self, _start: char, _end: char) -> crate::stub::CharacterSet {
-        Default::default()
+    pub fn AddRange(&mut self, _start: char, _end: char) -> &mut CharacterSet {
+        for c in (_start as u32)..=(_end as u32) {
+            if let Some(c) = char::from_u32(c) {
+                self.characters.insert(c);
+            }
+        }
+        self
     }
 
     // C# signature: public CharacterSet AddCharacters(IEnumerable<char> chars)
-    pub fn AddCharacters(&mut self, _chars: Vec<char>) -> crate::stub::CharacterSet {
-        Default::default()
+    pub fn AddCharacters<I>(&mut self, _chars: I) -> &mut CharacterSet
+    where
+        I: IntoIterator<Item = char>,
+    {
+        self.characters.extend(_chars);
+        self
     }
 
     // C# signature: public CharacterSet AddCharacters (string chars)
-    pub fn AddCharacters_overload_2(&mut self, _chars: String) -> crate::stub::CharacterSet {
-        Default::default()
+    pub fn AddCharacters_overload_2(&mut self, _chars: String) -> &mut CharacterSet {
+        self.AddCharacters(_chars.chars())
+    }
+
+    pub fn Contains(&self, c: char) -> bool {
+        self.characters.contains(&c)
     }
 }

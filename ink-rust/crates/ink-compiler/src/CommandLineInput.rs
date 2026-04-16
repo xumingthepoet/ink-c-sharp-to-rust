@@ -1,11 +1,16 @@
 // Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/compiler/CommandLineInput.cs
 
-use crate::stub::*;
+use std::any::Any;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Default)]
 pub struct CommandLineInput {
-    pub _port_marker: (),
+    pub isHelp: bool,
+    pub isExit: bool,
+    pub choiceInput: Option<i32>,
+    pub debugSource: Option<i32>,
+    pub debugPathLookup: Option<String>,
+    pub userImmediateModeStatement: Option<Box<dyn Any>>,
 }
 
 impl CommandLineInput {
