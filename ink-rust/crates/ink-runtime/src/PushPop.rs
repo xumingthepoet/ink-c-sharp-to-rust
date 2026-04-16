@@ -1,17 +1,12 @@
 // Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/PushPop.cs
 
-use crate::stub::*;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum PushPopType {
-    PortPlaceholder,
-}
-
-impl Default for PushPopType {
-    fn default() -> Self {
-        Self::PortPlaceholder
-    }
+    Tunnel,
+    #[default]
+    Function,
+    FunctionEvaluationFromGame,
 }
 
 impl PushPopType {

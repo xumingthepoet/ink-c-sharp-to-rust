@@ -1,21 +1,38 @@
 // Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/StoryException.cs
 
-use crate::stub::*;
-
 #[derive(Clone, Debug, Default)]
 pub struct StoryException {
-    pub _port_marker: (),
+    pub useEndLineNumber: bool,
+    pub message: Option<String>,
 }
 
 impl StoryException {
     // C# signature: public StoryException ()
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 
     // C# signature: public StoryException(string message)
     pub fn new_overload_2(_message: String) -> Self {
-        Default::default()
+        Self {
+            useEndLineNumber: false,
+            message: Some(_message),
+        }
+    }
+
+    pub fn message(&self) -> Option<&str> {
+        self.message.as_deref()
     }
 }
+
+impl std::fmt::Display for StoryException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.message {
+            Some(message) => write!(f, "{message}"),
+            None => write!(f, "StoryException"),
+        }
+    }
+}
+
+impl std::error::Error for StoryException {}

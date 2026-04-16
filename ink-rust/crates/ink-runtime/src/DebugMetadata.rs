@@ -1,26 +1,69 @@
 // Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/DebugMetadata.cs
 
-use crate::stub::*;
-
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DebugMetadata {
-    pub _port_marker: (),
+    pub startLineNumber: i32,
+    pub endLineNumber: i32,
+    pub startCharacterNumber: i32,
+    pub endCharacterNumber: i32,
+    pub fileName: Option<String>,
+    pub sourceName: Option<String>,
 }
 
 impl DebugMetadata {
     // C# signature: public DebugMetadata ()
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 
     // C# signature: public DebugMetadata Merge(DebugMetadata dm)
-    pub fn Merge(&mut self, _dm: crate::stub::DebugMetadata) -> crate::stub::DebugMetadata {
-        Default::default()
+    pub fn Merge(&self, dm: &DebugMetadata) -> DebugMetadata {
+        let mut new_debug_metadata = DebugMetadata {
+            fileName: self.fileName.clone(),
+            sourceName: self.sourceName.clone(),
+            ..Default::default()
+        };
+
+        if self.startLineNumber < dm.startLineNumber {
+            new_debug_metadata.startLineNumber = self.startLineNumber;
+            new_debug_metadata.startCharacterNumber = self.startCharacterNumber;
+        } else if self.startLineNumber > dm.startLineNumber {
+            new_debug_metadata.startLineNumber = dm.startLineNumber;
+            new_debug_metadata.startCharacterNumber = dm.startCharacterNumber;
+        } else {
+            new_debug_metadata.startLineNumber = self.startLineNumber;
+            new_debug_metadata.startCharacterNumber =
+                self.startCharacterNumber.min(dm.startCharacterNumber);
+        }
+
+        if self.endLineNumber > dm.endLineNumber {
+            new_debug_metadata.endLineNumber = self.endLineNumber;
+            new_debug_metadata.endCharacterNumber = self.endCharacterNumber;
+        } else if self.endLineNumber < dm.endLineNumber {
+            new_debug_metadata.endLineNumber = dm.endLineNumber;
+            new_debug_metadata.endCharacterNumber = dm.endCharacterNumber;
+        } else {
+            new_debug_metadata.endLineNumber = self.endLineNumber;
+            new_debug_metadata.endCharacterNumber =
+                self.endCharacterNumber.max(dm.endCharacterNumber);
+        }
+
+        new_debug_metadata
     }
 
     // C# signature: public override string ToString ()
-    pub fn ToString(&mut self) -> String {
-        Default::default()
+    pub fn ToString(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl std::fmt::Display for DebugMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(file_name) = &self.fileName {
+            write!(f, "line {} of {}", self.startLineNumber, file_name)
+        } else {
+            write!(f, "line {}", self.startLineNumber)
+        }
     }
 }

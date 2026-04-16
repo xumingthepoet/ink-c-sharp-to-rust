@@ -1,6 +1,10 @@
 // Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/INamedContent.cs
 
-use crate::stub::*;
+pub trait INamedContent {
+    fn name(&self) -> Option<&str>;
 
-pub trait INamedContent {}
+    fn hasValidName(&self) -> bool {
+        self.name().is_some_and(|name| !name.is_empty())
+    }
+}

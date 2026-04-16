@@ -1,17 +1,14 @@
 // Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/Error.cs
 
-use crate::stub::*;
+pub type ErrorHandler = Box<dyn FnMut(&str, ErrorType)>;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ErrorType {
-    PortPlaceholder,
-}
-
-impl Default for ErrorType {
-    fn default() -> Self {
-        Self::PortPlaceholder
-    }
+    Author,
+    Warning,
+    #[default]
+    Error,
 }
 
 impl ErrorType {
