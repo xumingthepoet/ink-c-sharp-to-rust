@@ -130,6 +130,7 @@ fn content_item_name(content: &ContentItem) -> Option<String> {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Container {
+    parent: Option<Box<Container>>,
     content: Vec<ContentItem>,
     named_content: HashMap<String, ContentItem>,
     name: Option<String>,
@@ -168,6 +169,7 @@ impl Container {
     pub fn AddContent<T: Into<ContentItem>>(&mut self, contentObj: T) {
         let mut content = contentObj.into();
         if let ContentItem::Container(ref mut container) = content {
+            container.parent = Some(Box::new(self.clone()));
             let index = self.content.len() as i32;
             let child_path = if container.get_hasValidName() {
                 self.path
@@ -197,6 +199,7 @@ impl Container {
         let index = index.max(0) as usize;
         let mut content = contentObj.into();
         if let ContentItem::Container(ref mut container) = content {
+            container.parent = Some(Box::new(self.clone()));
             let child_path = if container.get_hasValidName() {
                 self.path
                     .PathByAppendingComponent(Component::new_overload_2(
@@ -225,7 +228,10 @@ impl Container {
 
     // C# signature: public void AddToNamedContentOnly(INamedContent namedContentObj)
     pub fn AddToNamedContentOnly<T: Into<ContentItem>>(&mut self, namedContentObj: T) {
-        let content = namedContentObj.into();
+        let mut content = namedContentObj.into();
+        if let ContentItem::Container(ref mut container) = content {
+            container.parent = Some(Box::new(self.clone()));
+        }
         if let Some(name) = content_item_name(&content) {
             self.named_content.insert(name, content);
         }
@@ -251,7 +257,9 @@ impl Container {
                 None
             }
         } else if component.get_isParent() {
-            None
+            self.parent
+                .as_ref()
+                .map(|parent| ContentItem::Container(parent.clone()))
         } else {
             self.named_content
                 .get(component.get_name().unwrap_or(""))
