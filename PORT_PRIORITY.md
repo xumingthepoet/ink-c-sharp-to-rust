@@ -34,7 +34,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 18. `Choice.cs` (`deps=3`) [partial: reason=CallStack.Thread dependency is still skeleton and Clone uses derived clone; missing=threadAtGeneration.Copy semantics and exact C# copied-field set; next=port CallStack.Thread then fix Choice.Clone]
 19. `InkList.cs` (`deps=3`) [partial: reason=most list algebra and item/origin semantics are ported, and story-backed construction is now wired through runtime Story listDefinitions, but the compatibility layer still differs from upstream's exact InkList/ListValue shape; missing=exact value/origin object parity and a final audit of the list construction paths; next=continue reconciling runtime list value representation with upstream InkList semantics]
 20. `Pointer.cs` (`deps=3`) [ported]
-21. `VariableReference.cs` (`deps=3`)
+21. `VariableReference.cs` (`deps=3`) [partial: reason=the runtime reference now carries named and read-count paths, but the container resolution depends on the unported Runtime.Object path search pipeline; missing=containerForCount and full reference-resolution parity; next=port Runtime.Object.ResolvePath and linked container lookup]
 22. `ChoicePoint.cs` (`deps=4`)
 23. `Profiler.cs` (`deps=4`)
 24. `Value.cs` (`deps=4`) [partial: reason=the runtime value family now works through a Rust compatibility wrapper rather than the exact C# generic hierarchy; missing=full upstream object/value inheritance surface and later InkList/Object linkage audit; next=port the remaining object hierarchy and reconcile the wrapper with InkList]
