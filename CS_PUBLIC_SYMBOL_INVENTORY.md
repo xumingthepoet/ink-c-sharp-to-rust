@@ -5,8 +5,8 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 38
-Rust skeleton: 60
+Rust implemented: 39
+Rust skeleton: 59
 Rust missing: 0
 
 | C# file | Rust target | Public types | Public members | Rust state |
@@ -19,7 +19,7 @@ Rust missing: 0
 | `ink-c-sharp/compiler/InkParser/CommentEliminator.cs` | `ink-rust/crates/ink-compiler/src/InkParser/CommentEliminator.rs` | 1 | 2 | implemented |
 | `ink-c-sharp/compiler/InkParser/InkParser.cs` | `ink-rust/crates/ink-compiler/src/InkParser/InkParser.rs` | 1 | 2 | skeleton |
 | `ink-c-sharp/compiler/InkParser/InkParser_AuthorWarning.cs` | `ink-rust/crates/ink-compiler/src/InkParser/InkParser_AuthorWarning.rs` | 1 | 0 | skeleton |
-| `ink-c-sharp/compiler/InkParser/InkParser_CharacterRanges.cs` | `ink-rust/crates/ink-compiler/src/InkParser/InkParser_CharacterRanges.rs` | 1 | 14 | skeleton |
+| `ink-c-sharp/compiler/InkParser/InkParser_CharacterRanges.cs` | `ink-rust/crates/ink-compiler/src/InkParser/InkParser_CharacterRanges.rs` | 1 | 14 | implemented |
 | `ink-c-sharp/compiler/InkParser/InkParser_Choices.cs` | `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Choices.rs` | 1 | 0 | skeleton |
 | `ink-c-sharp/compiler/InkParser/InkParser_CommandLineInput.cs` | `ink-rust/crates/ink-compiler/src/InkParser/InkParser_CommandLineInput.rs` | 1 | 1 | skeleton |
 | `ink-c-sharp/compiler/InkParser/InkParser_Conditional.cs` | `ink-rust/crates/ink-compiler/src/InkParser/InkParser_Conditional.rs` | 1 | 0 | skeleton |
