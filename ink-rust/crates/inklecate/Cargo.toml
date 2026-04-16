@@ -1,0 +1,13 @@
+[package]
+name = "inklecate"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "inklecate"
+path = "src/main.rs"
+
+[dependencies]
+ink-runtime = { path = "../ink-runtime" }
+ink-compiler = { path = "../ink-compiler" }

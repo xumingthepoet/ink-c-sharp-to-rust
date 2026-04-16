@@ -1,0 +1,12 @@
+[package]
+name = "ink-compiler"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "ink_compiler"
+path = "src/lib.rs"
+
+[dependencies]
+ink-runtime = { path = "../ink-runtime" }

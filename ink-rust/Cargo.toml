@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "crates/ink-runtime",
+    "crates/ink-compiler",
+    "crates/inklecate",
+    "crates/ink-tests",
+]
+resolver = "2"
