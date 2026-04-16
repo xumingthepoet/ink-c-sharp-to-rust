@@ -9,6 +9,7 @@ use crate::Path::Path;
 use crate::Pointer::Pointer;
 use crate::Profiler::Profiler;
 use crate::SearchResult::SearchResult;
+use crate::Value::Value;
 
 #[derive(Clone, Debug, Default)]
 pub struct Story {
@@ -277,13 +278,14 @@ impl Story {
     }
 
     // C# signature: public List<string> TagsForContentAtPath (string path)
-    pub fn TagsForContentAtPath(&mut self, _path: String) -> Vec<String> {
-        Default::default()
+    pub fn TagsForContentAtPath(&mut self, path: String) -> Vec<String> {
+        self.TagsAtStartOfFlowContainerWithPathString(path)
     }
 
     // C# signature: public virtual string BuildStringOfHierarchy()
     pub fn BuildStringOfHierarchy(&mut self) -> String {
-        Default::default()
+        self.main_content_container
+            .BuildStringOfHierarchy_overload_2()
     }
 
     // C# signature: private void NextContent()
@@ -379,6 +381,54 @@ impl Story {
     pub fn get_mainContentContainer(&mut self) -> Container {
         self.main_content_container.clone()
     }
+
+    fn TagsAtStartOfFlowContainerWithPathString(&mut self, pathString: String) -> Vec<String> {
+        let path = Path::new_overload_4(pathString);
+        let Some(mut flow_container) = self.ContentAtPath(path).get_container().cloned() else {
+            return Vec::new();
+        };
+
+        loop {
+            let Some(first_content) = flow_container.get_content().first() else {
+                break;
+            };
+            if let crate::Container::ContentItem::Container(container) = first_content {
+                flow_container = container.as_ref().clone();
+            } else {
+                break;
+            }
+        }
+
+        let mut in_tag = false;
+        let mut tags = Vec::new();
+        for content in flow_container.get_content() {
+            match content {
+                crate::Container::ContentItem::ControlCommand(command) => {
+                    if command.get_commandType() == crate::ControlCommand::CommandType::BeginTag {
+                        in_tag = true;
+                    } else if command.get_commandType()
+                        == crate::ControlCommand::CommandType::EndTag
+                    {
+                        in_tag = false;
+                    }
+                }
+                crate::Container::ContentItem::Value(Value::String(str_value)) if in_tag => {
+                    tags.push(str_value.value.clone());
+                }
+                crate::Container::ContentItem::Value(_) if in_tag => {
+                    // Match C# behavior: only plain text is allowed inside tags.
+                    // The runtime error path is not wired yet, so keep the behavior visible.
+                    return tags;
+                }
+                _ if in_tag => {
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        tags
+    }
 }
 
 #[cfg(test)]
@@ -387,6 +437,7 @@ mod tests {
     use crate::Container::Container;
     use crate::ControlCommand::ControlCommand;
     use crate::Path::{Component, Path};
+    use crate::Value::Value;
 
     #[test]
     fn resolves_root_content_and_named_functions() {
@@ -408,5 +459,27 @@ mod tests {
             .get_path()
             .is_some());
         assert!(story.get_mainContentContainer().get_name().is_empty());
+    }
+
+    #[test]
+    fn extracts_start_tags_for_named_content_paths() {
+        let mut root = Container::new();
+        let mut knot = Container::new();
+        knot.set_name(Some("knot".to_string()));
+        knot.AddContent(ControlCommand::BeginTag());
+        knot.AddContent(Value::new_string("tag-one".to_string()));
+        knot.AddContent(ControlCommand::EndTag());
+        root.AddContent(knot);
+
+        let mut story = Story::new(root, Vec::new());
+
+        assert_eq!(
+            story.TagsForContentAtPath("0".to_string()),
+            vec!["tag-one".to_string()]
+        );
+        assert_eq!(
+            story.BuildStringOfHierarchy(),
+            "[\n    [ (knot)\n        BeginTag\n        tag-one\n        EndTag\n    ]\n]"
+        );
     }
 }
