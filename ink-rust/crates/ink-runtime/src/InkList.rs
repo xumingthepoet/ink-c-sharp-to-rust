@@ -147,6 +147,10 @@ impl InkList {
         }
     }
 
+    pub fn get_entries(&self) -> &HashMap<InkListItem, i32> {
+        &self.entries
+    }
+
     // C# signature: public static InkList FromString(string myListItem, Story originStory)
     pub fn FromString(_myListItem: String, _originStory: crate::stub::Story) -> Self {
         todo!("port InkList.FromString after Story.listDefinitions is ported");
@@ -526,7 +530,7 @@ mod tests {
     fn list_definition_based_queries_work() {
         let mut items = HashMap::new();
         items.insert("apple".to_string(), 2);
-        let mut def = ListDefinition::new("food".to_string(), items);
+        let def = ListDefinition::new("food".to_string(), items);
         let mut list = InkList::new();
         list.origins = Some(vec![def.clone()]);
         list.AddItem(InkListItem::new(Some("food".into()), Some("apple".into())));

@@ -1,26 +1,25 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/compiler/ParsedHierarchy/IncludedFile.cs
 
-use crate::stub::*;
+use crate::ParsedHierarchy::Story::Story;
 
 #[derive(Clone, Debug, Default)]
 pub struct IncludedFile {
-    pub _port_marker: (),
+    pub includedStory: Story,
 }
 
 impl IncludedFile {
     // C# signature: public IncludedFile (Parsed.Story includedStory)
-    pub fn new(_includedStory: crate::stub::Story) -> Self {
-        Default::default()
+    pub fn new(includedStory: Story) -> Self {
+        Self { includedStory }
     }
 
     // C# signature: public override Runtime.Object GenerateRuntimeObject ()
     pub fn GenerateRuntimeObject(&mut self) -> crate::stub::PortStub {
-        Default::default()
+        crate::stub::PortStub::default()
     }
 
     // C# signature: Parsed.Story includedStory { get; }
-    pub fn get_includedStory(&mut self) -> crate::stub::Story {
-        Default::default()
+    pub fn get_includedStory(&self) -> &Story {
+        &self.includedStory
     }
 }

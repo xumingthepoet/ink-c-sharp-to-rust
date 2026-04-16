@@ -76,7 +76,7 @@ Source area: `ink-c-sharp/compiler/`
 13. `Plugins/Plugin.cs` (`deps=1`) [ported]
 14. `InkParser/CommentEliminator.cs` (`deps=2`) [ported]
 15. `InkParser/InkParser_AuthorWarning.cs` (`deps=2`)
-16. `ParsedHierarchy/IncludedFile.cs` (`deps=2`)
+16. `ParsedHierarchy/IncludedFile.cs` (`deps=2`) [partial: reason=the parsed node now carries included story metadata, but runtime generation still returns a stub and the main-story include wiring is not ported; missing=runtime object emission and include-processing integration; next=port include handling in ParsedHierarchy/Story and runtime container wiring]
 17. `ParsedHierarchy/Return.cs` (`deps=2`)
 18. `ParsedHierarchy/Wrap.cs` (`deps=2`) [ported]
 19. `InkParser/InkParser_Include.cs` (`deps=3`)
@@ -87,14 +87,14 @@ Source area: `ink-c-sharp/compiler/`
 24. `ParsedHierarchy/List.cs` (`deps=3`)
 25. `InkParser/InkParser_CharacterRanges.cs` (`deps=4`)
 26. `InkParser/InkParser_CommandLineInput.cs` (`deps=4`)
-27. `ParsedHierarchy/ConstantDeclaration.cs` (`deps=4`)
-28. `ParsedHierarchy/ExternalDeclaration.cs` (`deps=4`)
+27. `ParsedHierarchy/ConstantDeclaration.cs` (`deps=4`) [partial: reason=the declaration now stores its identifier and expression, but runtime generation is still a stub and reference resolution is not wired to story-level symbol checks; missing=global declaration registration and collision validation; next=port ParsedHierarchy/Story symbol bookkeeping]
+28. `ParsedHierarchy/ExternalDeclaration.cs` (`deps=4`) [partial: reason=the declaration now stores identifier and argument names, but runtime generation is still a stub and story-level external registration is not wired; missing=story.AddExternal integration and downstream metadata use; next=port external registration in ParsedHierarchy/Story]
 29. `ParsedHierarchy/StringExpression.cs` (`deps=4`)
 30. `ParsedHierarchy/TunnelOnwards.cs` (`deps=4`)
 31. `Plugins/PluginManager.cs` (`deps=4`)
 32. `ParsedHierarchy/Conditional.cs` (`deps=5`)
 33. `ParsedHierarchy/Gather.cs` (`deps=5`)
-34. `ParsedHierarchy/ListDefinition.cs` (`deps=5`)
+34. `ParsedHierarchy/ListDefinition.cs` (`deps=5`) [partial: reason=runtime list construction and item lookup are ported, but reference resolution and parent/name propagation are still incomplete; missing=story collision checks, parent-link fidelity, and any dependent list-item resolution path; next=port ParsedHierarchy/Story symbol validation and list parent wiring]
 35. `ParsedHierarchy/Stitch.cs` (`deps=5`)
 36. `StringParser/StringParser.cs` (`deps=5`)
 37. `InkParser/InkParser_Tags.cs` (`deps=6`)
