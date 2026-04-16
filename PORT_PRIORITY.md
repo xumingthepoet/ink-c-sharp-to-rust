@@ -6,6 +6,8 @@ Ordering rule: files with fewer direct references to types defined in the same a
 
 Reference projects remain read-only. Implement work in `ink-rust/`.
 
+Completion annotations: append `[ported]` to a file entry only after that file's corresponding Rust implementation fully matches the C# source file according to `AGENTS.md`'s file port completion standard and `make -C ink-rust gate` passes. Do not mark partial type wiring, compile-only cleanup, or skeleton removal as ported.
+
 ## Runtime
 
 Source area: `ink-c-sharp/ink-engine-runtime/`

@@ -84,6 +84,13 @@ When moving a file out of skeleton/stub state:
 
 If a file cannot meet this standard yet, keep it as an explicit skeleton/stub. A visible stub is better than a compiling partial port that hides missing logic.
 
+After completing a file under this standard:
+
+- Update `PORT_PRIORITY.md` in the same change and annotate that source file's list entry as ported.
+- Only add the annotation after the Rust file has no placeholder behavior for the corresponding C# file and `make -C ink-rust gate` passes.
+- Do not mark a file as ported for partial structure work, type-only wiring, compile-only cleanup, or tests that cover only a small subset of the C# behavior.
+- If later refactoring changes the file without changing behavior, keep the ported annotation. If a later audit finds missing C# behavior, remove or correct the annotation in the same change that records the gap.
+
 5. Rustify only after compatibility is complete.
    - Once all ported tests pass, refactor toward idiomatic Rust.
    - Each Rustification step must preserve behavior and rerun the relevant tests.
