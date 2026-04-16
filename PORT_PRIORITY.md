@@ -109,10 +109,10 @@ Source area: `ink-c-sharp/compiler/`
 46. `InkParser/InkParser_Content.cs` (`deps=8`)
 47. `InkParser/InkParser_Sequences.cs` (`deps=8`)
 48. `ParsedHierarchy/Object.cs` (`deps=8`)
-49. `ParsedHierarchy/Path.cs` (`deps=8`)
+49. `ParsedHierarchy/Path.cs` (`deps=8`) [partial: reason=path component storage and string formatting are real, but ancestry-based resolution still depends on the unported ParsedHierarchy.Object/FlowBase tree; missing=ResolveFromContext and child lookup through the parser hierarchy; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase]
 50. `InkParser/InkParser.cs` (`deps=9`)
 51. `ParsedHierarchy/FunctionCall.cs` (`deps=9`) [partial: reason=builtin name detection is now real, but proxy divert generation, native function generation, and special-case argument handling are still stubbed; missing=GenerateIntoContainer, ResolveReferences, and the runtime/linkage-backed properties; next=port the full function-call generation path]
-52. `ParsedHierarchy/VariableReference.cs` (`deps=9`)
+52. `ParsedHierarchy/VariableReference.cs` (`deps=9`) [partial: reason=constant and list-item recognition are now wired, but read-count resolution and full ancestry-based variable lookup still depend on the unported parser object tree; missing=read-count resolution, ResolveReferences parity, and runtime variable reference generation for the remaining cases; next=port ParsedHierarchy/Object and ParsedHierarchy/Path resolution]
 53. `InkParser/InkParser_Statements.cs` (`deps=10`)
 54. `ParsedHierarchy/Divert.cs` (`deps=10`)
 55. `ParsedHierarchy/DivertTarget.cs` (`deps=10`)

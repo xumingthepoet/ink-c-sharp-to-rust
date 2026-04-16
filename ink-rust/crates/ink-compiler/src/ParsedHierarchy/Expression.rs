@@ -39,7 +39,8 @@ impl Expression {
     }
 
     // C# signature: public void GenerateConstantIntoContainer(Runtime.Container container)
-    pub fn GenerateConstantIntoContainer(&mut self, _container: crate::stub::Container) {}
+    pub fn GenerateConstantIntoContainer(&mut self, _container: ink_runtime::Container::Container) {
+    }
 
     // C# signature: public abstract void GenerateIntoContainer (Runtime.Container container)
     pub fn GenerateIntoContainer(&mut self, _container: crate::stub::Container) {}

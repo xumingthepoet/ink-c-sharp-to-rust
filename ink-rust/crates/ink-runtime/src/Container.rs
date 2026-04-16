@@ -3,6 +3,7 @@
 use crate::ControlCommand::ControlCommand;
 use crate::Path::Path;
 use crate::Value::{ListValue, StringValue, Value};
+use crate::VariableReference::VariableReference;
 use crate::Void::Void;
 use std::collections::HashMap;
 
@@ -12,6 +13,7 @@ pub enum ContentItem {
     ControlCommand(ControlCommand),
     Void(Void),
     Container(Box<Container>),
+    VariableReference(VariableReference),
 }
 
 impl From<Value> for ContentItem {
@@ -47,6 +49,12 @@ impl From<Void> for ContentItem {
 impl From<Container> for ContentItem {
     fn from(value: Container) -> Self {
         Self::Container(Box::new(value))
+    }
+}
+
+impl From<VariableReference> for ContentItem {
+    fn from(value: VariableReference) -> Self {
+        Self::VariableReference(value)
     }
 }
 
