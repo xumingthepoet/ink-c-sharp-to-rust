@@ -1,11 +1,18 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/SearchResult.cs
 
-use crate::stub::*;
+use crate::Container::Container;
+use crate::Object::Object;
+
+#[derive(Clone, Debug)]
+pub enum SearchResultObject {
+    Object(Object),
+    Container(Container),
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct SearchResult {
-    pub _port_marker: (),
+    pub obj: Option<SearchResultObject>,
+    pub approximate: bool,
 }
 
 impl SearchResult {
@@ -13,13 +20,42 @@ impl SearchResult {
         Self::default()
     }
 
+    pub fn new_with_object(obj: SearchResultObject, approximate: bool) -> Self {
+        Self {
+            obj: Some(obj),
+            approximate,
+        }
+    }
+
     // C# signature: Runtime.Object correctObj { get; }
-    pub fn get_correctObj(&mut self) -> crate::stub::PortStub {
-        Default::default()
+    pub fn get_correctObj(&self) -> Option<&SearchResultObject> {
+        if self.approximate {
+            None
+        } else {
+            self.obj.as_ref()
+        }
     }
 
     // C# signature: Container container { get; }
-    pub fn get_container(&mut self) -> crate::stub::Container {
-        Default::default()
+    pub fn get_container(&self) -> Option<&Container> {
+        match self.obj.as_ref() {
+            Some(SearchResultObject::Container(container)) => Some(container),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SearchResult, SearchResultObject};
+    use crate::Container::Container;
+
+    #[test]
+    fn approximate_results_do_not_expose_correct_object() {
+        let result =
+            SearchResult::new_with_object(SearchResultObject::Container(Container::new()), true);
+
+        assert!(result.get_correctObj().is_none());
+        assert!(result.get_container().is_some());
     }
 }
