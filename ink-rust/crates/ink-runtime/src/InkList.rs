@@ -92,10 +92,24 @@ impl InkList {
     }
 
     // C# signature: public InkList (string singleOriginListName, Story originStory)
-    pub fn new_overload_3(singleOriginListName: String, _originStory: crate::stub::Story) -> Self {
+    pub fn new_overload_3(singleOriginListName: String, originStory: crate::Story::Story) -> Self {
         let mut list = Self::new();
-        list.SetInitialOriginName(singleOriginListName);
-        todo!("port InkList story-backed constructor after Story.listDefinitions is ported");
+        list.SetInitialOriginName(singleOriginListName.clone());
+
+        let mut originStory = originStory;
+        if let Some(def) = originStory
+            .get_listDefinitions()
+            .TryListGetDefinition(singleOriginListName.clone())
+            .cloned()
+        {
+            list.origins = Some(vec![def]);
+            return list;
+        }
+
+        panic!(
+            "InkList origin could not be found in story when constructing new list: {}",
+            singleOriginListName
+        );
     }
 
     // C# signature: public InkList (KeyValuePair<InkListItem, int> singleElement)
@@ -152,8 +166,44 @@ impl InkList {
     }
 
     // C# signature: public static InkList FromString(string myListItem, Story originStory)
-    pub fn FromString(_myListItem: String, _originStory: crate::stub::Story) -> Self {
-        todo!("port InkList.FromString after Story.listDefinitions is ported");
+    pub fn FromString(myListItem: String, originStory: crate::Story::Story) -> Self {
+        if myListItem.is_empty() {
+            return Self::new();
+        }
+
+        let mut originStory = originStory;
+        if let Some(list_value) = originStory
+            .get_listDefinitions()
+            .FindSingleItemListWithName(myListItem.clone())
+            .cloned()
+        {
+            let mut list = Self {
+                entries: list_value.value.clone(),
+                origins: None,
+                origin_names: list_value.originNames.clone(),
+            };
+            if let Some(origin_name) = list_value
+                .value
+                .keys()
+                .next()
+                .and_then(|item| item.originName.clone())
+            {
+                list.SetInitialOriginName(origin_name.clone());
+                if let Some(def) = originStory
+                    .get_listDefinitions()
+                    .TryListGetDefinition(origin_name)
+                    .cloned()
+                {
+                    list.origins = Some(vec![def]);
+                }
+            }
+            return list;
+        }
+
+        panic!(
+            "Could not find the InkListItem from the string '{}' to create an InkList because it doesn't exist in the original list definition in ink.",
+            myListItem
+        );
     }
 
     // C# signature: public void AddItem (InkListItem item)
@@ -180,7 +230,8 @@ impl InkList {
     }
 
     // C# signature: public void AddItem(string itemName, Story storyObject = null)
-    pub fn AddItem_overload_2(&mut self, itemName: String, _storyObject: crate::stub::Story) {
+    pub fn AddItem_overload_2(&mut self, itemName: String, storyObject: crate::Story::Story) {
+        let mut storyObject = storyObject;
         let mut foundListDef: Option<ListDefinition> = None;
 
         if let Some(origins) = self.origins.as_ref() {
@@ -205,7 +256,18 @@ impl InkList {
             let itemVal = foundListDef.ValueForItem(&item);
             self.entries.insert(item, itemVal);
         } else {
-            todo!("port InkList.AddItem(string, Story) fallback after Story.listDefinitions is ported");
+            if let Some(def) = storyObject
+                .get_listDefinitions()
+                .FindSingleItemListWithName(itemName.clone())
+                .cloned()
+            {
+                self.entries.extend(def.value.clone());
+            } else {
+                panic!(
+                    "Could not find the InkListItem from the string '{}' to create an InkList because it doesn't exist in the original list definition in ink.",
+                    itemName
+                );
+            }
         }
     }
 
@@ -502,6 +564,7 @@ impl std::fmt::Display for InkList {
 mod tests {
     use super::{InkList, InkListItem, ListBound};
     use crate::ListDefinition::ListDefinition;
+    use crate::Story::Story;
     use std::collections::HashMap;
 
     #[test]
@@ -539,5 +602,19 @@ mod tests {
         assert_eq!(list.get_singleItem().itemName.as_deref(), Some("apple"));
         assert!(list.ContainsItemNamed("apple".into()));
         assert_eq!(list.GetHashCode(), list.GetHashCode());
+    }
+
+    #[test]
+    fn story_backed_construction_and_string_lookup_work() {
+        let mut items = HashMap::new();
+        items.insert("apples".to_string(), 2);
+        let def = ListDefinition::new("food".to_string(), items);
+        let story = Story::new(crate::Container::Container::new(), vec![def]);
+
+        let mut list = InkList::new_overload_3("food".to_string(), story.clone());
+        assert_eq!(list.get_originNames(), Some(vec!["food".to_string()]));
+
+        let from_string = InkList::FromString("apples".to_string(), story);
+        assert!(from_string.ContainsItemNamed("apples".to_string()));
     }
 }

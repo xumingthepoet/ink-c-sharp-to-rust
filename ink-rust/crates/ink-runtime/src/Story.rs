@@ -2,9 +2,13 @@
 // Source: ink-c-sharp/ink-engine-runtime/Story.cs
 
 use crate::stub::*;
+use crate::Container::Container;
+use crate::ListDefinition::ListDefinition;
+use crate::ListDefinitionsOrigin::ListDefinitionsOrigin;
 
 #[derive(Clone, Debug, Default)]
 pub struct Story {
+    listDefinitions: ListDefinitionsOrigin,
     pub _port_marker: (),
 }
 
@@ -26,11 +30,11 @@ pub struct ExternalFunctionDef {
 
 impl Story {
     // C# signature: public Story (Container contentContainer, List<Runtime.ListDefinition> lists = null)
-    pub fn new(
-        _contentContainer: crate::stub::Container,
-        _lists: Vec<crate::stub::ListDefinition>,
-    ) -> Self {
-        Default::default()
+    pub fn new(_contentContainer: Container, lists: Vec<ListDefinition>) -> Self {
+        Self {
+            listDefinitions: ListDefinitionsOrigin::new(lists),
+            _port_marker: (),
+        }
     }
 
     // C# signature: public Story(string jsonString)
@@ -291,8 +295,8 @@ impl Story {
     }
 
     // C# signature: ListDefinitionsOrigin listDefinitions { get; }
-    pub fn get_listDefinitions(&mut self) -> crate::stub::ListDefinitionsOrigin {
-        Default::default()
+    pub fn get_listDefinitions(&mut self) -> ListDefinitionsOrigin {
+        self.listDefinitions.clone()
     }
 
     // C# signature: StoryState state { get; }
