@@ -34,13 +34,6 @@ impl ConstantDeclaration {
                 String::new(),
             );
         }
-
-        if let (Some(name), Some(expression)) = (
-            self.get_constantName().map(|s| s.to_string()),
-            self.expression.clone(),
-        ) {
-            context.register_constant(name, expression);
-        }
     }
 
     // C# signature: string constantName { get; }
