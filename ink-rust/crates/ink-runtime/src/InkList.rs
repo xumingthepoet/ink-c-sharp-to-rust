@@ -2,10 +2,68 @@
 // Source: ink-c-sharp/ink-engine-runtime/InkList.cs
 
 use crate::stub::*;
+use std::hash::{Hash, Hasher};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct InkListItem {
-    pub _port_marker: (),
+    pub originName: Option<String>,
+    pub itemName: Option<String>,
+}
+
+impl InkListItem {
+    // C# signature: public InkListItem (string originName, string itemName)
+    pub fn new(originName: Option<String>, itemName: Option<String>) -> Self {
+        Self {
+            originName,
+            itemName,
+        }
+    }
+
+    // C# signature: public InkListItem (string fullName)
+    pub fn new_overload_2(fullName: String) -> Self {
+        let mut name_parts = fullName.split('.');
+        Self {
+            originName: Some(name_parts.next().unwrap().to_string()),
+            itemName: Some(name_parts.next().unwrap().to_string()),
+        }
+    }
+
+    // C# signature: public static InkListItem Null { get; }
+    pub fn Null() -> Self {
+        Self::new(None, None)
+    }
+
+    // C# signature: bool isNull { get; }
+    pub fn get_isNull(&self) -> bool {
+        self.originName.is_none() && self.itemName.is_none()
+    }
+
+    // C# signature: string fullName { get; }
+    pub fn get_fullName(&self) -> String {
+        format!(
+            "{}.{}",
+            self.originName.as_deref().unwrap_or("?"),
+            self.itemName.as_deref().unwrap_or("")
+        )
+    }
+
+    // C# signature: public override string ToString ()
+    pub fn ToString(&self) -> String {
+        self.get_fullName()
+    }
+}
+
+impl Hash for InkListItem {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.originName.hash(state);
+        self.itemName.hash(state);
+    }
+}
+
+impl std::fmt::Display for InkListItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.get_fullName())
+    }
 }
 
 #[derive(Clone, Debug, Default)]
