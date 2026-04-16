@@ -38,7 +38,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 22. `ChoicePoint.cs` (`deps=4`)
 23. `Profiler.cs` (`deps=4`)
 24. `Value.cs` (`deps=4`) [partial: reason=the runtime value family now works through a Rust compatibility wrapper rather than the exact C# generic hierarchy; missing=full upstream object/value inheritance surface and later InkList/Object linkage audit; next=port the remaining object hierarchy and reconcile the wrapper with InkList]
-25. `Container.cs` (`deps=5`)
+25. `Container.cs` (`deps=5`) [partial: reason=the container now stores real runtime content items and supports add/insert operations, but path resolution, named content traversal, and hierarchy stringification are still incomplete; missing=content-at-path search, parent/path bookkeeping, and full named content semantics; next=port Runtime.Object/Path traversal and finalize container hierarchy behavior]
 26. `Divert.cs` (`deps=5`)
 27. `Object.cs` (`deps=5`)
 28. `Flow.cs` (`deps=6`)
@@ -70,7 +70,7 @@ Source area: `ink-c-sharp/compiler/`
 7. `FileHandler.cs` (`deps=1`) [ported]
 8. `InkStringConversionExtensions.cs` (`deps=1`) [ported]
 9. `ParsedHierarchy/AuthorWarning.cs` (`deps=1`) [partial: reason=Parsed.Object warning plumbing is not ported; missing=GenerateRuntimeObject must call Warning(warningMessage); next=port ParsedHierarchy/Object error-warning context]
-10. `ParsedHierarchy/Number.cs` (`deps=1`)
+10. `ParsedHierarchy/Number.cs` (`deps=1`) [ported]
 11. `ParsedHierarchy/Tag.cs` (`deps=1`) [ported]
 12. `ParsedHierarchy/Text.cs` (`deps=1`) [ported]
 13. `Plugins/Plugin.cs` (`deps=1`) [ported]
