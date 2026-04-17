@@ -100,3 +100,7 @@ Source area: `ink-c-sharp/compiler/`
 9. `StringParser/StringParser.cs` (`deps=5`) [ported]
 10. `Stats.cs` (`deps=7`)
 11. `Compiler.cs` (`deps=11`)
+
+## Tool Projects
+
+1. `InkTestBed/InkTestBed.cs` [partial: runtime play loop, JSON roundtrip, split-file utilities, diff helper, and input loop are ported, but source compilation and ink-file loading still depend on the unported compiler front-end]

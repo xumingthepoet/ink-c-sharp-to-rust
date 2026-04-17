@@ -14,6 +14,13 @@ name = "ink-runtime"
 version = "0.1.0"
 
 [[package]]
+name = "ink-testbed"
+version = "0.1.0"
+dependencies = [
+ "ink-runtime",
+]
+
+[[package]]
 name = "ink-tests"
 version = "0.1.0"
 dependencies = [

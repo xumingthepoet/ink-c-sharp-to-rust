@@ -3,6 +3,7 @@ members = [
     "crates/ink-runtime",
     "crates/ink-compiler",
     "crates/inklecate",
+    "crates/ink-testbed",
     "crates/ink-tests",
 ]
 resolver = "2"

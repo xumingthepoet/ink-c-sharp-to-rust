@@ -1,0 +1,12 @@
+[package]
+name = "ink-testbed"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "ink-testbed"
+path = "src/main.rs"
+
+[dependencies]
+ink-runtime = { path = "../ink-runtime" }
