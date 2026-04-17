@@ -31,6 +31,7 @@ pub struct Object {
     pub kind: ObjectKind,
     pub identifier: Option<Identifier>,
     pub indentationDepth: i32,
+    pub isFunction: bool,
     pub parent: Option<Box<Object>>,
     pub content: Vec<Object>,
     debugMetadata: Option<DebugMetadata>,
@@ -47,6 +48,7 @@ impl Object {
     pub fn with_kind(kind: ObjectKind) -> Self {
         Self {
             kind,
+            isFunction: false,
             ..Default::default()
         }
     }

@@ -43,6 +43,7 @@ impl InkParser {
             knot.get_name().map(|name| name.to_string()),
             knot.get_base().base.content.clone(),
             runtime_container,
+            knot.get_base().get_isFunction(),
         ))
     }
 
@@ -127,6 +128,7 @@ impl InkParser {
             stitch.get_name().map(|name| name.to_string()),
             stitch.get_base().base.content.clone(),
             runtime_container,
+            stitch.get_base().get_isFunction(),
         ))
     }
 
@@ -296,8 +298,10 @@ impl InkParser {
         name: Option<String>,
         content: Vec<Object>,
         runtime_container: Container,
+        isFunction: bool,
     ) -> Object {
         let mut obj = Object::with_kind(kind);
+        obj.isFunction = isFunction;
         obj.set_identifier(name.map(|name| Identifier {
             name: Some(name),
             debugMetadata: None,
