@@ -16,6 +16,7 @@ pub struct InkParser {
     externalErrorHandler: Option<ErrorHandler>,
     fileHandler: Arc<dyn IFileHandler + Send + Sync>,
     openFilenames: Rc<RefCell<HashSet<String>>>,
+    parsingChoice: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -51,6 +52,7 @@ impl InkParser {
             externalErrorHandler,
             fileHandler,
             openFilenames,
+            parsingChoice: false,
         }
     }
 
@@ -139,6 +141,14 @@ impl InkParser {
     // C# signature: bool tagActive { get; }
     pub fn get_tagActive(&mut self) -> bool {
         self.parser.GetFlag(CustomFlags::TagActive as u32)
+    }
+
+    pub fn get_parsingChoice(&self) -> bool {
+        self.parsingChoice
+    }
+
+    pub fn set_parsingChoice(&mut self, value: bool) {
+        self.parsingChoice = value;
     }
 
     pub fn get_fileHandler(&self) -> &dyn IFileHandler {

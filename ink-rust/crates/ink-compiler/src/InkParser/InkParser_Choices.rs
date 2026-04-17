@@ -36,6 +36,8 @@ impl InkParser {
         let condition_expr = self.ChoiceCondition();
 
         self.Whitespace();
+        let was_parsing_choice = self.get_parsingChoice();
+        self.set_parsingChoice(true);
 
         let mut start_content = None;
         let mut option_only_content = None;
@@ -54,6 +56,7 @@ impl InkParser {
 
             if self.ParseString("]".to_string()).is_none() {
                 self.Error("Expected closing ']' for weave-style option".to_string());
+                self.set_parsingChoice(was_parsing_choice);
                 return None;
             }
 
@@ -122,6 +125,7 @@ impl InkParser {
         choice.set_condition(condition_expr);
         choice.set_onceOnly(once_only_choice);
         choice.set_isInvisibleDefault(empty_content);
+        self.set_parsingChoice(was_parsing_choice);
 
         Some(choice)
     }
@@ -281,5 +285,12 @@ mod tests {
         let gather = parser.Gather().expect("gather");
         assert_eq!(gather.get_indentationDepth(), 2);
         assert_eq!(gather.get_name(), Some("label"));
+    }
+
+    #[test]
+    fn choice_content_treats_brackets_as_boundaries() {
+        let mut parser = InkParser::new("* hello [world] there\n".to_string(), None, None, None);
+        let choice = parser.Choice().expect("choice");
+        assert!(choice.get_startContent().is_some());
     }
 }

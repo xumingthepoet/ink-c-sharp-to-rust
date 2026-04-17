@@ -173,6 +173,7 @@ impl InkParser {
             }
 
             if matches!(c, '-' | '<' | '{' | '}' | '|' | '\n' | '\r' | '\\' | '#')
+                || (self.get_parsingChoice() && matches!(c, '[' | ']'))
                 || (self.get_parsingStringExpression() && c == '"')
             {
                 break;
