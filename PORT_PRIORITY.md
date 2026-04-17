@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 36 | 25 | 3 |
-| Total | 98 | 70 | 25 | 3 |
+| Compiler | 64 | 37 | 24 | 3 |
+| Total | 98 | 71 | 24 | 3 |
 
 ## Runtime
 
@@ -46,7 +46,7 @@ Source area: `ink-c-sharp/compiler/`
 14. `ParsedHierarchy/ConstantDeclaration.cs` (`deps=4`) [ported]
 15. `ParsedHierarchy/ExternalDeclaration.cs` (`deps=4`) [ported]
 16. `ParsedHierarchy/StringExpression.cs` (`deps=4`) [ported]
-17. `ParsedHierarchy/TunnelOnwards.cs` (`deps=4`) [partial: tunnel target resolution still depends on Parsed.Object ancestry and FlowBase/path resolution]
+17. `ParsedHierarchy/TunnelOnwards.cs` (`deps=4`) [ported]
 18. `ParsedHierarchy/Conditional.cs` (`deps=5`) [partial: reason=conditional branches now generate runtime containers, but parser integration and weave/sequence ownership are still incomplete; missing=InkParser conditional parsing, weave-style nesting, and full branch rejoin wiring; next=port InkParser_Conditional and the remaining weave helpers]
 19. `ParsedHierarchy/Gather.cs` (`deps=5`) [partial: content tree handling is still waiting on Parsed.Object/FlowBase/ContentList porting]
 20. `ParsedHierarchy/ListDefinition.cs` (`deps=5`) [ported]
