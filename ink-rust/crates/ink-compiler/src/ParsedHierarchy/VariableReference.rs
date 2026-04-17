@@ -93,21 +93,21 @@ impl VariableReference {
     }
 
     // C# signature: Identifier identifier { get; }
-    pub fn get_identifier(&mut self) -> Option<&Identifier> {
-        if self.singleIdentifier.is_none() && !self.pathIdentifiers.is_empty() {
+    pub fn get_identifier(&self) -> Option<Identifier> {
+        if !self.pathIdentifiers.is_empty() {
             let name = self.path.join(".");
             let debugMetadata = self
                 .pathIdentifiers
                 .iter()
                 .filter_map(|identifier| identifier.debugMetadata.clone())
                 .reduce(|acc, dm| acc.Merge(&dm));
-            self.singleIdentifier = Some(Identifier {
+            Some(Identifier {
                 name: Some(name),
                 debugMetadata,
-            });
+            })
+        } else {
+            self.singleIdentifier.clone()
         }
-
-        self.singleIdentifier.as_ref()
     }
 
     // C# signature: List<string> path { get; }

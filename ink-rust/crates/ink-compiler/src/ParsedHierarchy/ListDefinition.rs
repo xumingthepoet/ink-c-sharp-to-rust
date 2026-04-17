@@ -136,6 +136,10 @@ impl ListDefinition {
 
     pub fn ResolveReferences(&mut self, context: &mut Story) {
         if let Some(identifier) = self.identifier.clone() {
+            let parent_name = identifier.name.clone();
+            for element in &mut self.itemDefinitions {
+                element.set_parent_list_name(parent_name.clone());
+            }
             context.CheckForNamingCollisions(
                 Default::default(),
                 identifier,
@@ -159,7 +163,7 @@ impl ListElementDefinition {
         }
     }
 
-    fn set_parent_list_name(&mut self, parentListName: Option<String>) {
+    pub fn set_parent_list_name(&mut self, parentListName: Option<String>) {
         self.parentListName = parentListName;
     }
 

@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 25 | 12 | 27 |
-| Total | 98 | 59 | 12 | 27 |
+| Compiler | 64 | 26 | 12 | 26 |
+| Total | 98 | 60 | 12 | 26 |
 
 ## Runtime
 
@@ -94,7 +94,7 @@ Source area: `ink-c-sharp/compiler/`
 21. `ParsedHierarchy/ContentList.cs` (`deps=3`)
 22. `ParsedHierarchy/FlowLevel.cs` (`deps=3`) [ported]
 23. `ParsedHierarchy/IWeavePoint.cs` (`deps=3`) [ported]
-24. `ParsedHierarchy/List.cs` (`deps=3`)
+24. `ParsedHierarchy/List.cs` (`deps=3`) [ported]
 25. `InkParser/InkParser_CharacterRanges.cs` (`deps=4`) [ported]
 26. `InkParser/InkParser_CommandLineInput.cs` (`deps=4`) [partial: reason=the parser helper now handles help, exit, DebugSource, DebugPath, and choice-number inputs, but immediate-mode statement parsing is still omitted; missing=UserImmediateModeStatement and the statement/expression tree it depends on; next=port the statement hierarchy and expression parser enough to support immediate-mode input]
 27. `ParsedHierarchy/ConstantDeclaration.cs` (`deps=4`) [ported]
@@ -131,7 +131,7 @@ Source area: `ink-c-sharp/compiler/`
 58. `Compiler.cs` (`deps=11`)
 59. `InkParser/InkParser_Knot.cs` (`deps=11`)
 60. `ParsedHierarchy/Choice.cs` (`deps=11`)
-61. `InkParser/InkParser_Expressions.cs` (`deps=15`)
+61. `InkParser/InkParser_Expressions.cs` (`deps=15`) [partial: reason=the parser now handles temp keywords, return, infix precedence, function calls, lists, variables, and parens, but string/divert-target parsing and temp assignment still depend on unported MixedTextAndLogic, SingleDivert, and VariableAssignment/statement rules; missing=MixedTextAndLogic string parsing, divert-target expressions, and temp declaration/assignment parsing; next=port ParsedHierarchy/Object, ParsedHierarchy/VariableAssignment, and the remaining parser rules]
 62. `ParsedHierarchy/FlowBase.cs` (`deps=16`)
 63. `ParsedHierarchy/Story.cs` (`deps=16`) [partial: reason=the parser-side story now handles symbol registration and list/external lookup, but top-level object processing, runtime export, and the full variable-resolution / weave-processing pipeline are still skeletons; missing=top-level AST traversal, runtime export, flattening, and variable resolution; next=port ParsedHierarchy/FlowBase, ParsedHierarchy/Object, and the remaining export pipeline]
 64. `ParsedHierarchy/Weave.cs` (`deps=16`)
