@@ -18,10 +18,10 @@ pub struct Conditional {
 
 impl Conditional {
     // C# signature: public Conditional (Expression condition, List<ConditionalSingleBranch> branches)
-    pub fn new(condition: Expression, branches: Vec<ConditionalSingleBranch>) -> Self {
+    pub fn new(condition: Option<Expression>, branches: Vec<ConditionalSingleBranch>) -> Self {
         Self {
             base: Object::new(),
-            initialCondition: Some(condition),
+            initialCondition: condition,
             branches,
             reJoinTarget: None,
         }

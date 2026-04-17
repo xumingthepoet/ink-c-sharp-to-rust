@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 31 | 25 | 8 |
-| Total | 98 | 65 | 25 | 8 |
+| Compiler | 64 | 31 | 26 | 7 |
+| Total | 98 | 65 | 26 | 7 |
 
 ## Runtime
 
@@ -78,7 +78,7 @@ Source area: `ink-c-sharp/compiler/`
 7. `InkParser/InkParser_Tags.cs` (`deps=6`)
 8. `InkParser/InkParser_Divert.cs` (`deps=7`) [partial: reason=the parser now resolves single diverts, thread diverts, and diverted path components, but full multi-divert/tunnel-onwards parity and tag/content list integration are still incomplete; missing=exact tunnel-onwards chain handling, tag/content-list integration, and the full arrow/divert sequence semantics; next=port ParsedHierarchy/TunnelOnwards, ContentList, and the remaining parser content tree]
 9. `InkParser/InkParser_Choices.cs` (`deps=8`) [partial: choice and gather parsing are real, but the statement dispatcher and flow-level integration still depend on the unported parsed hierarchy tree; missing=StatementsAtLevel wiring and choice/gather placement in the top-level parser; next=port InkParser_Statements and ParsedHierarchy/FlowBase]
-10. `InkParser/InkParser_Conditional.cs` (`deps=8`)
+10. `InkParser/InkParser_Conditional.cs` (`deps=8`) [partial: reason=conditional grammar is now real enough to parse branches, but the branch-content wrapping and source-aware error recovery still use simplified compatibility paths; missing=exact ErrorWithParsedObject parity and inline/branch ownership wiring; next=continue the remaining flow-tree/parser ownership work]
 11. `InkParser/InkParser_Content.cs` (`deps=8`) [partial: reason=text/tag/glue line parsing is real, but full inline logic, choice-specific content rules, and weave integration are still incomplete; missing=multi-branch inline logic and choice-aware content handling; next=port InkParser_Choices/InkParser_Conditional and the remaining hierarchy tree]
 12. `InkParser/InkParser_Sequences.cs` (`deps=8`)
 13. `InkParser/InkParser_Logic.cs` (`deps=9`) [partial: reason=identifier parsing is real, but the line/variable/list/inline logic parser family is still skeletal; missing=LogicLine, VariableDeclaration, List/Const declarations, inline logic, and expression helper parity; next=port the remaining InkParser logic and expression rules]
