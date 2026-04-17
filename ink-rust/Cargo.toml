@@ -5,6 +5,5 @@ members = [
     "crates/inklecate",
     "crates/ink-testbed",
     "crates/ink-tests",
-    "crates/ink-integration-tests",
 ]
 resolver = "2"

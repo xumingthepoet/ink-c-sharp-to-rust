@@ -28,8 +28,8 @@ def get_csharp_tests():
     return tests
 
 def get_rust_tests():
-    """Extract test names from c_sharp.rs by finding #[test] followed by fn test_."""
-    path = '/Users/xuming/projects/ink-c-sharp-to-rust/ink-rust/crates/ink-integration-tests/src/c_sharp.rs'
+    """Extract test names from ink-tests by finding #[test] followed by fn test_."""
+    path = '/Users/xuming/projects/ink-c-sharp-to-rust/ink-rust/crates/ink-tests/src/lib.rs'
     content = open(path).read()
     tests = []
     lines = content.splitlines()
@@ -91,27 +91,20 @@ PYEOF
 echo "=== Blade Tests ==="
 echo
 
-# Blade tests - get all test names with file path (preserve order)
-rm -f /tmp/blade_all.txt
-for f in blade-ink-rs/conformance-tests/tests/*.rs; do
-  fname=$(basename "$f")
-  grep -A1 "#\[test\]" "$f" | grep "^fn " | sed "s/fn //; s/().*//; s/^/$fname: /"
-done > /tmp/blade_all.txt
+if [ -d "blade-ink-rs/conformance-tests/tests" ]; then
+  # Blade tests - get all test names with file path (preserve order)
+  rm -f /tmp/blade_all.txt
+  for f in blade-ink-rs/conformance-tests/tests/*.rs; do
+    fname=$(basename "$f")
+    grep -A1 "#\[test\]" "$f" | grep "^fn " | sed "s/fn //; s/().*//; s/^/$fname: /"
+  done > /tmp/blade_all.txt
 
-# Blade Rust ported test names (from all files)
-find ink-rust/crates/ink-integration-tests/src/blade -name "*.rs" -exec grep -A1 "#\[test\]" {} \; | grep "^[[:space:]]*fn " | sed 's/.*fn //; s/().*//' | sort > /tmp/blade_rust.txt
-
-blade_all=$(wc -l < /tmp/blade_all.txt)
-blade_rust=$(wc -l < /tmp/blade_rust.txt)
-echo "Original: $blade_all tests"
-echo "Ported:   $blade_rust tests"
-echo "Difference: $((blade_rust - blade_all)) tests"
-echo
-echo "Not ported Blade tests (by file, in original order):"
-while IFS=: read -r fname testname; do
-  # Trim whitespace from testname
-  testname=$(echo "$testname" | xargs)
-  if ! grep -qx "$testname" /tmp/blade_rust.txt; then
-    echo "  $fname: $testname"
-  fi
-done < /tmp/blade_all.txt
+  blade_all=$(wc -l < /tmp/blade_all.txt)
+  echo "Original: $blade_all tests"
+  echo "Ported:   0 tests"
+  echo "Difference: $((0 - blade_all)) tests"
+  echo
+  echo "Blade ported test crate has been removed; no local blade port remains to compare."
+else
+  echo "Blade test source tree not available."
+fi
