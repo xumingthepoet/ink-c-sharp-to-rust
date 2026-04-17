@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 31 | 27 | 6 |
-| Total | 98 | 65 | 27 | 6 |
+| Compiler | 64 | 31 | 29 | 4 |
+| Total | 98 | 65 | 29 | 4 |
 
 ## Runtime
 
@@ -51,7 +51,7 @@ Source area: `ink-c-sharp/compiler/`
 19. `ParsedHierarchy/Gather.cs` (`deps=5`) [partial: content tree handling is still waiting on Parsed.Object/FlowBase/ContentList porting]
 20. `ParsedHierarchy/ListDefinition.cs` (`deps=5`) [ported]
 21. `ParsedHierarchy/Stitch.cs` (`deps=5`) [partial: thin flow wrapper is real, but full story-owned subflow resolution and knot/stitch cross-name collision parity still depend on the remaining flow-tree structure]
-22. `ParsedHierarchy/Sequence.cs` (`deps=6`)
+22. `ParsedHierarchy/Sequence.cs` (`deps=6`) [partial: reason=flat sequence runtime generation is ported, but nested weave-backed branch ownership and multiline sequence reconstruction still depend on the unported weave/tree model; missing=Weave integration, nested loose-end routing, and exact multiline branch conversion; next=finish ParsedHierarchy/Weave or the remaining flow-tree hierarchy]
 23. `ParsedHierarchy/ConditionalSingleBranch.cs` (`deps=7`) [partial: reason=branch runtime generation is real, but the weave-based nesting model and parser ownership are still incomplete; missing=weave nesting, exact else/branch recovery, and parser integration; next=port ParsedHierarchy/Weave and InkParser_Conditional]
 24. `ParsedHierarchy/Knot.cs` (`deps=7`) [partial: thin flow wrapper is real, but knot/stitch ownership and cross-name collision behavior still depend on the remaining flow-tree hierarchy]
 25. `ParsedHierarchy/VariableAssignment.cs` (`deps=7`) [partial: list-definition backref is not yet modeled with the C# ownership cycle, and variable resolution is still using a reduced Story-side lookup until FlowBase/Object are ported]
@@ -80,7 +80,7 @@ Source area: `ink-c-sharp/compiler/`
 9. `InkParser/InkParser_Choices.cs` (`deps=8`) [partial: choice and gather parsing are real, but the statement dispatcher and flow-level integration still depend on the unported parsed hierarchy tree; missing=StatementsAtLevel wiring and choice/gather placement in the top-level parser; next=port InkParser_Statements and ParsedHierarchy/FlowBase]
 10. `InkParser/InkParser_Conditional.cs` (`deps=8`) [partial: reason=conditional grammar is now real enough to parse branches, but the branch-content wrapping and source-aware error recovery still use simplified compatibility paths; missing=exact ErrorWithParsedObject parity and inline/branch ownership wiring; next=continue the remaining flow-tree/parser ownership work]
 11. `InkParser/InkParser_Content.cs` (`deps=8`) [partial: reason=text/tag/glue line parsing is real, but full inline logic, choice-specific content rules, and weave integration are still incomplete; missing=multi-branch inline logic and choice-aware content handling; next=port InkParser_Choices/InkParser_Conditional and the remaining hierarchy tree]
-12. `InkParser/InkParser_Sequences.cs` (`deps=8`)
+12. `InkParser/InkParser_Sequences.cs` (`deps=8`) [partial: reason=inline sequence annotations and single-line parsing are wired, but multiline sequence reconstruction still depends on the unported weave/tree conversion path; missing=multiline branch conversion from parsed statements into ContentList values and weave-backed nested sequence ownership; next=finish ParsedHierarchy/Weave or the remaining statement-tree conversion]
 13. `InkParser/InkParser_Logic.cs` (`deps=9`) [partial: reason=identifier parsing is real, but the line/variable/list/inline logic parser family is still skeletal; missing=LogicLine, VariableDeclaration, List/Const declarations, inline logic, and expression helper parity; next=port the remaining InkParser logic and expression rules]
 14. `InkParser/InkParser.cs` (`deps=9`) [partial: reason=the parser wrapper now delegates comment elimination, whitespace, include, debug metadata, and top-level Parse construction, but the full statement hierarchy and declaration grammar remain incomplete; missing=LogicLine, declarations, and the remaining statement branches; next=port the remaining InkParser logic and ParsedHierarchy tree]
 15. `InkParser/InkParser_Statements.cs` (`deps=10`) [partial: reason=the parser helper now dispatches knots, stitches, choices, gathers, divert lines, and text lines, but the logic-line family, sequence/conditional branches, and full top-level story export still depend on the remaining hierarchy tree; missing=LogicLine/VariableDeclaration/ListDeclaration/ConstDeclaration and the sequence/conditional parser surface; next=port the remaining parsed hierarchy nodes that feed statement dispatch]
