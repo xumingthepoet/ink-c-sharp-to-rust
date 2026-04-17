@@ -106,7 +106,7 @@ Source area: `ink-c-sharp/compiler/`
 33. `ParsedHierarchy/Gather.cs` (`deps=5`)
 34. `ParsedHierarchy/ListDefinition.cs` (`deps=5`) [ported]
 35. `ParsedHierarchy/Stitch.cs` (`deps=5`)
-36. `StringParser/StringParser.cs` (`deps=5`)
+36. `StringParser/StringParser.cs` (`deps=5`) [partial: reason=the core scanner, rule stack, and basic character parsing are real, but the full delegate/reflection parser ecosystem and InkParser integration are still unfinished; missing=full ParseRule plumbing, parser combinator parity, and the higher-level InkParser entry points; next=port the remaining StringParser combinator layer and wire InkParser onto it]
 37. `InkParser/InkParser_Tags.cs` (`deps=6`)
 38. `ParsedHierarchy/Sequence.cs` (`deps=6`)
 39. `InkParser/InkParser_Divert.cs` (`deps=7`)
