@@ -224,14 +224,6 @@ impl ContentList {
             Self::append_content_to_runtime(&mut container, content);
         }
 
-        // The original C# code asks the owning Story to remember containers that
-        // must not be flattened. That hookup still depends on the higher-level
-        // parser/story ownership chain, so the flag is preserved here but the
-        // story callback remains the next integration step.
-        if self.dontFlatten {
-            // intentionally left as a visible compatibility gap
-        }
-
         self.runtimeContainer = Some(container.clone());
         container
     }
@@ -255,6 +247,14 @@ impl ContentList {
                 ContentListItem::Object(object) => object.ResolveReferences(context),
                 _ => {}
             }
+        }
+
+        if self.dontFlatten {
+            let runtime_container = match self.runtimeContainer.clone() {
+                Some(container) => container,
+                None => self.GenerateRuntimeObject(),
+            };
+            context.DontFlattenContainer(runtime_container);
         }
     }
 
