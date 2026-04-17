@@ -116,6 +116,22 @@ impl FlowBase {
         for obj in contentObjs {
             let is_sub_flow = matches!(obj.kind, ObjectKind::Knot | ObjectKind::Stitch);
             if is_sub_flow {
+                let mut obj = obj;
+                if let Some(payload) = obj.payload.as_mut() {
+                    match payload {
+                        ObjectPayload::Knot(knot) => {
+                            knot.get_base_mut()
+                                .set_parent_flow(Some(Box::new(self.clone())));
+                        }
+                        ObjectPayload::Stitch(stitch) => {
+                            stitch
+                                .get_base_mut()
+                                .set_parent_flow(Some(Box::new(self.clone())));
+                        }
+                        _ => {}
+                    }
+                }
+
                 if self.firstChildFlow.is_none() {
                     self.firstChildFlow = Some(obj.clone());
                 }
@@ -125,8 +141,9 @@ impl FlowBase {
                     .as_ref()
                     .and_then(|identifier| identifier.name.clone())
                 {
-                    self.subFlowsByName
-                        .insert(name, Box::new(FlowBase::from_object(&obj)));
+                    let mut sub_flow = FlowBase::from_object(&obj);
+                    sub_flow.set_parent_flow(Some(Box::new(self.clone())));
+                    self.subFlowsByName.insert(name, Box::new(sub_flow));
                 }
                 subFlowObjs.push(obj);
             } else {
@@ -169,7 +186,7 @@ impl FlowBase {
         final_content
     }
 
-    fn from_object(object: &Object) -> Self {
+    pub(crate) fn from_object(object: &Object) -> Self {
         match object.payload.as_ref() {
             Some(ObjectPayload::Knot(knot)) => return knot.get_base().clone(),
             Some(ObjectPayload::Stitch(stitch)) => return stitch.get_base().clone(),
@@ -216,7 +233,14 @@ impl FlowBase {
 
         let ownerFlow = fromNode
             .ClosestFlowBase()
-            .unwrap_or_else(|| self.base.clone());
+            .map(|owner| {
+                if owner.kind == ObjectKind::Story {
+                    self.clone()
+                } else {
+                    FlowBase::from_object(&owner)
+                }
+            })
+            .unwrap_or_else(|| self.clone());
 
         if self.arguments.iter().any(|arg| {
             arg.identifier.as_ref().and_then(|id| id.name.as_deref()) == Some(varName.as_str())
@@ -227,28 +251,34 @@ impl FlowBase {
             return result;
         }
 
-        if self.variableDeclarations.contains_key(&varName) {
+        if ownerFlow.flow_level != FlowLevel::Story
+            && ownerFlow.variableDeclarations.contains_key(&varName)
+        {
             result.found = true;
             result.isTemporary = true;
-            result.ownerFlow = self
+            result.ownerFlow = ownerFlow
                 .identifier
                 .as_ref()
                 .and_then(|identifier| identifier.name.clone());
             return result;
         }
 
-        if self.flow_level == FlowLevel::Story {
-            result.found = true;
-            result.isGlobal = true;
-            result.ownerFlow = self
-                .identifier
-                .as_ref()
-                .and_then(|identifier| identifier.name.clone());
-            return result;
-        }
+        let mut current_flow = Some(ownerFlow.clone());
+        while let Some(flow) = current_flow {
+            if flow.flow_level == FlowLevel::Story {
+                if flow.variableDeclarations.contains_key(&varName) {
+                    result.found = true;
+                    result.isGlobal = true;
+                    result.ownerFlow = flow
+                        .identifier
+                        .as_ref()
+                        .and_then(|identifier| identifier.name.clone());
+                    return result;
+                }
+                break;
+            }
 
-        if let Some(parent) = &self.parent_flow {
-            return parent.ResolveVariableWithName(varName, fromNode);
+            current_flow = flow.parent_flow.map(|parent| *parent);
         }
 
         result
@@ -451,23 +481,7 @@ impl FlowBase {
         }
 
         for sub_flow in self.subFlowsByName.values() {
-            if sub_flow
-                .base
-                .identifier
-                .as_ref()
-                .and_then(|identifier| identifier.name.as_deref())
-                == Some(name.as_str())
-            {
-                return Some(sub_flow.base.clone());
-            }
-
-            if let Some(found) = sub_flow.base.FindAll(None).into_iter().find(|candidate| {
-                candidate
-                    .identifier
-                    .as_ref()
-                    .and_then(|identifier| identifier.name.as_deref())
-                    == Some(name.as_str())
-            }) {
+            if let Some(found) = sub_flow.ContentWithNameAtLevel(name.clone(), None, true) {
                 return Some(found);
             }
         }
@@ -632,15 +646,16 @@ mod tests {
     use crate::ParsedHierarchy::Expression::{Expression, ExpressionKind};
     use crate::ParsedHierarchy::FlowLevel::FlowLevel;
     use crate::ParsedHierarchy::Identifier::Identifier;
+    use crate::ParsedHierarchy::Knot::Knot;
     use crate::ParsedHierarchy::Number::{Number, NumberValue};
     use crate::ParsedHierarchy::Object::{Object, ObjectKind};
     use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
 
     #[test]
     fn resolves_arguments_and_temporaries_in_current_flow() {
-        let mut flow = FlowBase::new(
+        let mut flow = FlowBase::from_object(&Object::from_knot(Knot::new(
             Identifier {
-                name: Some("story".to_string()),
+                name: Some("knot".to_string()),
                 debugMetadata: None,
             },
             vec![],
@@ -653,9 +668,7 @@ mod tests {
                 isDivertTarget: false,
             }],
             false,
-            false,
-        );
-        flow.set_flowLevel(FlowLevel::Story);
+        )));
         flow.TryAddNewVariableDeclaration(VariableAssignment::new(
             Identifier {
                 name: Some("temp".to_string()),
@@ -673,7 +686,7 @@ mod tests {
                 isGlobal: false,
                 isArgument: true,
                 isTemporary: false,
-                ownerFlow: Some("story".to_string()),
+                ownerFlow: Some("knot".to_string()),
             }
         );
 
@@ -712,5 +725,74 @@ mod tests {
                 .map(|debug| debug.startLineNumber),
             Some(12)
         );
+    }
+
+    #[test]
+    fn resolves_globals_through_parent_flow_chain() {
+        let mut story = FlowBase::new(
+            Identifier {
+                name: Some("story".to_string()),
+                debugMetadata: None,
+            },
+            vec![],
+            vec![],
+            false,
+            false,
+        );
+        story.set_flowLevel(FlowLevel::Story);
+        story.TryAddNewVariableDeclaration(VariableAssignment::new(
+            Identifier {
+                name: Some("score".to_string()),
+                debugMetadata: None,
+            },
+            Expression::from_kind(ExpressionKind::Number(Number::new(NumberValue::Int(1)))),
+        ));
+
+        let child_knot = Knot::new(
+            Identifier {
+                name: Some("intro".to_string()),
+                debugMetadata: None,
+            },
+            vec![],
+            vec![],
+            false,
+        );
+        let mut child_flow = FlowBase::from_object(&Object::from_knot(child_knot));
+        child_flow.set_parent_flow(Some(Box::new(story.clone())));
+
+        let result = child_flow
+            .ResolveVariableWithName("score".to_string(), &Object::with_kind(ObjectKind::Plain));
+
+        assert!(result.found);
+        assert!(result.isGlobal);
+        assert_eq!(result.ownerFlow.as_deref(), Some("story"));
+    }
+
+    #[test]
+    fn deep_search_reaches_nested_subflows() {
+        let inner_knot = Knot::new(
+            Identifier {
+                name: Some("inner".to_string()),
+                debugMetadata: None,
+            },
+            vec![],
+            vec![],
+            false,
+        );
+
+        let outer_knot = Knot::new(
+            Identifier {
+                name: Some("outer".to_string()),
+                debugMetadata: None,
+            },
+            vec![Object::from_knot(inner_knot)],
+            vec![],
+            false,
+        );
+
+        assert!(outer_knot
+            .get_base()
+            .ContentWithNameAtLevel("inner".to_string(), None, true)
+            .is_some());
     }
 }

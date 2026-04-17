@@ -5,6 +5,7 @@ use crate::ParsedHierarchy::ContentList::{ContentList, ContentListItem};
 use crate::ParsedHierarchy::Divert::Divert;
 use crate::ParsedHierarchy::FlowLevel::FlowLevel;
 use crate::ParsedHierarchy::Object::Object;
+use crate::ParsedHierarchy::Object::ObjectPayload;
 use crate::ParsedHierarchy::Return::Return;
 use crate::ParsedHierarchy::Tag::Tag;
 use crate::ParsedHierarchy::Text::Text;
@@ -109,6 +110,15 @@ impl InkParser {
                 self.ParseObject(|parser| parser.LineOfMixedTextAndLogic())
                     .map(Self::wrap_content_line)
             });
+
+        if level == StatementLevel::Top {
+            if matches!(
+                statement.as_ref().and_then(|obj| obj.payload.as_ref()),
+                Some(ObjectPayload::Return(_))
+            ) {
+                self.Error("should not have return statement outside of a knot".to_string());
+            }
+        }
 
         statement
     }
@@ -261,6 +271,7 @@ mod tests {
     use super::StatementLevel;
     use crate::InkParser::InkParser::InkParser;
     use crate::ParsedHierarchy::Object::ObjectPayload;
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn statement_levels_sort_in_expected_order() {
@@ -272,7 +283,7 @@ mod tests {
     #[test]
     fn top_level_declarations_remain_typed_objects() {
         let mut parser = InkParser::new(
-            "VAR score = 5\nCONST MAX = 10\nEXTERNAL host\n".to_string(),
+            "VAR score = 5\nCONST MAX = 10\nEXTERNAL host()\n".to_string(),
             None,
             None,
             None,
@@ -292,5 +303,33 @@ mod tests {
             statements[2].payload.as_ref(),
             Some(ObjectPayload::ExternalDeclaration(_))
         ));
+    }
+
+    #[test]
+    fn top_level_return_still_parses_but_reports_error() {
+        let seen = Arc::new(Mutex::new(None));
+        let captured = Arc::clone(&seen);
+        let handler = Arc::new(
+            move |message: String, line: i32, character: i32, is_warning: bool| {
+                *captured.lock().unwrap() = Some((message, line, character, is_warning));
+            },
+        );
+
+        let mut parser = InkParser::new("~ return 5\n".to_string(), None, Some(handler), None);
+        let statements = parser.StatementsAtLevel(StatementLevel::Top).unwrap();
+
+        assert!(matches!(
+            statements[0].payload.as_ref(),
+            Some(ObjectPayload::Return(_))
+        ));
+        assert_eq!(
+            *seen.lock().unwrap(),
+            Some((
+                "should not have return statement outside of a knot".to_string(),
+                0,
+                0,
+                false
+            ))
+        );
     }
 }

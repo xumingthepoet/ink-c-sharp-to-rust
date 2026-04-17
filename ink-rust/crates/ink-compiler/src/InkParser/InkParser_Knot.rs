@@ -267,7 +267,16 @@ impl InkParser {
 
         self.Whitespace();
 
-        let parameterNames = self.BracketedKnotDeclArguments().unwrap_or_default();
+        let parameterNames = match self.BracketedKnotDeclArguments() {
+            Some(parameter_names) => parameter_names,
+            None => {
+                self.Error(format!(
+                    "declaration of arguments for EXTERNAL, even if empty, i.e. 'EXTERNAL {}()'",
+                    funcIdentifier.name.clone().unwrap_or_default()
+                ));
+                return None;
+            }
+        };
         let argNames = parameterNames
             .iter()
             .filter_map(|arg| arg.identifier.as_ref().and_then(|id| id.name.clone()))
@@ -331,5 +340,14 @@ mod tests {
             story.content[1].payload.as_ref(),
             Some(ObjectPayload::Knot(_))
         ));
+    }
+
+    #[test]
+    fn external_declaration_requires_argument_parentheses() {
+        let mut parser = InkParser::new("EXTERNAL host()\n".to_string(), None, None, None);
+        assert!(parser.ExternalDeclaration().is_some());
+
+        let mut invalid = InkParser::new("EXTERNAL host\n".to_string(), None, None, None);
+        assert!(invalid.ExternalDeclaration().is_none());
     }
 }

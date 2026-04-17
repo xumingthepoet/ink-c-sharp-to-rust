@@ -61,4 +61,14 @@ mod tests {
         assert_eq!(output, "Hello from knot\n");
         assert!(!story.get_canContinue());
     }
+
+    #[test]
+    fn simple_stories_start_without_choices() {
+        let mut compiler = Compiler::new("Hello world\n".to_string(), Options::default());
+        let mut story = compiler
+            .Compile()
+            .expect("source compilation should succeed");
+
+        assert!(story.get_currentChoices().is_empty());
+    }
 }

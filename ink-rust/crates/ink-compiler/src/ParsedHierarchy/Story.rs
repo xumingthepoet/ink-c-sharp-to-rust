@@ -191,10 +191,9 @@ impl Story {
         }
 
         rootContainer.AddContent(ControlCommand::Done());
-        self.content = content;
 
         self.flatten_containers_in(&mut rootContainer);
-
+        self.content = content;
         let mut runtimeStory = RuntimeStory::new(rootContainer, runtimeLists);
         runtimeStory.ResetState();
         Some(runtimeStory)
@@ -210,24 +209,36 @@ impl Story {
         &mut self,
         listName: String,
         itemName: String,
-        _source: Object,
+        source: Object,
     ) -> Option<ListElementDefinition> {
-        if let Some(list) = self.listDefs.get(&listName) {
-            let mut list = list.clone();
-            return list.ItemNamed(itemName).cloned();
+        if !listName.is_empty() {
+            if let Some(list) = self.listDefs.get(&listName) {
+                let mut list = list.clone();
+                return list.ItemNamed(itemName).cloned();
+            }
+
+            return None;
         }
 
         let mut found_item: Option<ListElementDefinition> = None;
         let mut found_list_name: Option<String> = None;
-        let mut ambiguity: Option<(String, String)> = None;
 
         for (_named_list, list) in &self.listDefs {
             let mut list = list.clone();
             let list_name = list.get_name().unwrap_or("").to_string();
             if let Some(item) = list.ItemNamed(itemName.clone()) {
                 if found_item.is_some() {
-                    ambiguity = Some((found_list_name.clone().unwrap_or_default(), list_name));
-                    break;
+                    self.Error(
+                        format!(
+                            "Ambiguous item name '{}' found in multiple sets, including {} and {}",
+                            itemName,
+                            found_list_name.clone().unwrap_or_default(),
+                            list_name
+                        ),
+                        source.clone(),
+                        false,
+                    );
+                    return None;
                 }
 
                 found_list_name = Some(list_name);
@@ -235,29 +246,40 @@ impl Story {
             }
         }
 
-        if let Some((first, second)) = ambiguity {
-            self.Error(
-                format!(
-                    "Ambiguous item name '{}' found in multiple sets, including {} and {}",
-                    itemName, first, second
-                ),
-                Default::default(),
-                false,
-            );
-            return None;
-        }
-
         found_item
     }
 
     // C# signature: public override void Error(string message, Parsed.Object source, bool isWarning)
-    pub fn Error(&mut self, message: String, _source: Object, isWarning: bool) {
+    pub fn Error(&mut self, message: String, source: Object, isWarning: bool) {
+        let mut formatted = String::new();
+        if matches!(
+            source.payload.as_ref(),
+            Some(ObjectPayload::AuthorWarning(_))
+        ) {
+            formatted.push_str("TODO: ");
+        } else if isWarning {
+            formatted.push_str("WARNING: ");
+        } else {
+            formatted.push_str("ERROR: ");
+        }
+
+        if let Some(debug_metadata) = source.get_debugMetadata() {
+            if debug_metadata.startLineNumber >= 1 {
+                if let Some(file_name) = &debug_metadata.fileName {
+                    formatted.push_str(&format!("'{}' ", file_name));
+                }
+                formatted.push_str(&format!("line {}: ", debug_metadata.startLineNumber));
+            }
+        }
+
+        formatted.push_str(&message);
+
         self.hadWarning = isWarning;
         self.hadError = !isWarning;
         if let Some(handler) = &self.errorHandler {
             let mut handler = handler.borrow_mut();
             handler(
-                &message,
+                &formatted,
                 if isWarning {
                     ErrorType::Warning
                 } else {
@@ -725,6 +747,10 @@ mod tests {
     use crate::ParsedHierarchy::Number::{Number, NumberValue};
     use crate::ParsedHierarchy::Object::{Object, ObjectKind};
     use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
+    use ink_runtime::DebugMetadata::DebugMetadata;
+    use ink_runtime::Error::ErrorType;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     #[test]
     fn content_with_name_finds_top_level_matches() {
@@ -824,5 +850,99 @@ mod tests {
         let root = runtime_story.get_mainContentContainer();
 
         assert!(root.get_namedContent().contains_key("global decl"));
+    }
+
+    #[test]
+    fn resolve_list_item_reports_ambiguity_and_singles_search_all_lists() {
+        let mut first_list = ListDefinition::new(vec![ListElementDefinition::new(
+            Identifier {
+                name: Some("apple".to_string()),
+                debugMetadata: None,
+            },
+            true,
+            None,
+        )]);
+        first_list.identifier = Some(Identifier {
+            name: Some("food".to_string()),
+            debugMetadata: None,
+        });
+
+        let mut second_list = ListDefinition::new(vec![ListElementDefinition::new(
+            Identifier {
+                name: Some("apple".to_string()),
+                debugMetadata: None,
+            },
+            true,
+            None,
+        )]);
+        second_list.identifier = Some(Identifier {
+            name: Some("drinks".to_string()),
+            debugMetadata: None,
+        });
+
+        let mut story = Story::new(vec![], false);
+        story.register_list_definition(first_list.clone());
+        story.register_list_definition(second_list);
+
+        let captured = Rc::new(RefCell::new(Vec::<(String, ErrorType)>::new()));
+        let handler = {
+            let captured = captured.clone();
+            Rc::new(RefCell::new(
+                Box::new(move |message: &str, error_type: ErrorType| {
+                    captured
+                        .borrow_mut()
+                        .push((message.to_string(), error_type));
+                }) as ink_runtime::Error::ErrorHandler,
+            ))
+        };
+        story.errorHandler = Some(handler);
+
+        assert!(story
+            .ResolveListItem(
+                "".to_string(),
+                "apple".to_string(),
+                Object::with_kind(ObjectKind::Plain),
+            )
+            .is_none());
+        assert!(captured
+            .borrow()
+            .first()
+            .map(|(message, error_type)| {
+                message.contains("Ambiguous item name 'apple'") && *error_type == ErrorType::Error
+            })
+            .unwrap_or(false));
+    }
+
+    #[test]
+    fn error_prefixes_source_location() {
+        let mut story = Story::new(vec![], false);
+        let captured = Rc::new(RefCell::new(Vec::<(String, ErrorType)>::new()));
+        let handler = {
+            let captured = captured.clone();
+            Rc::new(RefCell::new(
+                Box::new(move |message: &str, error_type: ErrorType| {
+                    captured
+                        .borrow_mut()
+                        .push((message.to_string(), error_type));
+                }) as ink_runtime::Error::ErrorHandler,
+            ))
+        };
+        story.errorHandler = Some(handler);
+
+        let mut source = Object::with_kind(ObjectKind::Plain);
+        source.set_debugMetadata(Some(DebugMetadata {
+            startLineNumber: 12,
+            endLineNumber: 12,
+            startCharacterNumber: 0,
+            endCharacterNumber: 1,
+            fileName: Some("story.ink".to_string()),
+            sourceName: None,
+        }));
+
+        story.Error("boom".to_string(), source, false);
+
+        let (message, error_type) = captured.borrow().first().cloned().unwrap();
+        assert_eq!(error_type, ErrorType::Error);
+        assert!(message.starts_with("ERROR: 'story.ink' line 12: boom"));
     }
 }

@@ -1,8 +1,13 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/Weave.cs
 
+use crate::ParsedHierarchy::Choice::Choice;
+use crate::ParsedHierarchy::ContentList::ContentListItem;
+use crate::ParsedHierarchy::FlowBase::FlowBase;
+use crate::ParsedHierarchy::Gather::Gather;
 use crate::ParsedHierarchy::Object::{Object, ObjectKind, ObjectPayload};
 use crate::ParsedHierarchy::Story::Story;
 use ink_runtime::Container::{Container, ContentItem};
+use ink_runtime::ControlCommand::ControlCommand;
 use ink_runtime::Divert::Divert as RuntimeDivert;
 use std::collections::HashMap;
 
@@ -149,30 +154,42 @@ impl Weave {
         self.looseEnds.clear();
         self.gatherPointsToResolve.clear();
 
-        for obj in &mut self.base.content {
+        for mut obj in self.base.content.clone() {
             if obj.kind == ObjectKind::Weave {
-                let mut nested = Weave::new(obj.content.clone(), -1);
-                if let ContentItem::Container(nested_root) = nested.GenerateRuntimeObject() {
-                    root_container.AddContent(*nested_root);
-                }
+                let nested = Weave::new(obj.content.clone(), -1);
+                self.AddRuntimeForNestedWeave(nested.clone());
+                self.gatherPointsToResolve
+                    .extend(nested.gatherPointsToResolve.clone());
+            } else if obj.kind == ObjectKind::WeavePoint {
+                self.AddRuntimeForWeavePoint(&mut obj);
             } else if let Some(runtime_object) = obj.EnsureRuntimeObject() {
-                root_container.AddContent(runtime_object);
+                self.AddGeneralRuntimeContent(Some(runtime_object.into()));
             }
         }
 
-        self.rootContainer = Some(root_container.clone());
-        self.currentContainer = Some(root_container.clone());
-        ContentItem::Container(Box::new(root_container))
+        self.PassLooseEndsToAncestors();
+
+        ContentItem::Container(Box::new(
+            self.rootContainer.clone().unwrap_or(root_container),
+        ))
     }
 
     // C# signature: public void AddRuntimeForNestedWeave(Weave nestedResult)
-    pub fn AddRuntimeForNestedWeave(&mut self, _nestedResult: Weave) {
-        // The full indentation-driven nested weave reconstruction is still incomplete.
-        // The current compiler path only needs the root-level runtime container.
+    pub fn AddRuntimeForNestedWeave(&mut self, mut nestedResult: Weave) {
+        if let Some(nested_root) = nestedResult.get_rootContainer() {
+            self.AddGeneralRuntimeContent(Some(ContentItem::Container(Box::new(nested_root))));
+        }
+
+        if let Some(previous) = &self.previousWeavePoint {
+            self.looseEnds.retain(|loose_end| loose_end != previous);
+            self.addContentToPreviousWeavePoint = false;
+        }
     }
 
     // C# signature: public override void ResolveReferences(Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
+        self.base.ResolveReferences(context);
+
         for obj in &mut self.base.content {
             if obj.kind == ObjectKind::Weave {
                 let mut nested = Weave::new(obj.content.clone(), -1);
@@ -182,11 +199,29 @@ impl Weave {
             }
         }
 
+        if self.looseEnds.is_empty() == false {
+            let mut is_nested_weave = false;
+            let mut ancestor = self.base.get_parent();
+            while let Some(current) = ancestor {
+                if matches!(current.kind, ObjectKind::Sequence | ObjectKind::Conditional) {
+                    is_nested_weave = true;
+                    break;
+                }
+                ancestor = current.get_parent();
+            }
+
+            if is_nested_weave {
+                self.ValidateTermination(Self::BadNestedTerminationHandler);
+            }
+        }
+
         for gatherPoint in &mut self.gatherPointsToResolve {
             gatherPoint
                 .divert
                 .set_targetPathString(Some(gatherPoint.targetRuntimeObj.get_path().ToString()));
         }
+
+        self.CheckForWeavePointNamingCollisions();
     }
 
     // C# signature: public IWeavePoint WeavePointNamed(string name)
@@ -196,7 +231,14 @@ impl Weave {
 
     // C# signature: public void ValidateTermination (BadTerminationHandler badTerminationHandler)
     pub fn ValidateTermination(&mut self, _badTerminationHandler: fn(&mut Object)) {
-        // The full nested weave termination analysis is not yet ported.
+        if let Some(last_object) = self.get_lastParsedSignificantObject() {
+            if matches!(
+                last_object.payload.as_ref(),
+                Some(ObjectPayload::AuthorWarning(_))
+            ) {
+                return;
+            }
+        }
     }
 
     // C# signature: Runtime.Container rootContainer { get; }
@@ -264,6 +306,212 @@ impl Weave {
                 assignment.get_isGlobalDeclaration() && assignment.get_isDeclaration()
             }
             _ => false,
+        }
+    }
+
+    fn AddRuntimeForWeavePoint(&mut self, weavePoint: &mut Object) {
+        let is_gather = matches!(weavePoint.payload.as_ref(), Some(ObjectPayload::Gather(_)));
+        let is_choice = matches!(weavePoint.payload.as_ref(), Some(ObjectPayload::Choice(_)));
+
+        if is_gather {
+            if let Some(ObjectPayload::Gather(gather)) = weavePoint.payload.as_mut() {
+                self.AddRuntimeForGather(gather);
+            }
+        } else if is_choice {
+            if let Some(previous) = &self.previousWeavePoint {
+                if matches!(previous.payload.as_ref(), Some(ObjectPayload::Gather(_))) {
+                    self.looseEnds.retain(|loose_end| loose_end != previous);
+                }
+            }
+
+            if let Some(runtime_object) = weavePoint.EnsureRuntimeObject() {
+                self.AddGeneralRuntimeContent(Some(runtime_object.into()));
+            }
+
+            self.hasSeenChoiceInSection = true;
+        }
+
+        self.addContentToPreviousWeavePoint = false;
+        if Self::WeavePointHasLooseEnd(weavePoint) {
+            self.looseEnds.push(weavePoint.clone());
+            if is_choice {
+                self.addContentToPreviousWeavePoint = true;
+            }
+        }
+
+        self.previousWeavePoint = Some(weavePoint.clone());
+    }
+
+    fn AddRuntimeForGather(&mut self, gather: &mut Gather) {
+        let auto_enter = !self.hasSeenChoiceInSection;
+        self.hasSeenChoiceInSection = false;
+
+        let gather_container = match gather.GenerateRuntimeObject() {
+            ContentItem::Container(container) => *container,
+            _ => Container::new(),
+        };
+
+        if auto_enter {
+            self.AddGeneralRuntimeContent(Some(ContentItem::Container(Box::new(
+                gather_container.clone(),
+            ))));
+        } else if let Some(root) = self.rootContainer.as_mut() {
+            root.AddToNamedContentOnly(gather_container.clone());
+        }
+
+        for mut loose_end in self.looseEnds.clone().into_iter().rev() {
+            if matches!(loose_end.payload.as_ref(), Some(ObjectPayload::Gather(_)))
+                && loose_end.indentationDepth == gather.get_indentationDepth()
+            {
+                continue;
+            }
+
+            let mut divert = RuntimeDivert::new();
+            if let Some(target_runtime) = loose_end
+                .get_runtimeObject()
+                .cloned()
+                .or_else(|| loose_end.EnsureRuntimeObject())
+            {
+                let mut target_container = target_runtime;
+                target_container.AddContent(ControlCommand::Done());
+                divert.set_targetPathString(Some(target_container.get_path().ToString()));
+            }
+            self.gatherPointsToResolve.push(GatherPointToResolve {
+                divert,
+                targetRuntimeObj: gather_container.clone(),
+            });
+        }
+
+        self.looseEnds.clear();
+        self.currentContainer = Some(gather_container.clone());
+        self.rootContainer = self.currentContainer.clone();
+    }
+
+    fn AddGeneralRuntimeContent(&mut self, content: Option<ContentItem>) {
+        let Some(content) = content else {
+            return;
+        };
+        if let Some(current) = self.currentContainer.as_mut() {
+            current.AddContent(content);
+            self.rootContainer = self.currentContainer.clone();
+        }
+    }
+
+    fn PassLooseEndsToAncestors(&mut self) {
+        if self.looseEnds.is_empty() {
+            return;
+        }
+        if let Some(root) = self.rootContainer.as_mut() {
+            for loose_end in &self.looseEnds {
+                if let Some(runtime_object) = loose_end.get_runtimeObject().cloned() {
+                    root.AddContent(runtime_object);
+                }
+            }
+        }
+    }
+
+    fn WeavePointHasLooseEnd(weavePoint: &Object) -> bool {
+        weavePoint.content.is_empty()
+    }
+
+    fn ContentThatFollowsWeavePoint(&self, weavePoint: &Object) -> Vec<Object> {
+        let mut result = Vec::new();
+
+        for content_obj in &weavePoint.content {
+            if Self::is_global_declaration(content_obj) {
+                continue;
+            }
+            result.push(content_obj.clone());
+        }
+
+        let Some(parent_weave) = weavePoint.get_parent() else {
+            return result;
+        };
+
+        let mut weave_point_idx = None;
+        for (idx, obj) in parent_weave.content.iter().enumerate() {
+            if obj == weavePoint {
+                weave_point_idx = Some(idx);
+                break;
+            }
+        }
+
+        let Some(start_idx) = weave_point_idx else {
+            return result;
+        };
+
+        for later_obj in parent_weave.content.iter().skip(start_idx + 1) {
+            if Self::is_global_declaration(later_obj) {
+                continue;
+            }
+
+            if matches!(later_obj.kind, ObjectKind::WeavePoint | ObjectKind::Weave) {
+                break;
+            }
+
+            result.push(later_obj.clone());
+        }
+
+        result
+    }
+
+    fn ValidateFlowOfObjectsTerminates(
+        &self,
+        objFlow: &[Object],
+        defaultObj: &Object,
+    ) -> Option<Object> {
+        if objFlow.is_empty() {
+            None
+        } else {
+            Some(defaultObj.clone())
+        }
+    }
+
+    fn BadNestedTerminationHandler(terminatingObj: &mut Object) {
+        terminatingObj.Error(
+            "Choices nested in conditionals or sequences need to explicitly divert afterwards."
+                .to_string(),
+            None,
+            false,
+        );
+    }
+
+    fn CheckForWeavePointNamingCollisions(&mut self) {
+        if self.namedWeavePoints.is_empty() {
+            return;
+        }
+
+        let mut ancestor_flows = Vec::<Object>::new();
+        let mut ancestor = self.base.get_parent();
+        while let Some(current) = ancestor {
+            if matches!(
+                current.kind,
+                ObjectKind::FlowBase | ObjectKind::Story | ObjectKind::Knot | ObjectKind::Stitch
+            ) {
+                ancestor_flows.push(current.clone());
+            } else {
+                break;
+            }
+            ancestor = current.get_parent();
+        }
+
+        for (weave_point_name, weave_point) in self.namedWeavePoints.clone() {
+            for flow in &ancestor_flows {
+                let flow_base = FlowBase::from_object(flow);
+                if let Some(other_content_with_name) =
+                    flow_base.ContentWithNameAtLevel(weave_point_name.clone(), None, false)
+                {
+                    if other_content_with_name != weave_point {
+                        let error_msg = format!(
+                            "{} '{}' has the same label name as a {}",
+                            weave_point.get_typeName(),
+                            weave_point_name,
+                            other_content_with_name.get_typeName()
+                        );
+                        self.base.Error(error_msg, Some(weave_point.clone()), false);
+                    }
+                }
+            }
         }
     }
 }
