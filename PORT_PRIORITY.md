@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 30 | 24 | 10 |
-| Total | 98 | 64 | 24 | 10 |
+| Compiler | 64 | 30 | 26 | 8 |
+| Total | 98 | 64 | 26 | 8 |
 
 ## Runtime
 
@@ -47,12 +47,12 @@ Source area: `ink-c-sharp/compiler/`
 15. `ParsedHierarchy/ExternalDeclaration.cs` (`deps=4`) [ported]
 16. `ParsedHierarchy/StringExpression.cs` (`deps=4`) [ported]
 17. `ParsedHierarchy/TunnelOnwards.cs` (`deps=4`) [partial: tunnel target resolution still depends on Parsed.Object ancestry and FlowBase/path resolution]
-18. `ParsedHierarchy/Conditional.cs` (`deps=5`)
+18. `ParsedHierarchy/Conditional.cs` (`deps=5`) [partial: reason=conditional branches now generate runtime containers, but parser integration and weave/sequence ownership are still incomplete; missing=InkParser conditional parsing, weave-style nesting, and full branch rejoin wiring; next=port InkParser_Conditional and the remaining weave helpers]
 19. `ParsedHierarchy/Gather.cs` (`deps=5`) [partial: content tree handling is still waiting on Parsed.Object/FlowBase/ContentList porting]
 20. `ParsedHierarchy/ListDefinition.cs` (`deps=5`) [ported]
 21. `ParsedHierarchy/Stitch.cs` (`deps=5`) [partial: thin flow wrapper is real, but full story-owned subflow resolution and knot/stitch cross-name collision parity still depend on the remaining flow-tree structure]
 22. `ParsedHierarchy/Sequence.cs` (`deps=6`)
-23. `ParsedHierarchy/ConditionalSingleBranch.cs` (`deps=7`)
+23. `ParsedHierarchy/ConditionalSingleBranch.cs` (`deps=7`) [partial: reason=branch runtime generation is real, but the weave-based nesting model and parser ownership are still incomplete; missing=weave nesting, exact else/branch recovery, and parser integration; next=port ParsedHierarchy/Weave and InkParser_Conditional]
 24. `ParsedHierarchy/Knot.cs` (`deps=7`) [partial: thin flow wrapper is real, but knot/stitch ownership and cross-name collision behavior still depend on the remaining flow-tree hierarchy]
 25. `ParsedHierarchy/VariableAssignment.cs` (`deps=7`) [partial: list-definition backref is not yet modeled with the C# ownership cycle, and variable resolution is still using a reduced Story-side lookup until FlowBase/Object are ported]
 26. `ParsedHierarchy/Object.cs` (`deps=8`) [partial: reason=the shared parsed-object base now tracks ancestry, identifiers, and runtime storage, but it is not yet wired into the concrete parsed node types or the story-root ownership model; missing=concrete node inheritance/composition wiring and full Story-root lookup; next=port ParsedHierarchy/Story and the remaining flow-tree nodes onto this base]
