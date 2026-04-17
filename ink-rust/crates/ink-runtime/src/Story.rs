@@ -7,6 +7,7 @@ use crate::ChoicePoint::ChoicePoint;
 use crate::Container::{Container, ContentItem};
 use crate::ControlCommand::{CommandType, ControlCommand};
 use crate::Divert::Divert;
+use crate::Error::{ErrorHandler, ErrorType};
 use crate::Glue::Glue;
 use crate::ListDefinition::ListDefinition;
 use crate::ListDefinitionsOrigin::ListDefinitionsOrigin;
@@ -21,6 +22,7 @@ use crate::Tag::Tag;
 use crate::Value::{StringValue, Value, ValueInput};
 use crate::VariablesState::VariableObserver;
 use crate::VariablesState::VariablesState;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -34,6 +36,8 @@ pub struct Story {
     state_snapshot_at_last_new_line: Option<Box<StoryState>>,
     temporary_evaluation_container: Option<Container>,
     _externals: HashMap<String, ExternalFunctionDef>,
+    pub on_error: Option<Rc<RefCell<ErrorHandler>>>,
+    pub on_did_continue: Option<Arc<dyn Fn() + Send + Sync>>,
     pub on_make_choice: Option<Arc<dyn Fn(Choice) + Send + Sync>>,
     pub on_evaluate_function: Option<Arc<dyn Fn(String, Vec<ValueInput>) + Send + Sync>>,
     pub on_complete_evaluate_function:
@@ -68,6 +72,11 @@ impl std::fmt::Debug for Story {
                     .temporary_evaluation_container
                     .as_ref()
                     .map(|_| "<temporary>"),
+            )
+            .field("on_error", &self.on_error.as_ref().map(|_| "<callback>"))
+            .field(
+                "on_did_continue",
+                &self.on_did_continue.as_ref().map(|_| "<callback>"),
             )
             .field(
                 "on_make_choice",
@@ -113,6 +122,8 @@ impl Clone for Story {
             state_snapshot_at_last_new_line: None,
             temporary_evaluation_container: None,
             _externals: self._externals.clone(),
+            on_error: self.on_error.clone(),
+            on_did_continue: self.on_did_continue.clone(),
             on_make_choice: self.on_make_choice.clone(),
             on_evaluate_function: self.on_evaluate_function.clone(),
             on_complete_evaluate_function: self.on_complete_evaluate_function.clone(),
@@ -161,6 +172,8 @@ impl Story {
             state_snapshot_at_last_new_line: None,
             temporary_evaluation_container: None,
             _externals: HashMap::new(),
+            on_error: None,
+            on_did_continue: None,
             on_make_choice: None,
             on_evaluate_function: None,
             on_complete_evaluate_function: None,
@@ -220,6 +233,8 @@ impl Story {
             state_snapshot_at_last_new_line: None,
             temporary_evaluation_container: None,
             _externals: HashMap::new(),
+            on_error: None,
+            on_did_continue: None,
             on_make_choice: None,
             on_evaluate_function: None,
             on_complete_evaluate_function: None,
@@ -1626,19 +1641,58 @@ impl Story {
             }
 
             self.async_continue_active = false;
+            if self.recursive_continue_count == 1 {
+                if let Some(callback) = self.on_did_continue.clone() {
+                    callback();
+                }
+            }
         }
 
         self.recursive_continue_count -= 1;
 
         if self.story_state_ref().get_hasError() || self.story_state_ref().get_hasWarning() {
-            if self.story_state_ref().get_hasError() {
-                let mut msg = String::from("Ink had ");
-                msg.push_str(&self.story_state_ref().get_currentErrors().len().to_string());
-                msg.push_str(" error");
-                if self.story_state_ref().get_currentErrors().len() != 1 {
-                    msg.push('s');
+            if let Some(handler) = self.on_error.clone() {
+                if self.story_state_ref().get_hasError() {
+                    for err in self.story_state_ref().get_currentErrors() {
+                        (handler.borrow_mut())(&err, ErrorType::Error);
+                    }
                 }
-                panic!("{}", msg);
+                if self.story_state_ref().get_hasWarning() {
+                    for err in self.story_state_ref().get_currentWarnings() {
+                        (handler.borrow_mut())(&err, ErrorType::Warning);
+                    }
+                }
+                self.story_state_mut().ResetErrors();
+            } else {
+                let mut sb = String::from("Ink had ");
+                let current_errors = self.story_state_ref().get_currentErrors();
+                let current_warnings = self.story_state_ref().get_currentWarnings();
+                if self.story_state_ref().get_hasError() {
+                    sb.push_str(&current_errors.len().to_string());
+                    sb.push_str(if current_errors.len() == 1 {
+                        " error"
+                    } else {
+                        " errors"
+                    });
+                    if self.story_state_ref().get_hasWarning() {
+                        sb.push_str(" and ");
+                    }
+                }
+                if self.story_state_ref().get_hasWarning() {
+                    sb.push_str(&current_warnings.len().to_string());
+                    sb.push_str(if current_warnings.len() == 1 {
+                        " warning"
+                    } else {
+                        " warnings"
+                    });
+                }
+                sb.push_str(". It is strongly suggested that you assign an error handler to story.onError. The first issue was: ");
+                if self.story_state_ref().get_hasError() {
+                    sb.push_str(&current_errors[0]);
+                } else {
+                    sb.push_str(&current_warnings[0]);
+                }
+                panic!("{}", StoryException::new_overload_2(sb));
             }
         }
 
@@ -1708,6 +1762,14 @@ impl Story {
         self.state
             .as_ref()
             .map(|state| state.get_currentWarnings())
+            .unwrap_or_default()
+    }
+
+    // C# signature: string currentFlowName => state.currentFlowName;
+    pub fn get_currentFlowName(&mut self) -> String {
+        self.state
+            .as_ref()
+            .map(|state| state.get_currentFlowName())
             .unwrap_or_default()
     }
 
@@ -1896,5 +1958,11 @@ mod tests {
             story.BuildStringOfHierarchy(),
             "[\n    [ (knot)\n        BeginTag,\n        \"tag-one\",\n        EndTag\n    ]\n]"
         );
+    }
+
+    #[test]
+    fn exposes_current_flow_name_from_state() {
+        let mut story = Story::new(Container::new(), Vec::new());
+        assert_eq!(story.get_currentFlowName(), "DEFAULT_FLOW");
     }
 }
