@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 30 | 21 | 13 |
-| Total | 98 | 64 | 21 | 13 |
+| Compiler | 64 | 30 | 23 | 11 |
+| Total | 98 | 64 | 23 | 11 |
 
 ## Runtime
 
@@ -83,9 +83,9 @@ Source area: `ink-c-sharp/compiler/`
 12. `InkParser/InkParser_Sequences.cs` (`deps=8`)
 13. `InkParser/InkParser_Logic.cs` (`deps=9`) [partial: reason=identifier parsing is real, but the line/variable/list/inline logic parser family is still skeletal; missing=LogicLine, VariableDeclaration, List/Const declarations, inline logic, and expression helper parity; next=port the remaining InkParser logic and expression rules]
 14. `InkParser/InkParser.cs` (`deps=9`) [partial: reason=the parser wrapper now delegates comment elimination, whitespace, include, and debug metadata, but the main Parse entry point and statement hierarchy are still unported; missing=full statement parsing and parsed-object tree construction; next=port InkParser statement/content rules and the remaining ParsedHierarchy tree]
-15. `InkParser/InkParser_Statements.cs` (`deps=10`) [partial: reason=the parser helper now defines statement levels and line/skip helpers, but the real statement dispatcher still depends on the unported parsed hierarchy tree; missing=StatementsAtLevel/StatementAtLevel rule tables and end-to-end statement parsing; next=port the remaining parsed hierarchy nodes that feed statement dispatch]
+15. `InkParser/InkParser_Statements.cs` (`deps=10`) [partial: reason=the parser helper now dispatches knots, stitches, choices, gathers, divert lines, and text lines, but the logic-line family, sequence/conditional branches, and full top-level story export still depend on the remaining hierarchy tree; missing=LogicLine/VariableDeclaration/ListDeclaration/ConstDeclaration and the sequence/conditional parser surface; next=port the remaining parsed hierarchy nodes that feed statement dispatch]
 16. `InkParser/InkParser_Tags.cs` (`deps=10`) [ported]
-17. `InkParser/InkParser_Knot.cs` (`deps=11`)
+17. `InkParser/InkParser_Knot.cs` (`deps=11`) [partial: knot and stitch declarations now parse and wrap runtime containers, but full recovery, statement ownership, and story-root integration still depend on the remaining parser/story tree]
 18. `InkParser/InkParser_Expressions.cs` (`deps=15`) [partial: reason=the parser now handles temp keywords, return, infix precedence, function calls, lists, variables, parens, divert targets, and temp declaration/assignment, but string parsing still depends on unported MixedTextAndLogic and remaining parser rules; missing=MixedTextAndLogic string parsing; next=port the remaining parser content rules]
 
 ### Outer Files
