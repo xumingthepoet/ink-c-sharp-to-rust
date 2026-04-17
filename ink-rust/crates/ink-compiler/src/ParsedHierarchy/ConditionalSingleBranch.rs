@@ -132,6 +132,10 @@ impl ConditionalSingleBranch {
 
     // C# signature: public override void ResolveReferences (Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
+        if let Some(own_expression) = &mut self.ownExpression {
+            own_expression.ResolveReferences(context);
+        }
+
         if let Some(content_container) = &self.contentContainer {
             if let Some(conditional_divert) = &mut self.conditionalDivert {
                 conditional_divert
@@ -200,5 +204,40 @@ impl ConditionalSingleBranch {
 
     pub fn get_base(&self) -> &Object {
         &self.base
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ConditionalSingleBranch;
+    use crate::ParsedHierarchy::Expression::{Expression, ExpressionKind};
+    use crate::ParsedHierarchy::Identifier::Identifier;
+    use crate::ParsedHierarchy::Story::Story;
+    use crate::ParsedHierarchy::VariableReference::VariableReference;
+
+    #[test]
+    fn resolve_references_visits_branch_own_expression() {
+        let mut branch = ConditionalSingleBranch::new(vec![]);
+        branch.set_ownExpression(Some(Expression::from_kind(
+            ExpressionKind::VariableReference(Box::new(VariableReference::new(vec![Identifier {
+                name: Some("score".to_string()),
+                debugMetadata: None,
+            }]))),
+        )));
+
+        let mut story = Story::new(vec![], false);
+        branch.ResolveReferences(&mut story);
+
+        let resolved = branch
+            .get_ownExpression()
+            .and_then(|expression| match &expression.kind {
+                ExpressionKind::VariableReference(reference) => {
+                    Some(reference.get_runtimeVarRef().is_some())
+                }
+                _ => None,
+            })
+            .unwrap_or(false);
+
+        assert!(resolved);
     }
 }
