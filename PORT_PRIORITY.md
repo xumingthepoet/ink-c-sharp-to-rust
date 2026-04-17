@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 31 | 26 | 7 |
-| Total | 98 | 65 | 26 | 7 |
+| Compiler | 64 | 31 | 27 | 6 |
+| Total | 98 | 65 | 27 | 6 |
 
 ## Runtime
 
@@ -97,7 +97,7 @@ Source area: `ink-c-sharp/compiler/`
 5. `FileHandler.cs` (`deps=1`) [ported]
 6. `InkStringConversionExtensions.cs` (`deps=1`) [ported]
 7. `Plugins/Plugin.cs` (`deps=1`) [ported]
-8. `Plugins/PluginManager.cs` (`deps=4`)
+8. `Plugins/PluginManager.cs` (`deps=4`) [partial: reason=reflection-driven DLL loading is not yet modeled; missing=plugin discovery/loading and invoke-member dispatch; next=finish or replace plugin system integration]
 9. `StringParser/StringParser.cs` (`deps=5`) [ported]
 10. `Stats.cs` (`deps=7`)
 11. `Compiler.cs` (`deps=11`) [partial: source compilation now reaches Parsed.Story and Runtime.Story for simple stories, but plugin processing, full command-line handling, and debug-source bookkeeping remain incomplete; missing=plugin directories, parse error plumbing, immediate-mode commands, and debug range recovery; next=finish the remaining compiler front-end helpers]
