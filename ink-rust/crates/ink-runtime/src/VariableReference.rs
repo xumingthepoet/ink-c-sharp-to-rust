@@ -38,9 +38,17 @@ impl VariableReference {
         self.name.as_deref()
     }
 
+    pub fn set_name(&mut self, value: Option<String>) {
+        self.name = value;
+    }
+
     // C# signature: Path pathForCount { get; }
     pub fn get_pathForCount(&self) -> Option<&Path> {
         self.pathForCount.as_ref()
+    }
+
+    pub fn set_pathForCount(&mut self, value: Option<Path>) {
+        self.pathForCount = value;
     }
 
     // C# signature: Container containerForCount { get; }
@@ -48,7 +56,7 @@ impl VariableReference {
         let path = self
             .pathForCount
             .clone()
-            .unwrap_or_else(crate::Path::Path::new);
+            .expect("variable reference count path must be set");
         let parent = self
             .parent
             .as_ref()
@@ -96,6 +104,7 @@ mod tests {
         let named = VariableReference::new("score".to_string());
         let mut count = VariableReference::new_overload_2();
         count.set_pathStringForCount(Some("knot.stitch".to_string()));
+        count.set_name(None);
 
         assert_eq!(named.ToString(), "var(score)");
         assert_eq!(count.ToString(), "read_count(knot.stitch)");
@@ -116,5 +125,14 @@ mod tests {
 
         let resolved = reference.get_containerForCount();
         assert_eq!(resolved.get_name(), "target");
+    }
+
+    #[test]
+    fn supports_setting_named_reference_properties() {
+        let mut reference = VariableReference::new_overload_2();
+        reference.set_name(Some("score".to_string()));
+        reference.set_pathForCount(None);
+        assert_eq!(reference.get_name(), Some("score"));
+        assert!(reference.get_pathForCount().is_none());
     }
 }

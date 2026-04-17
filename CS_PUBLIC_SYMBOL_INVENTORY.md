@@ -5,8 +5,8 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 48
-Rust skeleton: 46
+Rust implemented: 51
+Rust skeleton: 43
 Rust partial: 4
 Rust missing: 0
 
@@ -87,11 +87,11 @@ Rust missing: 0
 | `ink-c-sharp/ink-engine-runtime/Flow.cs` | `ink-rust/crates/ink-runtime/src/Flow.rs` | 1 | 8 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Glue.cs` | `ink-rust/crates/ink-runtime/src/Glue.rs` | 1 | 2 | implemented |
 | `ink-c-sharp/ink-engine-runtime/INamedContent.cs` | `ink-rust/crates/ink-runtime/src/INamedContent.rs` | 1 | 0 | implemented |
-| `ink-c-sharp/ink-engine-runtime/InkList.cs` | `ink-rust/crates/ink-runtime/src/InkList.rs` | 2 | 47 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/InkList.cs` | `ink-rust/crates/ink-runtime/src/InkList.rs` | 2 | 47 | implemented |
 | `ink-c-sharp/ink-engine-runtime/JsonSerialisation.cs` | `ink-rust/crates/ink-runtime/src/JsonSerialisation.rs` | 1 | 12 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/ListDefinition.cs` | `ink-rust/crates/ink-runtime/src/ListDefinition.rs` | 1 | 8 | implemented |
 | `ink-c-sharp/ink-engine-runtime/ListDefinitionsOrigin.cs` | `ink-rust/crates/ink-runtime/src/ListDefinitionsOrigin.rs` | 1 | 4 | implemented |
-| `ink-c-sharp/ink-engine-runtime/NativeFunctionCall.cs` | `ink-rust/crates/ink-runtime/src/NativeFunctionCall.rs` | 1 | 39 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/NativeFunctionCall.cs` | `ink-rust/crates/ink-runtime/src/NativeFunctionCall.rs` | 1 | 39 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Object.cs` | `ink-rust/crates/ink-runtime/src/Object.rs` | 1 | 17 | partial |
 | `ink-c-sharp/ink-engine-runtime/Path.cs` | `ink-rust/crates/ink-runtime/src/Path.rs` | 2 | 31 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Pointer.cs` | `ink-rust/crates/ink-runtime/src/Pointer.rs` | 1 | 9 | implemented |
@@ -107,6 +107,6 @@ Rust missing: 0
 | `ink-c-sharp/ink-engine-runtime/Tag.cs` | `ink-rust/crates/ink-runtime/src/Tag.rs` | 1 | 3 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Value.cs` | `ink-rust/crates/ink-runtime/src/Value.rs` | 10 | 57 | implemented |
 | `ink-c-sharp/ink-engine-runtime/VariableAssignment.cs` | `ink-rust/crates/ink-runtime/src/VariableAssignment.rs` | 1 | 6 | implemented |
-| `ink-c-sharp/ink-engine-runtime/VariableReference.cs` | `ink-rust/crates/ink-runtime/src/VariableReference.rs` | 1 | 7 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/VariableReference.cs` | `ink-rust/crates/ink-runtime/src/VariableReference.rs` | 1 | 7 | implemented |
 | `ink-c-sharp/ink-engine-runtime/VariablesState.cs` | `ink-rust/crates/ink-runtime/src/VariablesState.rs` | 1 | 22 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/Void.cs` | `ink-rust/crates/ink-runtime/src/Void.rs` | 1 | 1 | implemented |
