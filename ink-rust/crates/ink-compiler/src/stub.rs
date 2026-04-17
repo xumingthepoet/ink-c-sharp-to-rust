@@ -134,7 +134,6 @@ pub type VariableReference = PortStub;
 pub type VariableResolveResult = PortStub;
 pub type VariablesState = PortStub;
 pub type Void = PortStub;
-pub type Weave = PortStub;
 pub type Wrap = PortStub;
 pub type Writer = PortStub;
 pub type implicit = PortStub;

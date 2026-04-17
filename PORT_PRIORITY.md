@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 35 | 25 | 4 |
-| Total | 98 | 69 | 25 | 4 |
+| Compiler | 64 | 35 | 26 | 3 |
+| Total | 98 | 69 | 26 | 3 |
 
 ## Runtime
 
@@ -65,7 +65,7 @@ Source area: `ink-c-sharp/compiler/`
 33. `ParsedHierarchy/Choice.cs` (`deps=11`) [partial: choice runtime generation and reference resolution are real, but the full parsed-object ownership chain, count-all-visits hookup, and flow-tree integration are still not modeled; missing=base-object content propagation and owning-story visit-count wiring; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase]
 34. `ParsedHierarchy/FlowBase.cs` (`deps=16`) [partial: reason=variable lookup and basic runtime export now work against a standalone flow base, but weave splitting, sub-flow ownership, and full C# hierarchy parity still depend on the unported story/flow object tree; missing=weave/subflow construction, flow-parent wiring, and exact story-root resolution; next=port ParsedHierarchy/Weave and the remaining flow-tree wrappers onto this base]
 35. `ParsedHierarchy/Story.cs` (`deps=16`) [partial: reason=the parser-side story now owns top-level content, handles include preprocessing, and exports runtime stories, but the full variable-resolution / weave-processing pipeline is still incomplete; missing=complete const/list/variable collection, exact weave processing, and full naming-collision parity; next=finish ParsedHierarchy/FlowBase and the remaining story-tree helpers]
-36. `ParsedHierarchy/Weave.cs` (`deps=16`)
+36. `ParsedHierarchy/Weave.cs` (`deps=16`) [partial: reason=the weave helper now owns indentation-based content ordering and basic runtime export, but the full nested weave hierarchy, loose-end routing, and termination analysis are still simplified; missing=exact recursive weave reconstruction, loose-end propagation, and full termination validation; next=finish the remaining flow-tree ownership model and nested sequence/conditional weaving]
 
 ### InkParser
 
