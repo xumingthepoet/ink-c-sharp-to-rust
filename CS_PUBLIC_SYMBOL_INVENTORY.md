@@ -5,8 +5,8 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 44
-Rust skeleton: 51
+Rust implemented: 46
+Rust skeleton: 49
 Rust partial: 3
 Rust missing: 0
 
@@ -105,7 +105,7 @@ Rust missing: 0
 | `ink-c-sharp/ink-engine-runtime/StoryState.cs` | `ink-rust/crates/ink-runtime/src/StoryState.rs` | 1 | 63 | partial |
 | `ink-c-sharp/ink-engine-runtime/StringJoinExtension.cs` | `ink-rust/crates/ink-runtime/src/StringJoinExtension.rs` | 1 | 1 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Tag.cs` | `ink-rust/crates/ink-runtime/src/Tag.rs` | 1 | 3 | implemented |
-| `ink-c-sharp/ink-engine-runtime/Value.cs` | `ink-rust/crates/ink-runtime/src/Value.rs` | 10 | 57 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/Value.cs` | `ink-rust/crates/ink-runtime/src/Value.rs` | 10 | 57 | implemented |
 | `ink-c-sharp/ink-engine-runtime/VariableAssignment.cs` | `ink-rust/crates/ink-runtime/src/VariableAssignment.rs` | 1 | 6 | implemented |
 | `ink-c-sharp/ink-engine-runtime/VariableReference.cs` | `ink-rust/crates/ink-runtime/src/VariableReference.rs` | 1 | 7 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/VariablesState.cs` | `ink-rust/crates/ink-runtime/src/VariablesState.rs` | 1 | 22 | skeleton |
