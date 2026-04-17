@@ -185,7 +185,7 @@ impl ListElementDefinition {
     }
 
     // C# signature: public override Runtime.Object GenerateRuntimeObject ()
-    pub fn GenerateRuntimeObject(&mut self) -> crate::stub::PortStub {
+    pub fn GenerateRuntimeObject(&mut self) {
         panic!("ListElementDefinition.GenerateRuntimeObject is not implemented in C#");
     }
 
