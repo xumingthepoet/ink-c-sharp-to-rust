@@ -64,22 +64,22 @@ impl InkParser {
         mut separatorRule: SeparatorRule,
     ) -> Option<Vec<T>>
     where
-        MainRule: FnMut(&mut StringParser) -> Option<T>,
-        SeparatorRule: FnMut(&mut StringParser) -> Option<()>,
+        MainRule: FnMut(&mut Self) -> Option<T>,
+        SeparatorRule: FnMut(&mut Self) -> Option<()>,
         T: 'static,
     {
-        let firstElement = self.parser.ParseObject(&mut mainRule)?;
+        let firstElement = self.ParseObject(&mut mainRule)?;
         let mut allElements = vec![firstElement];
 
         loop {
             let nextElementRuleId = self.parser.BeginRule();
 
-            if separatorRule(&mut self.parser).is_none() {
+            if separatorRule(self).is_none() {
                 self.parser.CancelRule(nextElementRuleId);
                 break;
             }
 
-            match self.parser.ParseObject(&mut mainRule) {
+            match self.ParseObject(&mut mainRule) {
                 Some(nextElement) => {
                     self.parser.SucceedRule(nextElementRuleId, ());
                     allElements.push(nextElement);
@@ -159,6 +159,34 @@ impl InkParser {
     ) -> Option<String> {
         self.parser
             .ParseCharactersFromCharSet(charSet, shouldIncludeChars, maxCount)
+    }
+
+    pub fn ParseObject<T, R>(&mut self, mut rule: R) -> Option<T>
+    where
+        R: FnMut(&mut Self) -> Option<T>,
+        T: 'static,
+    {
+        let rule_id = self.parser.BeginRule();
+        let stack_height_before = self.parser.get_state().get_stackHeight();
+
+        let result = rule(self);
+
+        if stack_height_before != self.parser.get_state().get_stackHeight() {
+            panic!("Mismatched Begin/Fail/Succeed rules");
+        }
+
+        match result {
+            Some(result) => Some(self.parser.SucceedRule(rule_id, result)),
+            None => self.parser.FailRule(rule_id),
+        }
+    }
+
+    pub fn ParseRule<T, R>(&mut self, mut rule: R) -> Option<T>
+    where
+        R: FnMut(&mut Self) -> Option<T>,
+        T: 'static,
+    {
+        self.ParseObject(&mut rule)
     }
 
     pub fn ParseCharactersFromString(&mut self, str: String, maxCount: i32) -> Option<String> {
