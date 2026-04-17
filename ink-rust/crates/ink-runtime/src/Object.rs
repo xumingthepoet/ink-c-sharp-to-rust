@@ -142,6 +142,10 @@ impl Object {
         self.parent.as_deref()
     }
 
+    pub fn set_parent(&mut self, parent: Option<Box<Container>>) {
+        self.parent = parent;
+    }
+
     // C# signature: Runtime.DebugMetadata debugMetadata { get; }
     pub fn get_debugMetadata(&self) -> Option<&DebugMetadata> {
         self.debug_metadata.as_ref().or_else(|| {
@@ -149,6 +153,10 @@ impl Object {
                 .as_deref()
                 .and_then(|parent| parent.get_debugMetadata())
         })
+    }
+
+    pub fn set_debugMetadata(&mut self, debug_metadata: Option<DebugMetadata>) {
+        self.debug_metadata = debug_metadata;
     }
 
     // C# signature: Runtime.DebugMetadata ownDebugMetadata { get; }
