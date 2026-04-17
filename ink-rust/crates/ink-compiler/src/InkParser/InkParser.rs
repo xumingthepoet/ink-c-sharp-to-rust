@@ -341,6 +341,62 @@ impl InkParser {
         self.parser.ParseUntilCharactersFromString(str, -1)
     }
 
+    pub fn ParseUntil<T, R>(
+        &mut self,
+        stopRule: R,
+        pauseCharacters: Option<CharacterSet>,
+        endCharacters: Option<CharacterSet>,
+    ) -> Option<String>
+    where
+        R: FnMut(&mut Self) -> Option<T>,
+        T: 'static,
+    {
+        let mut stopRule = stopRule;
+        let mut pause_and_end = CharacterSet::new();
+        if let Some(pause) = pauseCharacters.as_ref() {
+            pause_and_end.AddCharacters(pause.characters.iter().copied());
+        }
+        if let Some(end) = endCharacters.as_ref() {
+            pause_and_end.AddCharacters(end.characters.iter().copied());
+        }
+
+        let mut parsed_string = String::new();
+
+        loop {
+            if let Some(partial) = self
+                .parser
+                .ParseUntilCharactersFromCharSet(pause_and_end.clone(), -1)
+            {
+                parsed_string.push_str(&partial);
+            }
+
+            if self.Peek(|parser| stopRule(parser)).is_some() {
+                break;
+            }
+
+            if self.parser.get_endOfInput() {
+                break;
+            }
+
+            let pause_character = self.parser.get_currentCharacter();
+            if pauseCharacters
+                .as_ref()
+                .map_or(false, |set| set.Contains(pause_character))
+            {
+                parsed_string.push(self.ParseSingleCharacter());
+                continue;
+            } else {
+                break;
+            }
+        }
+
+        if parsed_string.is_empty() {
+            None
+        } else {
+            Some(parsed_string)
+        }
+    }
+
     pub fn ParseUntilCharactersFromCharSet(
         &mut self,
         charSet: CharacterSet,

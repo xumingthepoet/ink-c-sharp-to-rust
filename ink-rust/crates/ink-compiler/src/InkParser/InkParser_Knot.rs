@@ -1,5 +1,6 @@
 // Source: ink-c-sharp/compiler/InkParser/InkParser_Knot.cs
 
+use crate::CharacterSet::CharacterSet;
 use crate::InkParser::InkParser::InkParser;
 use crate::InkParser::InkParser_Statements::StatementLevel;
 use crate::ParsedHierarchy::FlowBase::Argument;
@@ -170,8 +171,11 @@ impl InkParser {
     pub fn KnotStitchNoContentRecoveryRule(
         &mut self,
     ) -> Option<Vec<crate::ParsedHierarchy::Object::Object>> {
-        let _ = self.ParseUntilCharactersFromString("\n\r".to_string());
-        let _ = self.ParseNewline();
+        let _ = self.ParseUntil(
+            |parser| parser.KnotDeclaration(),
+            Some(CharacterSet::new_overload_2("=".to_string())),
+            None,
+        );
         let mut recoveredFlowContent = Vec::new();
         let mut content_list = crate::ParsedHierarchy::ContentList::ContentList::new(vec![
             crate::ParsedHierarchy::ContentList::ContentListItem::from(
