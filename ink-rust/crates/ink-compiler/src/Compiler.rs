@@ -12,7 +12,10 @@ use ink_runtime::Story::Story as RuntimeStory;
 use ink_runtime::Value::{StringValue, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 #[derive(Clone)]
 pub struct Options {
@@ -89,13 +92,29 @@ impl Compiler {
 
     // C# signature: public Parsed.Story Parse()
     pub fn Parse(&mut self) -> ParsedStory {
+        self.hadParseError = false;
+        let had_parse_error = Arc::new(AtomicBool::new(false));
+        let parse_error_handler = {
+            let had_parse_error = Arc::clone(&had_parse_error);
+            Arc::new(
+                move |message: String, line: i32, _character: i32, is_warning: bool| {
+                    if !is_warning {
+                        had_parse_error.store(true, Ordering::SeqCst);
+                        panic!("Error on line {}: {}", line + 1, message);
+                    }
+                    eprintln!("Warning on line {}: {}", line + 1, message);
+                },
+            )
+        };
+
         let mut parser = InkParser::new(
             self.inputString.clone(),
             self.options.sourceFilename.clone(),
-            None,
+            Some(parse_error_handler),
             self.options.fileHandler.clone(),
         );
         let parsed_story = parser.Parse();
+        self.hadParseError = had_parse_error.load(Ordering::SeqCst);
         self.parser = Some(parser);
         self.parsedStory = Some(parsed_story.clone());
         parsed_story
@@ -110,6 +129,11 @@ impl Compiler {
         let mut parsed_story = self.Parse();
         if let Some(plugin_manager) = self.pluginManager.as_mut() {
             parsed_story = plugin_manager.PostParse(parsed_story);
+        }
+        if self.hadParseError {
+            self.parsedStory = Some(parsed_story);
+            self.runtimeStory = None;
+            return None;
         }
         parsed_story.countAllVisits = self.options.countAllVisits;
 
