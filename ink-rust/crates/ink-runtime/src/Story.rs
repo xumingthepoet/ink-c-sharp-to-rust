@@ -1894,7 +1894,7 @@ mod tests {
         );
         assert_eq!(
             story.BuildStringOfHierarchy(),
-            "[\n    [ (knot)\n        BeginTag\n        tag-one\n        EndTag\n    ]\n]"
+            "[\n    [ (knot)\n        BeginTag,\n        \"tag-one\",\n        EndTag\n    ]\n]"
         );
     }
 }

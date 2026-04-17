@@ -6,8 +6,8 @@ Source files: 98
 Public types: 133
 Public members: 1081
 Rust implemented: 48
-Rust skeleton: 47
-Rust partial: 3
+Rust skeleton: 46
+Rust partial: 4
 Rust missing: 0
 
 | C# file | Rust target | Public types | Public members | Rust state |
@@ -79,7 +79,7 @@ Rust missing: 0
 | `ink-c-sharp/ink-engine-runtime/CallStack.cs` | `ink-rust/crates/ink-runtime/src/CallStack.rs` | 3 | 41 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Choice.cs` | `ink-rust/crates/ink-runtime/src/Choice.rs` | 1 | 11 | implemented |
 | `ink-c-sharp/ink-engine-runtime/ChoicePoint.cs` | `ink-rust/crates/ink-runtime/src/ChoicePoint.rs` | 1 | 12 | implemented |
-| `ink-c-sharp/ink-engine-runtime/Container.cs` | `ink-rust/crates/ink-runtime/src/Container.rs` | 2 | 21 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/Container.cs` | `ink-rust/crates/ink-runtime/src/Container.rs` | 2 | 21 | partial |
 | `ink-c-sharp/ink-engine-runtime/ControlCommand.cs` | `ink-rust/crates/ink-runtime/src/ControlCommand.rs` | 2 | 32 | implemented |
 | `ink-c-sharp/ink-engine-runtime/DebugMetadata.cs` | `ink-rust/crates/ink-runtime/src/DebugMetadata.rs` | 1 | 9 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Divert.cs` | `ink-rust/crates/ink-runtime/src/Divert.rs` | 1 | 15 | implemented |

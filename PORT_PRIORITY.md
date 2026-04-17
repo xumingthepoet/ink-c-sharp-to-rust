@@ -38,7 +38,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 22. `ChoicePoint.cs` (`deps=4`) [ported]
 23. `Profiler.cs` (`deps=4`) [ported]
 24. `Value.cs` (`deps=4`) [ported]
-25. `Container.cs` (`deps=5`) [partial: reason=the container now stores real runtime content items and supports add/insert operations plus indexed path lookup, but parent/backlink bookkeeping and full named content semantics are still incomplete; missing=parent-path traversal, accurate named-content ownership, and full hierarchy stringification; next=introduce real parent links or an equivalent ownership model, then finish named traversal]
+25. `Container.cs` (`deps=5`) [partial: reason=the container now stores real runtime content items, supports add/insert operations, indexed path lookup, named-only content, and hierarchy stringification, but parent/backlink bookkeeping still differs from upstream; missing=exact parent-chain ownership and mutation propagation; next=introduce a shared parent-link model that preserves upstream hierarchy semantics]
 26. `Divert.cs` (`deps=5`) [ported]
 27. `Object.cs` (`deps=5`) [partial: reason=runtime path helpers are real, but parent backlinks and Copy/debug-line parity are still not wired into the current container model; missing=full parent-chain integration and exact runtime object cloning semantics; next=thread parent links through the runtime content graph or rework the path cache to match C#]
 28. `Flow.cs` (`deps=6`) [ported]

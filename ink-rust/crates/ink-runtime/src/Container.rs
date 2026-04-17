@@ -134,8 +134,10 @@ pub struct Container {
     parent: Option<Box<Container>>,
     content: Vec<ContentItem>,
     named_content: HashMap<String, ContentItem>,
+    named_only_content: HashMap<String, ContentItem>,
     name: Option<String>,
     path: Path,
+    path_to_first_leaf_content: Option<Path>,
     debug_metadata: Option<DebugMetadata>,
     visitsShouldBeCounted: bool,
     turnIndexShouldBeCounted: bool,
@@ -260,7 +262,8 @@ impl Container {
             divert.set_parent(Some(Box::new(self.clone())));
         }
         if let Some(name) = content_item_name(&content) {
-            self.named_content.insert(name, content);
+            self.named_content.insert(name.clone(), content.clone());
+            self.named_only_content.insert(name, content);
         }
     }
 
@@ -268,9 +271,6 @@ impl Container {
     pub fn AddContentsOfContainer(&mut self, otherContainer: Container) {
         for content in otherContainer.content {
             self.AddContent(content);
-        }
-        for (_, named_content) in otherContainer.named_content {
-            self.AddToNamedContentOnly(named_content);
         }
     }
 
@@ -354,95 +354,137 @@ impl Container {
     // C# signature: public void BuildStringOfHierarchy(StringBuilder sb, int indentation, Runtime.Object pointedObj)
     pub fn BuildStringOfHierarchy(
         &mut self,
-        _sb: crate::stub::StringBuilder,
-        _indentation: i32,
+        mut sb: crate::stub::StringBuilder,
+        indentation: i32,
         _pointedObj: crate::stub::PortStub,
     ) {
-    }
-
-    // C# signature: public virtual string BuildStringOfHierarchy()
-    pub fn BuildStringOfHierarchy_overload_2(&mut self) -> String {
-        let mut result = String::from("[");
-        if self.get_hasValidName() {
-            result.push(' ');
-            result.push('(');
-            result.push_str(self.get_name());
-            result.push(')');
+        fn append_indentation(sb: &mut crate::stub::StringBuilder, indentation: i32) {
+            for _ in 0..(indentation.max(0) as usize * 4) {
+                sb.AppendChar(' ');
+            }
         }
 
-        result.push('\n');
-
-        for content in &self.content {
+        fn append_content(
+            sb: &mut crate::stub::StringBuilder,
+            indentation: i32,
+            content: &ContentItem,
+        ) {
             match content {
                 ContentItem::Container(container) => {
-                    let mut child_container = container.as_ref().clone();
-                    let child = child_container.BuildStringOfHierarchy_overload_2();
-                    for line in child.lines() {
-                        result.push_str("    ");
-                        result.push_str(line);
-                        result.push('\n');
-                    }
+                    let mut child = container.as_ref().clone();
+                    child.BuildStringOfHierarchy(
+                        sb.clone(),
+                        indentation,
+                        crate::stub::PortStub::default(),
+                    );
                 }
                 ContentItem::Value(value) => {
-                    result.push_str("    ");
-                    result.push_str(&value.ToString());
-                    result.push('\n');
+                    append_indentation(sb, indentation);
+                    if matches!(value, Value::String(_)) {
+                        sb.Append("\"");
+                        sb.Append(value.ToString().replace('\n', "\\n"));
+                        sb.Append("\"");
+                    } else {
+                        sb.Append(value.ToString());
+                    }
                 }
                 ContentItem::ControlCommand(command) => {
-                    result.push_str("    ");
-                    result.push_str(&command.ToString());
-                    result.push('\n');
+                    append_indentation(sb, indentation);
+                    sb.Append(command.ToString())
                 }
                 ContentItem::Void(value) => {
-                    result.push_str("    ");
-                    result.push_str(&format!("{:?}", value));
-                    result.push('\n');
+                    append_indentation(sb, indentation);
+                    sb.Append("void")
                 }
                 ContentItem::VariableReference(reference) => {
-                    result.push_str("    ");
-                    result.push_str(&reference.ToString());
-                    result.push('\n');
+                    append_indentation(sb, indentation);
+                    sb.Append(reference.ToString())
                 }
                 ContentItem::Divert(divert) => {
-                    result.push_str("    ");
-                    result.push_str(&divert.ToString());
-                    result.push('\n');
+                    append_indentation(sb, indentation);
+                    sb.Append(divert.ToString())
                 }
                 ContentItem::ChoicePoint(choice) => {
-                    result.push_str("    ");
-                    result.push_str(&choice.ToString());
-                    result.push('\n');
+                    append_indentation(sb, indentation);
+                    sb.Append(choice.ToString())
                 }
                 ContentItem::Glue(glue) => {
-                    result.push_str("    ");
-                    result.push_str(&glue.ToString());
-                    result.push('\n');
+                    append_indentation(sb, indentation);
+                    sb.Append(glue.ToString())
                 }
                 ContentItem::NativeFunctionCall(call) => {
-                    result.push_str("    ");
-                    result.push_str(&call.ToString());
-                    result.push('\n');
+                    append_indentation(sb, indentation);
+                    sb.Append(call.ToString())
                 }
                 ContentItem::VariableAssignment(var) => {
-                    result.push_str("    ");
-                    result.push_str(&var.ToString());
-                    result.push('\n');
+                    append_indentation(sb, indentation);
+                    sb.Append(var.ToString())
                 }
                 ContentItem::Tag(tag) => {
-                    result.push_str("    ");
-                    result.push_str(&tag.ToString());
-                    result.push('\n');
+                    append_indentation(sb, indentation);
+                    sb.Append(tag.ToString())
                 }
                 ContentItem::Choice(choice) => {
-                    result.push_str("    ");
-                    result.push_str(choice.get_pathStringOnChoice().as_deref().unwrap_or(""));
-                    result.push('\n');
+                    append_indentation(sb, indentation);
+                    sb.Append(choice.get_pathStringOnChoice().as_deref().unwrap_or(""))
                 }
             }
         }
 
-        result.push(']');
-        result
+        append_indentation(&mut sb, indentation);
+        sb.Append("[");
+
+        if self.get_hasValidName() {
+            sb.Append(" (");
+            sb.Append(self.get_name());
+            sb.Append(")");
+        }
+
+        sb.AppendLine("");
+
+        for (index, content) in self.content.iter().enumerate() {
+            append_content(&mut sb, indentation + 1, content);
+
+            if index != self.content.len() - 1 {
+                sb.Append(",");
+            }
+
+            sb.AppendLine("");
+        }
+
+        let mut only_named = HashMap::<String, &ContentItem>::new();
+        for (name, content) in &self.named_content {
+            if !self.content.iter().any(|c| c == content) {
+                only_named.insert(name.clone(), content);
+            }
+        }
+
+        if !only_named.is_empty() {
+            append_indentation(&mut sb, indentation);
+            sb.AppendLine("-- named: --");
+
+            for (_, content) in only_named {
+                if let ContentItem::Container(container) = content {
+                    let mut child = container.as_ref().clone();
+                    child.BuildStringOfHierarchy(
+                        sb.clone(),
+                        indentation + 1,
+                        crate::stub::PortStub::default(),
+                    );
+                    sb.AppendLine("");
+                }
+            }
+        }
+
+        append_indentation(&mut sb, indentation);
+        sb.Append("]");
+    }
+
+    // C# signature: public virtual string BuildStringOfHierarchy()
+    pub fn BuildStringOfHierarchy_overload_2(&mut self) -> String {
+        let sb = crate::stub::StringBuilder::new();
+        self.BuildStringOfHierarchy(sb.clone(), 0, crate::stub::PortStub::default());
+        sb.ToString()
     }
 
     // C# signature: string name { get; }
@@ -481,6 +523,34 @@ impl Container {
         self.named_content = named_content;
     }
 
+    // C# signature: Dictionary<string, Runtime.Object> namedOnlyContent { get; }
+    pub fn get_namedOnlyContent(&self) -> Option<HashMap<String, ContentItem>> {
+        if self.named_only_content.is_empty() {
+            None
+        } else {
+            Some(self.named_only_content.clone())
+        }
+    }
+
+    pub fn set_namedOnlyContent(
+        &mut self,
+        named_only_content: Option<HashMap<String, ContentItem>>,
+    ) {
+        for name in self.named_only_content.keys().cloned().collect::<Vec<_>>() {
+            self.named_content.remove(&name);
+        }
+        self.named_only_content.clear();
+
+        let Some(named_only_content) = named_only_content else {
+            return;
+        };
+
+        for (name, content) in named_only_content {
+            self.named_content.insert(name.clone(), content.clone());
+            self.named_only_content.insert(name, content);
+        }
+    }
+
     // C# signature: bool visitsShouldBeCounted { get; }
     pub fn get_visitsShouldBeCounted(&self) -> bool {
         self.visitsShouldBeCounted
@@ -510,9 +580,13 @@ impl Container {
 
     // C# signature: int countFlags { get; }
     pub fn get_countFlags(&self) -> i32 {
-        (self.visitsShouldBeCounted as i32)
+        let mut flags = (self.visitsShouldBeCounted as i32)
             | ((self.turnIndexShouldBeCounted as i32) << 1)
-            | ((self.countingAtStartOnly as i32) << 2)
+            | ((self.countingAtStartOnly as i32) << 2);
+        if flags == 4 {
+            flags = 0;
+        }
+        flags
     }
 
     // C# signature: bool hasValidName { get; }
@@ -532,6 +606,10 @@ impl Container {
 
     // C# signature: Path pathToFirstLeafContent { get; }
     pub fn get_pathToFirstLeafContent(&self) -> Path {
+        if let Some(path) = &self.path_to_first_leaf_content {
+            return path.clone();
+        }
+
         let mut path = self.get_path().clone();
         let mut container = self;
         while let Some(ContentItem::Container(first_child)) = container.content.first() {

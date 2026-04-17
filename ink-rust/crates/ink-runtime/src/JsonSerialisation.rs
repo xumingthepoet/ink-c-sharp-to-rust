@@ -384,22 +384,27 @@ impl Json {
             Self::WriteRuntimeObject(writer, content);
         }
 
-        let named_only_content = container.get_namedContent();
+        let named_only_content = container.get_namedOnlyContent();
         let count_flags = container.get_countFlags();
         let has_name_property = !withoutName && container.get_hasValidName();
-        let has_terminator = !named_only_content.is_empty() || count_flags > 0 || has_name_property;
+        let has_terminator = named_only_content
+            .as_ref()
+            .map(|content| !content.is_empty())
+            .unwrap_or(false)
+            || count_flags > 0
+            || has_name_property;
 
         if has_terminator {
             must(writer.WriteObjectStart());
         }
 
-        if !named_only_content.is_empty() {
+        if let Some(named_only_content) = named_only_content {
             for (name, named_content) in named_only_content {
                 must(writer.WritePropertyStart(name.clone()));
                 if let ContentItem::Container(named_container) = named_content {
                     Self::WriteRuntimeContainer(writer, named_container.as_ref(), true);
                 } else {
-                    Self::WriteRuntimeObject(writer, named_content);
+                    Self::WriteRuntimeObject(writer, &named_content);
                 }
                 must(writer.WritePropertyEnd());
             }
@@ -460,7 +465,7 @@ impl Json {
                 }
             }
 
-            container.set_namedContent(named_only_content);
+            container.set_namedOnlyContent(Some(named_only_content));
         }
 
         container
