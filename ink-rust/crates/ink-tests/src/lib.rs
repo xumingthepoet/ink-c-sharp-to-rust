@@ -47,7 +47,7 @@ mod tests {
     }
 
     #[test]
-    fn compiles_divert_to_top_level_knot_runtime_json() {
+    fn compiles_and_runs_divert_to_top_level_knot() {
         let mut compiler = Compiler::new(
             "-> intro\n== intro ==\nHello from knot\n-> DONE\n".to_string(),
             Options::default(),
@@ -56,10 +56,9 @@ mod tests {
             .Compile()
             .expect("source compilation should succeed");
 
-        let json = story.ToJson();
+        let output = story.Continue();
 
-        assert!(json.contains(r#""->":"intro""#));
-        assert!(json.contains(r#""intro""#));
-        assert!(json.contains("Hello from knot"));
+        assert_eq!(output, "Hello from knot\n");
+        assert!(!story.get_canContinue());
     }
 }

@@ -1196,8 +1196,11 @@ impl Story {
                 );
                 return Ok(true);
             } else {
-                self.story_state_mut()
-                    .set_divertedPointer(current_divert.get_targetPointer());
+                let target_pointer = current_divert
+                    .get_targetPath()
+                    .map(|target_path| self.PointerAtPath(target_path))
+                    .unwrap_or_else(|| current_divert.get_targetPointer());
+                self.story_state_mut().set_divertedPointer(target_pointer);
             }
 
             if current_divert.get_pushesToStack() {
@@ -1207,6 +1210,15 @@ impl Story {
                     0,
                     output_len,
                 );
+            }
+
+            if self.story_state_ref().get_divertedPointer().get_isNull()
+                && !current_divert.get_isExternal()
+            {
+                return Err(StoryException::new_overload_2(format!(
+                    "Divert resolution failed: {}",
+                    current_divert.ToString()
+                )));
             }
 
             return Ok(true);
@@ -1342,7 +1354,15 @@ impl Story {
                     );
                     self.story_state_mut().PushThread();
                 }
-                CommandType::Done | CommandType::End => {
+                CommandType::Done => {
+                    if self.story_state_ref().get_callStack().canPopThread() {
+                        self.story_state_mut().PopThread();
+                    } else {
+                        self.story_state_mut().set_didSafeExit(true);
+                        self.story_state_mut().set_currentPointer(Pointer::Null());
+                    }
+                }
+                CommandType::End => {
                     self.story_state_mut().ForceEnd();
                 }
                 CommandType::ListFromInt | CommandType::ListRange | CommandType::ListRandom => {}
