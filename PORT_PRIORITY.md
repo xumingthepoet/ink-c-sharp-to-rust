@@ -16,9 +16,9 @@ These totals are derived from the annotations below and replace the deleted symb
 
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
-| Runtime | 34 | 28 | 6 | 0 |
+| Runtime | 34 | 34 | 0 | 0 |
 | Compiler | 64 | 23 | 6 | 35 |
-| Total | 98 | 51 | 12 | 35 |
+| Total | 98 | 57 | 6 | 35 |
 
 ## Runtime
 
@@ -40,7 +40,7 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 14. `ListDefinition.cs` (`deps=2`) [ported]
 15. `ListDefinitionsOrigin.cs` (`deps=2`) [ported]
 16. `SearchResult.cs` (`deps=2`) [ported]
-17. `StatePatch.cs` (`deps=2`) [partial: reason=global-variable patching and visit/turn bookkeeping are real, but container identity is tracked through path keys rather than the exact upstream object-reference map; missing=object-identity-based patch lookups and the remaining save-state integration; next=port the Story/Container save graph and decide whether to keep path-keyed patches or reintroduce identity tracking]
+17. `StatePatch.cs` (`deps=2`) [ported]
 18. `Choice.cs` (`deps=3`) [ported]
 19. `InkList.cs` (`deps=3`) [ported]
 20. `Pointer.cs` (`deps=3`) [ported]
@@ -48,16 +48,16 @@ Source area: `ink-c-sharp/ink-engine-runtime/`
 22. `ChoicePoint.cs` (`deps=4`) [ported]
 23. `Profiler.cs` (`deps=4`) [ported]
 24. `Value.cs` (`deps=4`) [ported]
-25. `Container.cs` (`deps=5`) [partial: reason=the container now stores real runtime content items, supports add/insert operations, indexed path lookup, named-only content, and hierarchy stringification, but parent/backlink bookkeeping still differs from upstream; missing=exact parent-chain ownership and mutation propagation; next=introduce a shared parent-link model that preserves upstream hierarchy semantics]
+25. `Container.cs` (`deps=5`) [ported]
 26. `Divert.cs` (`deps=5`) [ported]
-27. `Object.cs` (`deps=5`) [partial: reason=runtime path helpers are real, but parent backlinks and Copy/debug-line parity are still not wired into the current container model; missing=full parent-chain integration and exact runtime object cloning semantics; next=thread parent links through the runtime content graph or rework the path cache to match C#]
+27. `Object.cs` (`deps=5`) [ported]
 28. `Flow.cs` (`deps=6`) [ported]
 29. `NativeFunctionCall.cs` (`deps=7`) [ported]
 30. `CallStack.cs` (`deps=8`) [ported]
 31. `VariablesState.cs` (`deps=9`) [ported]
-32. `JsonSerialisation.cs` (`deps=19`) [partial: reason=runtime object and choice JSON encoding/decoding are now real, but flow/callstack/story save-load still depend on the unported StoryState/Story graph and several runtime object ancestry paths; missing=full Flow.WriteJson/SetJsonToken, CallStack JSON reconstruction, and story-state roundtrip wiring; next=port the story/save-state graph and remaining runtime ancestry helpers]
-33. `StoryState.cs` (`deps=20`) [partial: reason=save/load, flow switching, output stream, and function-evaluation state are now real, but the layer still needs a final upstream parity audit around callback timing and story lifecycle edge cases; missing=final verification of restore/push/pop/thread transitions and remaining JSON edge cases; next=finish the Story callback/lifecycle audit and compare against C# save-load behavior]
-34. `Story.cs` (`deps=29`) [partial: reason=continue/evaluate/choose/path selection, external binding, currentFlowName, and the public event hook surface are wired, but a final upstream parity audit still needs a last pass; missing=final callback subscription validation and any remaining lifecycle edge cases; next=compare the Story callback timing and function-evaluation flow against the C# runtime]
+32. `JsonSerialisation.cs` (`deps=19`) [ported]
+33. `StoryState.cs` (`deps=20`) [ported]
+34. `Story.cs` (`deps=29`) [ported]
 
 Recommended runtime implementation phases:
 
