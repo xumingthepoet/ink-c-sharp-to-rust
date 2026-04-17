@@ -8,18 +8,42 @@ use crate::StatePatch::StatePatch;
 use crate::StoryException::StoryException;
 use crate::Value::{ListValue, Value, VariablePointerValue};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 const DONT_SAVE_DEFAULT_VALUES: bool = true;
 
-#[derive(Clone, Debug)]
+pub type VariableObserver = Arc<dyn Fn(String, Value) + Send + Sync>;
+
+#[derive(Clone)]
 pub struct VariablesState {
     globalVariables: HashMap<String, Value>,
     defaultGlobalVariables: HashMap<String, Value>,
     callStack: CallStack,
     listDefsOrigin: ListDefinitionsOrigin,
+    variableObservers: HashMap<String, Vec<VariableObserver>>,
     changedVariablesForBatchObs: Option<HashSet<String>>,
     batchObservingVariableChanges: bool,
     pub patch: Option<StatePatch>,
+}
+
+impl std::fmt::Debug for VariablesState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VariablesState")
+            .field("globalVariables", &self.globalVariables)
+            .field("defaultGlobalVariables", &self.defaultGlobalVariables)
+            .field("callStack", &self.callStack)
+            .field("listDefsOrigin", &self.listDefsOrigin)
+            .field(
+                "changedVariablesForBatchObs",
+                &self.changedVariablesForBatchObs,
+            )
+            .field(
+                "batchObservingVariableChanges",
+                &self.batchObservingVariableChanges,
+            )
+            .field("patch", &self.patch)
+            .finish()
+    }
 }
 
 impl VariablesState {
@@ -37,6 +61,7 @@ impl VariablesState {
             listDefsOrigin,
             globalVariables: HashMap::new(),
             defaultGlobalVariables: HashMap::new(),
+            variableObservers: HashMap::new(),
             changedVariablesForBatchObs: None,
             batchObservingVariableChanges: false,
             patch: None,
@@ -79,7 +104,58 @@ impl VariablesState {
 
     // C# signature: public void NotifyObservers(Dictionary<string, Object> changedVars)
     pub fn NotifyObservers(&mut self, _changedVars: HashMap<String, Value>) {
-        // Observer callbacks are not modelled yet in the Rust port.
+        for (variableName, value) in _changedVars {
+            if let Some(observers) = self.variableObservers.get(&variableName) {
+                for observer in observers {
+                    observer(variableName.clone(), value.clone());
+                }
+            }
+        }
+    }
+
+    pub fn ObserveVariable(&mut self, variableName: String, observer: VariableObserver) {
+        self.variableObservers
+            .entry(variableName)
+            .or_insert_with(Vec::new)
+            .push(observer);
+    }
+
+    pub fn ObserveVariables(&mut self, variableNames: Vec<String>, observer: VariableObserver) {
+        for variableName in variableNames {
+            self.ObserveVariable(variableName, observer.clone());
+        }
+    }
+
+    pub fn RemoveVariableObserver(
+        &mut self,
+        observer: Option<&VariableObserver>,
+        specificVariableName: Option<&str>,
+    ) {
+        if let Some(specificVariableName) = specificVariableName {
+            if let Some(observers) = self.variableObservers.get_mut(specificVariableName) {
+                if let Some(observer) = observer {
+                    observers.retain(|candidate| !Arc::ptr_eq(candidate, observer));
+                } else {
+                    self.variableObservers.remove(specificVariableName);
+                    return;
+                }
+                if observers.is_empty() {
+                    self.variableObservers.remove(specificVariableName);
+                }
+            }
+        } else if let Some(observer) = observer {
+            let keys = self.variableObservers.keys().cloned().collect::<Vec<_>>();
+            for key in keys {
+                let mut should_remove = false;
+                if let Some(observers) = self.variableObservers.get_mut(&key) {
+                    observers.retain(|candidate| !Arc::ptr_eq(candidate, observer));
+                    should_remove = observers.is_empty();
+                }
+                if should_remove {
+                    self.variableObservers.remove(&key);
+                }
+            }
+        }
     }
 
     // C# signature: public IEnumerator<string> GetEnumerator()
@@ -341,6 +417,12 @@ impl VariablesState {
             if let Some(changed) = &mut self.changedVariablesForBatchObs {
                 changed.insert(variableName);
             }
+        } else if oldValue.as_ref() != Some(&value) {
+            if let Some(observers) = self.variableObservers.get(&variableName) {
+                for observer in observers {
+                    observer(variableName.clone(), value.clone());
+                }
+            }
         }
     }
 
@@ -397,6 +479,10 @@ mod tests {
     use crate::PushPop::PushPopType;
     use crate::StatePatch::StatePatch;
     use crate::Value::{Value, VariablePointerValue};
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
 
     #[test]
     fn gets_sets_and_batches_globals() {
@@ -438,5 +524,27 @@ mod tests {
             vars.ValueAtVariablePointer(pointer),
             Some(Value::Int(_))
         ));
+    }
+
+    #[test]
+    fn notifies_variable_observers_on_change() {
+        let story = crate::Story::Story::default();
+        let callstack = CallStack::new(story);
+        let mut vars = VariablesState::new(callstack, ListDefinitionsOrigin::default());
+        vars.SetGlobal("score".to_string(), Value::new_int(1));
+
+        let called = Arc::new(AtomicBool::new(false));
+        let called_clone = called.clone();
+        vars.ObserveVariable(
+            "score".to_string(),
+            Arc::new(move |name, value| {
+                assert_eq!(name, "score");
+                assert!(matches!(value, Value::Int(_)));
+                called_clone.store(true, Ordering::SeqCst);
+            }),
+        );
+
+        vars.SetGlobal("score".to_string(), Value::new_int(2));
+        assert!(called.load(Ordering::SeqCst));
     }
 }

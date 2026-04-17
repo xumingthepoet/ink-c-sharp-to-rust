@@ -17,7 +17,7 @@ use crate::SimpleJson::{JsonObject, JsonValue, SimpleJson, Writer};
 use crate::StatePatch::StatePatch;
 use crate::Story::Story;
 use crate::Value::{ListValue, StringValue, Value, ValueType, VariablePointerValue};
-use crate::VariablesState::VariablesState;
+use crate::VariablesState::{VariableObserver, VariablesState};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
@@ -866,6 +866,24 @@ impl StoryState {
                 .get_or_insert_with(Vec::new)
                 .push(message);
         }
+    }
+
+    pub fn ObserveVariable(&mut self, variableName: String, observer: VariableObserver) {
+        self.variablesState.ObserveVariable(variableName, observer);
+    }
+
+    pub fn ObserveVariables(&mut self, variableNames: Vec<String>, observer: VariableObserver) {
+        self.variablesState
+            .ObserveVariables(variableNames, observer);
+    }
+
+    pub fn RemoveVariableObserver(
+        &mut self,
+        observer: Option<&VariableObserver>,
+        specificVariableName: Option<&str>,
+    ) {
+        self.variablesState
+            .RemoveVariableObserver(observer, specificVariableName);
     }
 
     pub fn get_callstackDepth(&self) -> i32 {

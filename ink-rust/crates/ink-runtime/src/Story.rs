@@ -13,6 +13,7 @@ use crate::SearchResult::SearchResult;
 use crate::StoryException::StoryException;
 use crate::StoryState::StoryState;
 use crate::Value::Value;
+use crate::VariablesState::VariableObserver;
 use crate::VariablesState::VariablesState;
 use std::collections::HashMap;
 
@@ -519,27 +520,34 @@ impl Story {
     }
 
     // C# signature: public void ObserveVariable(string variableName, VariableObserver observer)
-    pub fn ObserveVariable(
-        &mut self,
-        _variableName: String,
-        _observer: crate::stub::VariableObserver,
-    ) {
+    pub fn ObserveVariable(&mut self, variableName: String, observer: VariableObserver) {
+        if let Some(state) = self.state.as_mut() {
+            state.ObserveVariable(variableName, observer);
+        }
     }
 
     // C# signature: public void ObserveVariables(IList<string> variableNames, VariableObserver observer)
-    pub fn ObserveVariables(
-        &mut self,
-        _variableNames: Vec<String>,
-        _observer: crate::stub::VariableObserver,
-    ) {
+    pub fn ObserveVariables(&mut self, variableNames: Vec<String>, observer: VariableObserver) {
+        if let Some(state) = self.state.as_mut() {
+            state.ObserveVariables(variableNames, observer);
+        }
     }
 
     // C# signature: public void RemoveVariableObserver(VariableObserver observer = null, string specificVariableName = null)
     pub fn RemoveVariableObserver(
         &mut self,
-        _observer: crate::stub::VariableObserver,
-        _specificVariableName: String,
+        observer: VariableObserver,
+        specificVariableName: String,
     ) {
+        if let Some(state) = self.state.as_mut() {
+            let observer_ref = Some(&observer);
+            let specific_ref = if specificVariableName.is_empty() {
+                None
+            } else {
+                Some(specificVariableName.as_str())
+            };
+            state.RemoveVariableObserver(observer_ref, specific_ref);
+        }
     }
 
     fn ValidateExternalBindings_container(
