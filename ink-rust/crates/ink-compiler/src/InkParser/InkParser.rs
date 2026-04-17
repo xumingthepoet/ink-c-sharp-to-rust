@@ -126,12 +126,14 @@ impl InkParser {
     }
 
     // C# signature: protected override void RuleDidSucceed(object result, StringParserState.Element stateAtStart, StringParserState.Element stateAtEnd)
-    pub fn RuleDidSucceed(
+    pub fn RuleDidSucceed<T>(
         &mut self,
-        _result: crate::stub::PortStub,
+        _result: T,
         _stateAtStart: crate::StringParser::StringParserState::Element,
         _stateAtEnd: crate::StringParser::StringParserState::Element,
-    ) {
+    ) where
+        T: 'static,
+    {
     }
 
     // C# signature: bool parsingStringExpression { get; }

@@ -172,7 +172,7 @@ impl Story {
         &mut self,
         listName: String,
         itemName: String,
-        _source: crate::stub::PortStub,
+        _source: Object,
     ) -> Option<ListElementDefinition> {
         if let Some(list) = self.listDefs.get(&listName) {
             let mut list = list.clone();
@@ -213,7 +213,7 @@ impl Story {
     }
 
     // C# signature: public override void Error(string message, Parsed.Object source, bool isWarning)
-    pub fn Error(&mut self, message: String, _source: crate::stub::PortStub, isWarning: bool) {
+    pub fn Error(&mut self, message: String, _source: Object, isWarning: bool) {
         self.hadWarning = isWarning;
         self.hadError = !isWarning;
         if let Some(handler) = &self.errorHandler {
@@ -286,7 +286,7 @@ impl Story {
     // C# signature: public void CheckForNamingCollisions (Parsed.Object obj, Identifier identifier, SymbolType symbolType, string typeNameOverride = null)
     pub fn CheckForNamingCollisions(
         &mut self,
-        _obj: crate::stub::PortStub,
+        _obj: Object,
         identifier: Identifier,
         symbolType: SymbolType,
         _typeNameOverride: String,
@@ -469,7 +469,7 @@ impl Story {
     pub fn ResolveVariableWithName(
         &self,
         varName: String,
-        _fromNode: crate::stub::PortStub,
+        _fromNode: Object,
     ) -> VariableResolveResult {
         if self.constants.contains_key(&varName) {
             return VariableResolveResult {
