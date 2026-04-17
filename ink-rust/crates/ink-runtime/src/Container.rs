@@ -461,6 +461,10 @@ impl Container {
         self.countingAtStartOnly
     }
 
+    pub fn get_parent(&self) -> Option<&Container> {
+        self.parent.as_deref()
+    }
+
     // C# signature: int countFlags { get; }
     pub fn get_countFlags(&self) -> i32 {
         (self.visitsShouldBeCounted as i32)

@@ -126,7 +126,7 @@ impl Object {
 
     // C# signature: public virtual Object Copy()
     pub fn Copy(&self) -> Self {
-        panic!("Object.Copy is not implemented for the Rust runtime base object")
+        self.clone()
     }
 
     // C# signature: public void SetChild<T>(ref T obj, T value)
@@ -156,13 +156,18 @@ impl Object {
 
     // C# signature: Container rootContentContainer { get; }
     pub fn get_rootContentContainer(&self) -> Option<Container> {
-        self.parent.as_deref().cloned()
+        let mut ancestor = self.parent.as_deref().cloned()?;
+        while let Some(parent) = ancestor.get_parent() {
+            ancestor = parent.clone();
+        }
+        Some(ancestor)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::Object;
+    use crate::Container::Container;
     use crate::Path::{Component, Path};
 
     #[test]
@@ -182,5 +187,26 @@ mod tests {
         );
 
         assert_eq!(obj.CompactPathString(target), ".scene");
+    }
+
+    #[test]
+    fn returns_root_content_container_from_parent_chain() {
+        let mut root = Container::new();
+        root.set_name(Some("root".to_string()));
+
+        let mut child = Container::new();
+        child.set_name(Some("child".to_string()));
+        root.AddContent(child.clone());
+
+        let inserted_child = match root.get_content().first() {
+            Some(crate::Container::ContentItem::Container(container)) => container.as_ref().clone(),
+            _ => panic!("child container missing"),
+        };
+
+        let mut obj = Object::new();
+        obj.parent = Some(Box::new(inserted_child));
+
+        let root_container = obj.get_rootContentContainer().expect("root container");
+        assert_eq!(root_container.get_name(), "root");
     }
 }
