@@ -5,8 +5,8 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 43
-Rust skeleton: 52
+Rust implemented: 44
+Rust skeleton: 51
 Rust partial: 3
 Rust missing: 0
 
@@ -63,7 +63,7 @@ Rust missing: 0
 | `ink-c-sharp/compiler/ParsedHierarchy/Sequence.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Sequence.rs` | 2 | 5 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/Stitch.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Stitch.rs` | 1 | 2 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/Story.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Story.rs` | 2 | 16 | skeleton |
-| `ink-c-sharp/compiler/ParsedHierarchy/StringExpression.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/StringExpression.rs` | 1 | 6 | skeleton |
+| `ink-c-sharp/compiler/ParsedHierarchy/StringExpression.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/StringExpression.rs` | 1 | 6 | implemented |
 | `ink-c-sharp/compiler/ParsedHierarchy/Tag.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Tag.rs` | 1 | 4 | implemented |
 | `ink-c-sharp/compiler/ParsedHierarchy/Text.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Text.rs` | 1 | 4 | implemented |
 | `ink-c-sharp/compiler/ParsedHierarchy/TunnelOnwards.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/TunnelOnwards.rs` | 1 | 3 | skeleton |

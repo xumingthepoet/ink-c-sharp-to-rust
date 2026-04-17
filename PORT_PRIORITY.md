@@ -89,7 +89,7 @@ Source area: `ink-c-sharp/compiler/`
 26. `InkParser/InkParser_CommandLineInput.cs` (`deps=4`)
 27. `ParsedHierarchy/ConstantDeclaration.cs` (`deps=4`) [ported]
 28. `ParsedHierarchy/ExternalDeclaration.cs` (`deps=4`) [partial: reason=external registration now happens during ResolveReferences, but the parser-side story ancestry chain is still incomplete and the call-order parity with upstream has not been audited end-to-end; missing=full AST parent/story wiring and a final timing audit against upstream GenerateRuntimeObject registration; next=port ParsedHierarchy/Object parent links and verify the registration timing against the C# pipeline]
-29. `ParsedHierarchy/StringExpression.cs` (`deps=4`)
+29. `ParsedHierarchy/StringExpression.cs` (`deps=4`) [ported]
 30. `ParsedHierarchy/TunnelOnwards.cs` (`deps=4`)
 31. `Plugins/PluginManager.cs` (`deps=4`)
 32. `ParsedHierarchy/Conditional.cs` (`deps=5`)
@@ -116,7 +116,7 @@ Source area: `ink-c-sharp/compiler/`
 53. `InkParser/InkParser_Statements.cs` (`deps=10`)
 54. `ParsedHierarchy/Divert.cs` (`deps=10`)
 55. `ParsedHierarchy/DivertTarget.cs` (`deps=10`)
-56. `ParsedHierarchy/Expression.cs` (`deps=10`) [partial: reason=the wrapper now covers literal generation and recursive expression evaluation for the core AST forms, but the full upstream expression hierarchy still needs the remaining node variants and parser integrations; missing=FunctionCall/StringExpression/DivertTarget wiring and final parity for the expression node set; next=port the remaining expression-derived parser nodes and expand the wrapper variants]
+56. `ParsedHierarchy/Expression.cs` (`deps=10`) [partial: reason=the wrapper now covers literal generation and recursive expression evaluation for the core AST forms, but the full upstream expression hierarchy still needs the remaining node variants and parser integrations; missing=FunctionCall/DivertTarget wiring and final parity for the expression node set; next=port the remaining expression-derived parser nodes and expand the wrapper variants]
 57. `Compiler.cs` (`deps=11`)
 58. `InkParser/InkParser_Knot.cs` (`deps=11`)
 59. `ParsedHierarchy/Choice.cs` (`deps=11`)
