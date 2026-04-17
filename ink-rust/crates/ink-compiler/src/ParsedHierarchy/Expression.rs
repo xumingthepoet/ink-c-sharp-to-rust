@@ -14,11 +14,13 @@ use ink_runtime::NativeFunctionCall::NativeFunctionCall as RuntimeNativeFunction
 use ink_runtime::Value::{IntValue, Value};
 use ink_runtime::VariableAssignment::VariableAssignment as RuntimeVariableAssignment;
 use ink_runtime::VariableReference::VariableReference as RuntimeVariableReference;
+use std::cell::RefCell;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Expression {
     pub outputWhenComplete: bool,
     pub kind: ExpressionKind,
+    prototypeRuntimeConstantExpression: RefCell<Option<RuntimeContainer>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -68,6 +70,7 @@ impl Expression {
         Self {
             outputWhenComplete: false,
             kind: ExpressionKind::Empty,
+            prototypeRuntimeConstantExpression: RefCell::new(None),
         }
     }
 
@@ -75,6 +78,7 @@ impl Expression {
         Self {
             outputWhenComplete: false,
             kind,
+            prototypeRuntimeConstantExpression: RefCell::new(None),
         }
     }
 
@@ -97,9 +101,17 @@ impl Expression {
 
     // C# signature: public void GenerateConstantIntoContainer(Runtime.Container container)
     pub fn GenerateConstantIntoContainer(&self, container: &mut RuntimeContainer) {
-        let mut prototype = RuntimeContainer::new();
-        self.GenerateIntoContainer(&mut prototype);
-        container.AddContentsOfContainer(prototype);
+        if self.prototypeRuntimeConstantExpression.borrow().is_none() {
+            let mut prototype = RuntimeContainer::new();
+            self.GenerateIntoContainer(&mut prototype);
+            *self.prototypeRuntimeConstantExpression.borrow_mut() = Some(prototype);
+        }
+
+        if let Some(prototype) = self.prototypeRuntimeConstantExpression.borrow().as_ref() {
+            for runtime_obj in prototype.get_content().iter().cloned() {
+                container.AddContent(runtime_obj);
+            }
+        }
     }
 
     // C# signature: public abstract void GenerateIntoContainer (Runtime.Container container)
