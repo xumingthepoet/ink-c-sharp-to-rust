@@ -1,8 +1,11 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/Object.cs
 
+use crate::ParsedHierarchy::ContentList::ContentList;
 use crate::ParsedHierarchy::FlowLevel::FlowLevel;
 use crate::ParsedHierarchy::Identifier::Identifier;
+use crate::ParsedHierarchy::Weave::Weave;
 use ink_runtime::Container::Container;
+use ink_runtime::Container::ContentItem;
 use ink_runtime::DebugMetadata::DebugMetadata;
 use ink_runtime::Path::{Component, Path};
 
@@ -389,10 +392,36 @@ impl Object {
     }
 }
 
+impl From<ContentList> for Object {
+    fn from(mut value: ContentList) -> Self {
+        let runtimeObject = Some(value.GenerateRuntimeObject());
+
+        let mut object = Object::with_kind(ObjectKind::Plain);
+        object.set_runtimeObject(runtimeObject);
+        object
+    }
+}
+
+impl From<Weave> for Object {
+    fn from(mut value: Weave) -> Self {
+        let runtimeObject = match value.GenerateRuntimeObject() {
+            ContentItem::Container(container) => Some(*container),
+            _ => None,
+        };
+
+        let mut object = value.base;
+        object.set_runtimeObject(runtimeObject);
+        object
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Object, ObjectKind};
+    use crate::ParsedHierarchy::ContentList::{ContentList, ContentListItem};
     use crate::ParsedHierarchy::Identifier::Identifier;
+    use crate::ParsedHierarchy::Text::Text;
+    use crate::ParsedHierarchy::Weave::Weave;
 
     #[test]
     fn ancestry_and_scope_follow_parent_chain() {
@@ -409,5 +438,19 @@ mod tests {
         assert_eq!(ancestry.len(), 1);
         assert_eq!(ancestry[0].get_typeName(), "Story");
         assert_eq!(root.get_descriptionOfScope(), "'root' and at top scope");
+    }
+
+    #[test]
+    fn from_content_list_and_weave_preserves_runtime_object() {
+        let content_list =
+            ContentList::new(vec![ContentListItem::from(Text::new("x".to_string()))]);
+        let content_object = Object::from(content_list);
+        assert!(content_object.get_runtimeObject().is_some());
+        assert_eq!(content_object.get_typeName(), "Object");
+
+        let weave = Weave::new(vec![], -1);
+        let weave_object = Object::from(weave);
+        assert!(weave_object.get_runtimeObject().is_some());
+        assert_eq!(weave_object.get_typeName(), "Weave");
     }
 }
