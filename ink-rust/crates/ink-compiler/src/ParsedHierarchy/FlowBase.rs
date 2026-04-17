@@ -483,6 +483,46 @@ impl FlowBase {
 
         self.base.ResolveReferences(context);
 
+        if !self.arguments.is_empty() {
+            for arg in &self.arguments {
+                if let Some(identifier) = &arg.identifier {
+                    context.CheckForNamingCollisions(
+                        Default::default(),
+                        identifier.clone(),
+                        crate::ParsedHierarchy::Story::SymbolType::Arg,
+                        "argument".to_string(),
+                    );
+                }
+            }
+
+            for i in 0..self.arguments.len() {
+                for j in (i + 1)..self.arguments.len() {
+                    if self.arguments[i]
+                        .identifier
+                        .as_ref()
+                        .and_then(|id| id.name.as_deref())
+                        == self.arguments[j]
+                            .identifier
+                            .as_ref()
+                            .and_then(|id| id.name.as_deref())
+                    {
+                        self.base.Error(
+                            format!(
+                                "Multiple arguments with the same name: '{}'",
+                                self.arguments[i]
+                                    .identifier
+                                    .as_ref()
+                                    .and_then(|id| id.name.clone())
+                                    .unwrap_or_default()
+                            ),
+                            None,
+                            false,
+                        );
+                    }
+                }
+            }
+        }
+
         for sub_flow in self.subFlowsByName.values_mut() {
             sub_flow.ResolveReferences(context);
         }
@@ -555,8 +595,15 @@ impl FlowBase {
         }
     }
 
-    fn CheckForDisallowedFunctionFlowControl(&self) {
-        let _ = self.flow_level;
+    fn CheckForDisallowedFunctionFlowControl(&mut self) {
+        if self.flow_level != FlowLevel::Knot {
+            self.base.Error(
+                "Functions cannot be stitches - i.e. they should be defined as '== function myFunc ==' rather than public to another knot."
+                    .to_string(),
+                None,
+                false,
+            );
+        }
     }
 
     fn flow_level_rank(level: FlowLevel) -> i32 {
