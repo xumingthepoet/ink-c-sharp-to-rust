@@ -49,9 +49,10 @@ impl InkParser {
                         self.ParseObject(|parser| parser.SingleMultilineCondition())
                     {
                         if !else_branch.get_isElse() {
-                            self.Error(
+                            self.ErrorWithParsedObject(
                                 "Expected an '- else:' clause here rather than an extra condition"
                                     .to_string(),
+                                else_branch.get_base(),
                             );
                             else_branch.set_isElse(true);
                         }
@@ -92,9 +93,10 @@ impl InkParser {
                             branch.set_matchingEquality(true);
                             branch.set_isElse(true);
                         } else if !is_last && branch_count > 2 {
-                            self.Error(
+                            self.ErrorWithParsedObject(
                                 "Only final branch can be an 'else'. Did you miss a ':'?"
                                     .to_string(),
+                                branch.get_base(),
                             );
                         } else if index == 0 {
                             branch.set_isTrueBranch(true);
@@ -116,20 +118,23 @@ impl InkParser {
                             alt.set_isElse(true);
                         } else if alt.get_isElse() {
                             if final_clause.get_isElse() {
-                                self.Error(
+                                self.ErrorWithParsedObject(
                                     "Multiple 'else' cases. Can have a maximum of one, at the end."
                                         .to_string(),
+                                    final_clause.get_base(),
                                 );
                             } else {
-                                self.Error(
+                                self.ErrorWithParsedObject(
                                     "'else' case in conditional should always be the final one"
                                         .to_string(),
+                                    alt.get_base(),
                                 );
                             }
                         } else {
-                            self.Error(
+                            self.ErrorWithParsedObject(
                                 "Branch doesn't have condition. Are you missing a ':'? "
                                     .to_string(),
+                                alt.get_base(),
                             );
                         }
                     }
@@ -137,7 +142,10 @@ impl InkParser {
 
                 if alternatives_ref.len() == 1 && alternatives_ref[0].get_ownExpression().is_none()
                 {
-                    self.Error("Condition block with no conditions".to_string());
+                    self.ErrorWithParsedObject(
+                        "Condition block with no conditions".to_string(),
+                        alternatives_ref[0].get_base(),
+                    );
                 }
             }
         }
@@ -279,6 +287,9 @@ impl InkParser {
 #[cfg(test)]
 mod tests {
     use super::InkParser;
+    use crate::ParsedHierarchy::Object::Object;
+    use ink_runtime::DebugMetadata::DebugMetadata;
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn parses_condition_and_else_markers() {
@@ -287,5 +298,34 @@ mod tests {
 
         let mut else_parser = InkParser::new("else:".to_string(), None, None, None);
         assert!(else_parser.ElseExpression().is_some());
+    }
+
+    #[test]
+    fn error_with_parsed_object_reports_position() {
+        let seen = Arc::new(Mutex::new(None));
+        let captured = Arc::clone(&seen);
+        let handler = Arc::new(
+            move |message: String, line: i32, character: i32, is_warning: bool| {
+                *captured.lock().unwrap() = Some((message, line, character, is_warning));
+            },
+        );
+
+        let mut parser = InkParser::new("x".to_string(), None, Some(handler), None);
+        let mut obj = Object::new();
+        obj.set_debugMetadata(Some(DebugMetadata {
+            startLineNumber: 7,
+            endLineNumber: 7,
+            startCharacterNumber: 3,
+            endCharacterNumber: 4,
+            fileName: Some("story.ink".to_string()),
+            sourceName: None,
+        }));
+
+        parser.ErrorWithParsedObject("boom".to_string(), &obj);
+
+        assert_eq!(
+            *seen.lock().unwrap(),
+            Some(("boom".to_string(), 6, 3, false))
+        );
     }
 }

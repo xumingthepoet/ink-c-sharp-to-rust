@@ -2,6 +2,7 @@
 
 use crate::CharacterSet::CharacterSet;
 use crate::FileHandler::{DefaultFileHandler, IFileHandler};
+use crate::ParsedHierarchy::Object::Object;
 use crate::StringParser::StringParser::{ErrorHandler, StringParser};
 use ink_runtime::DebugMetadata::DebugMetadata;
 use std::cell::RefCell;
@@ -442,6 +443,21 @@ impl InkParser {
     pub fn Error(&mut self, message: String) {
         if let Some(handler) = &self.externalErrorHandler {
             handler(message, 0, 0, false);
+        }
+    }
+
+    pub fn ErrorWithParsedObject(&mut self, message: String, result: &Object) {
+        if let Some(handler) = &self.externalErrorHandler {
+            let (line, character) = result
+                .get_debugMetadata()
+                .map(|metadata| {
+                    (
+                        metadata.startLineNumber.saturating_sub(1),
+                        metadata.startCharacterNumber,
+                    )
+                })
+                .unwrap_or((0, 0));
+            handler(message, line, character, false);
         }
     }
 

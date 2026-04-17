@@ -197,4 +197,8 @@ impl ConditionalSingleBranch {
             return_divert.set_targetPathString(path.map(|p| p.ToString()));
         }
     }
+
+    pub fn get_base(&self) -> &Object {
+        &self.base
+    }
 }
