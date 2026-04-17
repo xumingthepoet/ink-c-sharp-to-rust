@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 26 | 16 | 22 |
-| Total | 98 | 60 | 16 | 22 |
+| Compiler | 64 | 27 | 15 | 22 |
+| Total | 98 | 61 | 15 | 22 |
 
 ## Runtime
 
@@ -97,6 +97,6 @@ Source area: `ink-c-sharp/compiler/`
 6. `InkStringConversionExtensions.cs` (`deps=1`) [ported]
 7. `Plugins/Plugin.cs` (`deps=1`) [ported]
 8. `Plugins/PluginManager.cs` (`deps=4`)
-9. `StringParser/StringParser.cs` (`deps=5`) [partial: reason=the core scanner, rule stack, and basic character parsing are real, but the full delegate/reflection parser ecosystem and InkParser integration are still unfinished; missing=full ParseRule plumbing, parser combinator parity, and the higher-level InkParser entry points; next=port the remaining StringParser combinator layer and wire InkParser onto it]
+9. `StringParser/StringParser.cs` (`deps=5`) [ported]
 10. `Stats.cs` (`deps=7`)
 11. `Compiler.cs` (`deps=11`)

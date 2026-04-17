@@ -732,4 +732,39 @@ mod tests {
         assert_eq!(parsed, "foo");
         assert_eq!(parser.get_currentCharacter(), ',');
     }
+
+    #[test]
+    fn one_of_and_interleave_follow_rule_order() {
+        let mut parser = StringParser::new("foo".to_string());
+        let result = parser
+            .OneOf(vec![
+                Box::new(|p: &mut StringParser| p.ParseString("bar".to_string())),
+                Box::new(|p: &mut StringParser| p.ParseString("foo".to_string())),
+            ])
+            .expect("second branch should match");
+        assert_eq!(result, "foo".to_string());
+
+        let mut parser = StringParser::new("a,b,c".to_string());
+        let parsed = parser
+            .Interleave(
+                |p: &mut StringParser| {
+                    p.ParseCharactersFromString("abcdefghijklmnopqrstuvwxyz".to_string(), 1)
+                },
+                |p: &mut StringParser| p.ParseString(",".to_string()),
+                None,
+                false,
+            )
+            .expect("interleave should parse alternating segments");
+
+        assert_eq!(
+            parsed,
+            vec![
+                "a".to_string(),
+                ",".to_string(),
+                "b".to_string(),
+                ",".to_string(),
+                "c".to_string()
+            ]
+        );
+    }
 }
