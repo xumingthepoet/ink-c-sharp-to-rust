@@ -1,9 +1,12 @@
 // Source: ink-c-sharp/ink-engine-runtime/Divert.cs
 
 use crate::Path::Path;
+use crate::SearchResult::SearchResult;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Divert {
+    parent: Option<Box<crate::Container::Container>>,
+    path: Option<Path>,
     targetPath: Option<Path>,
     variableDivertName: Option<String>,
     pushesToStack: bool,
@@ -16,6 +19,8 @@ pub struct Divert {
 impl Default for Divert {
     fn default() -> Self {
         Self {
+            parent: None,
+            path: None,
             targetPath: None,
             variableDivertName: None,
             pushesToStack: false,
@@ -90,27 +95,181 @@ impl Divert {
             result.push_str(" -> ");
             result.push_str(&self.get_targetPathString());
             result.push_str(" (");
-            result.push_str(&self.targetPath.as_ref().unwrap().ToString());
+            result.push_str(
+                &self
+                    .get_targetPath()
+                    .map(|path| path.ToString())
+                    .unwrap_or_default(),
+            );
             result.push(')');
             result
         }
     }
 
+    fn root_content_container(&self) -> Option<crate::Container::Container> {
+        let mut ancestor = self.parent.as_deref().cloned()?;
+        while let Some(parent) = ancestor.get_parent() {
+            ancestor = parent.clone();
+        }
+        Some(ancestor)
+    }
+
+    fn resolve_path_from_context(&self, path: &Path) -> SearchResult {
+        if path.get_isRelative() {
+            if let Some(mut parent) = self.parent.as_deref().cloned() {
+                return parent.ContentAtPath(path.clone(), 0, -1);
+            }
+
+            return SearchResult {
+                obj: None,
+                approximate: true,
+            };
+        }
+
+        if let Some(mut root) = self.root_content_container() {
+            root.ContentAtPath(path.clone(), 0, -1)
+        } else {
+            SearchResult {
+                obj: None,
+                approximate: true,
+            }
+        }
+    }
+
+    fn path_without_last_component(path: &Path) -> Path {
+        let length = path.get_length();
+        if length <= 0 {
+            return Path::new();
+        }
+
+        let mut components = Vec::new();
+        for index in 0..(length - 1) {
+            if let Some(component) = path.GetComponent(index) {
+                components.push(component.clone());
+            }
+        }
+        Path::new_overload_3(components, path.get_isRelative())
+    }
+
+    fn get_own_path(&self) -> Path {
+        self.path.clone().unwrap_or_else(Path::new)
+    }
+
+    fn ConvertPathToRelative(&self, globalPath: Path) -> Path {
+        let ownPath = self.get_own_path();
+        let minPathLength = ownPath.get_length().min(globalPath.get_length());
+        let mut lastSharedPathCompIndex = -1;
+
+        for i in 0..minPathLength {
+            let Some(ownComp) = ownPath.GetComponent(i) else {
+                break;
+            };
+            let Some(otherComp) = globalPath.GetComponent(i) else {
+                break;
+            };
+
+            if ownComp.Equals(otherComp) {
+                lastSharedPathCompIndex = i;
+            } else {
+                break;
+            }
+        }
+
+        if lastSharedPathCompIndex == -1 {
+            return globalPath;
+        }
+
+        let numUpwardsMoves = (ownPath.get_length() - 1) - lastSharedPathCompIndex;
+        let mut newPathComps = Vec::new();
+
+        for _ in 0..numUpwardsMoves {
+            newPathComps.push(crate::Path::Component::ToParent());
+        }
+
+        for down in (lastSharedPathCompIndex + 1)..globalPath.get_length() {
+            if let Some(component) = globalPath.GetComponent(down) {
+                newPathComps.push(component.clone());
+            }
+        }
+
+        Path::new_overload_3(newPathComps, true)
+    }
+
+    fn CompactPathString(&self, otherPath: Path) -> String {
+        let (relativePathStr, globalPathStr) = if otherPath.get_isRelative() {
+            (
+                otherPath.get_componentsString(),
+                self.get_own_path()
+                    .PathByAppendingPath(&otherPath)
+                    .get_componentsString(),
+            )
+        } else {
+            let relativePath = self.ConvertPathToRelative(otherPath.clone());
+            (
+                relativePath.get_componentsString(),
+                otherPath.get_componentsString(),
+            )
+        };
+
+        if relativePathStr.len() < globalPathStr.len() {
+            relativePathStr
+        } else {
+            globalPathStr
+        }
+    }
+
     // C# signature: Path targetPath { get; }
-    pub fn get_targetPath(&self) -> Option<&Path> {
-        self.targetPath.as_ref()
+    pub fn get_targetPath(&self) -> Option<Path> {
+        let targetPath = self.targetPath.as_ref()?;
+        if targetPath.get_isRelative() {
+            let targetObj = self.get_targetPointer().Resolve();
+            if let Some(crate::Container::ContentItem::Container(container)) = targetObj {
+                return Some(container.get_path().clone());
+            }
+        }
+        Some(targetPath.clone())
     }
 
     // C# signature: Pointer targetPointer { get; }
     pub fn get_targetPointer(&self) -> crate::Pointer::Pointer {
-        todo!("port runtime Divert.targetPointer after Runtime.Object.ResolvePath is translated");
+        let Some(target_path) = self.targetPath.as_ref() else {
+            return crate::Pointer::Pointer::Null();
+        };
+
+        let target_path = target_path.clone();
+        let resolution = self.resolve_path_from_context(&target_path);
+        let Some(target_obj) = resolution.obj else {
+            return crate::Pointer::Pointer::Null();
+        };
+
+        if let Some(last_component) = target_path.get_lastComponent() {
+            if last_component.get_isIndex() {
+                let target_container_path = Self::path_without_last_component(&target_path);
+                let target_container = self.resolve_path_from_context(&target_container_path);
+                if let Some(crate::Container::ContentItem::Container(container)) =
+                    target_container.obj
+                {
+                    return crate::Pointer::Pointer::new(
+                        container.as_ref().clone(),
+                        last_component.get_index(),
+                    );
+                }
+                return crate::Pointer::Pointer::Null();
+            }
+        }
+
+        match target_obj {
+            crate::Container::ContentItem::Container(container) => {
+                crate::Pointer::Pointer::StartOf(container.as_ref().clone())
+            }
+            _ => crate::Pointer::Pointer::Null(),
+        }
     }
 
     // C# signature: string targetPathString { get; }
     pub fn get_targetPathString(&self) -> String {
-        self.targetPath
-            .as_ref()
-            .map(|path| path.ToString())
+        self.get_targetPath()
+            .map(|path| self.CompactPathString(path))
             .unwrap_or_default()
     }
 
@@ -171,11 +330,27 @@ impl Divert {
     pub fn set_isConditional(&mut self, value: bool) {
         self.isConditional = value;
     }
+
+    pub fn set_parent(&mut self, parent: Option<Box<crate::Container::Container>>) {
+        self.parent = parent;
+    }
+
+    pub fn set_path(&mut self, path: Path) {
+        self.path = Some(path);
+    }
+}
+
+impl PartialEq for Divert {
+    fn eq(&self, other: &Self) -> bool {
+        self.Equals(other)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::Divert;
+    use crate::Container::{Container, ContentItem};
+    use crate::ControlCommand::ControlCommand;
     use crate::PushPop::PushPopType;
 
     #[test]
@@ -187,5 +362,27 @@ mod tests {
         let mut call = Divert::new_overload_2(PushPopType::Function);
         call.set_targetPathString(Some("knot.stitch".to_string()));
         assert!(call.ToString().contains("Divert function -> knot.stitch"));
+    }
+
+    #[test]
+    fn resolves_relative_target_pointers_from_parent_container() {
+        let mut child = Container::new();
+        child.AddContent(ControlCommand::BeginString());
+
+        let mut root = Container::new();
+        root.AddContent(child);
+
+        let mut divert = Divert::new();
+        divert.set_targetPathString(Some(".0".to_string()));
+        root.AddContent(divert);
+
+        let stored_divert = match root.get_content().get(1) {
+            Some(ContentItem::Divert(divert)) => divert,
+            _ => panic!("divert missing"),
+        };
+
+        let pointer = stored_divert.get_targetPointer();
+        assert!(matches!(pointer.Resolve(), Some(ContentItem::Container(_))));
+        assert_eq!(pointer.get_path().unwrap().ToString(), "0");
     }
 }

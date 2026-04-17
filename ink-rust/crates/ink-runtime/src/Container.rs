@@ -184,6 +184,11 @@ impl Container {
             choice_point.set_parent(Some(Box::new(self.clone())));
         } else if let ContentItem::VariableReference(ref mut variable_reference) = content {
             variable_reference.set_parent(Some(Box::new(self.clone())));
+        } else if let ContentItem::Divert(ref mut divert) = content {
+            divert.set_parent(Some(Box::new(self.clone())));
+            let index = self.content.len() as i32;
+            let child_path = self.path.PathByAppendingComponent(Component::new(index));
+            divert.set_path(child_path);
         }
         self.content.push(content.clone());
         if let Some(name) = content_item_name(&content) {
@@ -218,6 +223,12 @@ impl Container {
             choice_point.set_parent(Some(Box::new(self.clone())));
         } else if let ContentItem::VariableReference(ref mut variable_reference) = content {
             variable_reference.set_parent(Some(Box::new(self.clone())));
+        } else if let ContentItem::Divert(ref mut divert) = content {
+            divert.set_parent(Some(Box::new(self.clone())));
+            let child_path = self
+                .path
+                .PathByAppendingComponent(Component::new(index as i32));
+            divert.set_path(child_path);
         }
         if index >= self.content.len() {
             self.content.push(content.clone());
@@ -243,6 +254,8 @@ impl Container {
             choice_point.set_parent(Some(Box::new(self.clone())));
         } else if let ContentItem::VariableReference(ref mut variable_reference) = content {
             variable_reference.set_parent(Some(Box::new(self.clone())));
+        } else if let ContentItem::Divert(ref mut divert) = content {
+            divert.set_parent(Some(Box::new(self.clone())));
         }
         if let Some(name) = content_item_name(&content) {
             self.named_content.insert(name, content);

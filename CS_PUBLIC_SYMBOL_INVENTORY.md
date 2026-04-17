@@ -5,8 +5,8 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 41
-Rust skeleton: 55
+Rust implemented: 42
+Rust skeleton: 54
 Rust partial: 2
 Rust missing: 0
 
@@ -82,7 +82,7 @@ Rust missing: 0
 | `ink-c-sharp/ink-engine-runtime/Container.cs` | `ink-rust/crates/ink-runtime/src/Container.rs` | 2 | 21 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/ControlCommand.cs` | `ink-rust/crates/ink-runtime/src/ControlCommand.rs` | 2 | 32 | implemented |
 | `ink-c-sharp/ink-engine-runtime/DebugMetadata.cs` | `ink-rust/crates/ink-runtime/src/DebugMetadata.rs` | 1 | 9 | implemented |
-| `ink-c-sharp/ink-engine-runtime/Divert.cs` | `ink-rust/crates/ink-runtime/src/Divert.rs` | 1 | 15 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/Divert.cs` | `ink-rust/crates/ink-runtime/src/Divert.rs` | 1 | 15 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Error.cs` | `ink-rust/crates/ink-runtime/src/Error.rs` | 1 | 0 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Flow.cs` | `ink-rust/crates/ink-runtime/src/Flow.rs` | 1 | 8 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Glue.cs` | `ink-rust/crates/ink-runtime/src/Glue.rs` | 1 | 2 | implemented |
