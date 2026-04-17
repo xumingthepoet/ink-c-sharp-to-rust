@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 30 | 15 | 19 |
-| Total | 98 | 63 | 15 | 20 |
+| Compiler | 64 | 30 | 17 | 17 |
+| Total | 98 | 63 | 17 | 18 |
 
 ## Runtime
 
@@ -62,7 +62,7 @@ Source area: `ink-c-sharp/compiler/`
 30. `ParsedHierarchy/Divert.cs` (`deps=10`) [partial: reason=runtime divert generation and stack/argument packaging are real, but target-content resolution, reference validation, and ancestry-based path lookup still depend on the unported parser object tree; missing=ResolveReferences parity, targetContent resolution, and argument validity checks; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase or the remaining parser ancestry helpers]
 31. `ParsedHierarchy/DivertTarget.cs` (`deps=10`) [partial: reason=divert-target generation and equality are now real, but the ancestry-based usage checks and exact target counting still depend on the unported ParsedHierarchy.Object tree; missing=full usage-context validation and complete parent-chain counting parity; next=port ParsedHierarchy/Object and FlowBase or the remaining ancestry helpers]
 32. `ParsedHierarchy/Expression.cs` (`deps=10`) [partial: reason=the wrapper now covers literal generation plus function-call, divert-target, and variable-reference expression forms, but the upstream parser still needs the remaining entry points and parse-tree wiring; missing=InkParser expression integration and the rest of the expression grammar surface; next=port InkParser/InkParser_Expressions and the remaining parser rules]
-33. `ParsedHierarchy/Choice.cs` (`deps=11`)
+33. `ParsedHierarchy/Choice.cs` (`deps=11`) [partial: choice runtime generation and reference resolution are real, but the full parsed-object ownership chain, count-all-visits hookup, and flow-tree integration are still not modeled; missing=base-object content propagation and owning-story visit-count wiring; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase]
 34. `ParsedHierarchy/FlowBase.cs` (`deps=16`)
 35. `ParsedHierarchy/Story.cs` (`deps=16`) [partial: reason=the parser-side story now handles symbol registration and list/external lookup, but top-level object processing, runtime export, and the full variable-resolution / weave-processing pipeline are still skeletons; missing=top-level AST traversal, runtime export, flattening, and variable resolution; next=port ParsedHierarchy/FlowBase, ParsedHierarchy/Object, and the remaining export pipeline]
 36. `ParsedHierarchy/Weave.cs` (`deps=16`)
@@ -77,7 +77,7 @@ Source area: `ink-c-sharp/compiler/`
 6. `InkParser/InkParser_CommandLineInput.cs` (`deps=4`) [ported]
 7. `InkParser/InkParser_Tags.cs` (`deps=6`)
 8. `InkParser/InkParser_Divert.cs` (`deps=7`) [partial: reason=the parser now resolves single diverts, thread diverts, and diverted path components, but full multi-divert/tunnel-onwards parity and tag/content list integration are still incomplete; missing=exact tunnel-onwards chain handling, tag/content-list integration, and the full arrow/divert sequence semantics; next=port ParsedHierarchy/TunnelOnwards, ContentList, and the remaining parser content tree]
-9. `InkParser/InkParser_Choices.cs` (`deps=8`)
+9. `InkParser/InkParser_Choices.cs` (`deps=8`) [partial: choice and gather parsing are real, but the statement dispatcher and flow-level integration still depend on the unported parsed hierarchy tree; missing=StatementsAtLevel wiring and choice/gather placement in the top-level parser; next=port InkParser_Statements and ParsedHierarchy/FlowBase]
 10. `InkParser/InkParser_Conditional.cs` (`deps=8`)
 11. `InkParser/InkParser_Content.cs` (`deps=8`) [partial: reason=text/tag/glue line parsing is real, but full inline logic, choice-specific content rules, and weave integration are still incomplete; missing=multi-branch inline logic and choice-aware content handling; next=port InkParser_Choices/InkParser_Conditional and the remaining hierarchy tree]
 12. `InkParser/InkParser_Sequences.cs` (`deps=8`)

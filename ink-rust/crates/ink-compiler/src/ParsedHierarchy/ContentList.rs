@@ -8,6 +8,7 @@ use crate::ParsedHierarchy::Gather::Gather;
 use crate::ParsedHierarchy::IncludedFile::IncludedFile;
 use crate::ParsedHierarchy::List::List;
 use crate::ParsedHierarchy::Return::Return;
+use crate::ParsedHierarchy::Story::Story;
 use crate::ParsedHierarchy::Tag::Tag;
 use crate::ParsedHierarchy::Text::Text;
 use crate::ParsedHierarchy::TunnelOnwards::TunnelOnwards;
@@ -218,6 +219,27 @@ impl ContentList {
 
         self.runtimeContainer = Some(container.clone());
         container
+    }
+
+    // C# equivalent: iterate contained parsed objects and resolve them recursively.
+    pub fn ResolveReferences(&mut self, context: &mut Story) {
+        for content in &mut self.content {
+            match content {
+                ContentListItem::Expression(expression) => expression.ResolveReferences(context),
+                ContentListItem::List(list) => list.ResolveReferences(context),
+                ContentListItem::VariableAssignment(variable_assignment) => {
+                    variable_assignment.ResolveReferences(context)
+                }
+                ContentListItem::Gather(gather) => gather.ResolveReferences(context),
+                ContentListItem::ContentList(content_list) => {
+                    content_list.ResolveReferences(context);
+                }
+                ContentListItem::ConstantDeclaration(declaration) => {
+                    declaration.ResolveReferences(context)
+                }
+                _ => {}
+            }
+        }
     }
 
     fn append_content_to_runtime(container: &mut RuntimeContainer, content: &mut ContentListItem) {
