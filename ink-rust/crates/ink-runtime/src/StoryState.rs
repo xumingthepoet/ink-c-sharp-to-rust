@@ -163,7 +163,7 @@ impl StoryState {
                 .ContentAtPath(Path::new_overload_4(pathString.clone()));
             if let Some(container) = result.get_container().cloned() {
                 let mut visitCountOut = 0;
-                if patch.TryGetVisitCount(container, &mut visitCountOut) {
+                if patch.TryGetVisitCount(&container, &mut visitCountOut) {
                     return visitCountOut;
                 }
             }
@@ -188,7 +188,7 @@ impl StoryState {
 
         if let Some(patch) = &self.patch {
             let mut count = 0;
-            if patch.TryGetVisitCount(container.clone(), &mut count) {
+            if patch.TryGetVisitCount(&container, &mut count) {
                 return count;
             }
         }
@@ -203,7 +203,7 @@ impl StoryState {
     pub fn IncrementVisitCountForContainer(&mut self, container: Container) {
         let currCount = self.VisitCountForContainer(container.clone()) + 1;
         if let Some(patch) = &mut self.patch {
-            patch.SetVisitCount(container, currCount);
+            patch.SetVisitCount(&container, currCount);
             return;
         }
 
@@ -215,7 +215,7 @@ impl StoryState {
     // C# signature: public void RecordTurnIndexVisitToContainer(Container container)
     pub fn RecordTurnIndexVisitToContainer(&mut self, container: Container) {
         if let Some(patch) = &mut self.patch {
-            patch.SetTurnIndex(container, self.currentTurnIndex);
+            patch.SetTurnIndex(&container, self.currentTurnIndex);
             return;
         }
 
@@ -238,7 +238,7 @@ impl StoryState {
 
         if let Some(patch) = &self.patch {
             let mut index = 0;
-            if patch.TryGetTurnIndex(container.clone(), &mut index) {
+            if patch.TryGetTurnIndex(&container, &mut index) {
                 return self.currentTurnIndex - index;
             }
         }
