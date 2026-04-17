@@ -27,10 +27,10 @@ impl InkParser {
     }
 
     // C# signature: protected object SkipToNextLine()
-    pub fn SkipToNextLine(&mut self) -> crate::stub::PortStub {
+    pub fn SkipToNextLine(&mut self) -> Option<()> {
         self.ParseUntilCharactersFromString("\n\r".to_string());
         self.ParseNewline();
-        Default::default()
+        Some(())
     }
 
     // C# signature: protected ParseRule Line(ParseRule inlineRule)

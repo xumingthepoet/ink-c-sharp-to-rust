@@ -10,6 +10,7 @@ use crate::ParsedHierarchy::List::List;
 use crate::ParsedHierarchy::Return::Return;
 use crate::ParsedHierarchy::Tag::Tag;
 use crate::ParsedHierarchy::Text::Text;
+use crate::ParsedHierarchy::TunnelOnwards::TunnelOnwards;
 use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
 use crate::ParsedHierarchy::Wrap::{Glue, LegacyTag};
 use ink_runtime::Container::{Container as RuntimeContainer, ContentItem};
@@ -22,6 +23,7 @@ pub enum ContentListItem {
     LegacyTag(LegacyTag),
     Expression(Expression),
     Divert(Divert),
+    TunnelOnwards(TunnelOnwards),
     List(List),
     VariableAssignment(VariableAssignment),
     Return(Return),
@@ -65,6 +67,12 @@ impl From<Expression> for ContentListItem {
 impl From<Divert> for ContentListItem {
     fn from(value: Divert) -> Self {
         Self::Divert(value)
+    }
+}
+
+impl From<TunnelOnwards> for ContentListItem {
+    fn from(value: TunnelOnwards) -> Self {
+        Self::TunnelOnwards(value)
     }
 }
 
@@ -125,6 +133,7 @@ impl std::fmt::Display for ContentListItem {
             ContentListItem::LegacyTag(_) => f.write_str("LegacyTag"),
             ContentListItem::Expression(expression) => write!(f, "{}", expression.ToString()),
             ContentListItem::Divert(divert) => write!(f, "{}", divert.ToString()),
+            ContentListItem::TunnelOnwards(_) => f.write_str("TunnelOnwards"),
             ContentListItem::List(list) => write!(f, "{}", list.ToString()),
             ContentListItem::VariableAssignment(_) => f.write_str("VariableAssignment"),
             ContentListItem::Return(_) => f.write_str("Return"),
@@ -230,6 +239,9 @@ impl ContentList {
             }
             ContentListItem::Divert(divert) => {
                 container.AddContent(divert.GenerateRuntimeObject());
+            }
+            ContentListItem::TunnelOnwards(tunnel) => {
+                container.AddContent(tunnel.GenerateRuntimeObject());
             }
             ContentListItem::List(list) => {
                 let mut temp = RuntimeContainer::new();

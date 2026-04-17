@@ -40,31 +40,6 @@ impl InkParser {
         Default::default()
     }
 
-    // C# signature: protected Parsed.Object InlineLogicOrGlueOrStartTag()
-    pub fn InlineLogicOrGlueOrStartTag(&mut self) -> crate::stub::PortStub {
-        Default::default()
-    }
-
-    // C# signature: protected Parsed.Glue Glue()
-    pub fn Glue(&mut self) -> crate::stub::Glue {
-        Default::default()
-    }
-
-    // C# signature: protected Parsed.Object InlineLogic()
-    pub fn InlineLogic(&mut self) -> crate::stub::PortStub {
-        Default::default()
-    }
-
-    // C# signature: protected Parsed.Object InnerLogic()
-    pub fn InnerLogic(&mut self) -> crate::stub::PortStub {
-        Default::default()
-    }
-
-    // C# signature: protected Parsed.Object InnerExpression()
-    pub fn InnerExpression(&mut self) -> crate::stub::PortStub {
-        Default::default()
-    }
-
     fn identifier_char_set(&mut self) -> CharacterSet {
         let mut identifierCharSet = CharacterSet::new();
         identifierCharSet

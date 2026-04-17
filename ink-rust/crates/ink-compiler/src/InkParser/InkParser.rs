@@ -151,6 +151,10 @@ impl InkParser {
         self.parser.ParseNewline()
     }
 
+    pub fn ParseSingleCharacter(&mut self) -> char {
+        self.parser.ParseSingleCharacter()
+    }
+
     pub fn ParseCharactersFromCharSet(
         &mut self,
         charSet: CharacterSet,
@@ -330,6 +334,10 @@ impl InkParser {
             .ParseUntilCharactersFromCharSet(charSet, maxCount)
     }
 
+    pub fn LineRemainder(&mut self) -> String {
+        self.parser.LineRemainder()
+    }
+
     pub fn ExtendIdentifierCharacterRanges(&mut self, identifierCharSet: &mut CharacterSet) {
         for mut char_range in
             crate::InkParser::InkParser_CharacterRanges::InkParser::ListAllCharacterRanges()
@@ -362,6 +370,12 @@ impl InkParser {
     pub fn Error(&mut self, message: String) {
         if let Some(handler) = &self.externalErrorHandler {
             handler(message, 0, 0, false);
+        }
+    }
+
+    pub fn Warning(&mut self, message: String) {
+        if let Some(handler) = &self.externalErrorHandler {
+            handler(message, 0, 0, true);
         }
     }
 

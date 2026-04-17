@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 29 | 15 | 20 |
-| Total | 98 | 62 | 15 | 21 |
+| Compiler | 64 | 30 | 15 | 19 |
+| Total | 98 | 63 | 15 | 20 |
 
 ## Runtime
 
@@ -79,7 +79,7 @@ Source area: `ink-c-sharp/compiler/`
 8. `InkParser/InkParser_Divert.cs` (`deps=7`) [partial: reason=the parser now resolves single diverts, thread diverts, and diverted path components, but full multi-divert/tunnel-onwards parity and tag/content list integration are still incomplete; missing=exact tunnel-onwards chain handling, tag/content-list integration, and the full arrow/divert sequence semantics; next=port ParsedHierarchy/TunnelOnwards, ContentList, and the remaining parser content tree]
 9. `InkParser/InkParser_Choices.cs` (`deps=8`)
 10. `InkParser/InkParser_Conditional.cs` (`deps=8`)
-11. `InkParser/InkParser_Content.cs` (`deps=8`)
+11. `InkParser/InkParser_Content.cs` (`deps=8`) [partial: reason=text/tag/glue line parsing is real, but full inline logic, choice-specific content rules, and weave integration are still incomplete; missing=multi-branch inline logic and choice-aware content handling; next=port InkParser_Choices/InkParser_Conditional and the remaining hierarchy tree]
 12. `InkParser/InkParser_Sequences.cs` (`deps=8`)
 13. `InkParser/InkParser_Logic.cs` (`deps=9`) [partial: reason=identifier parsing is real, but the line/variable/list/inline logic parser family is still skeletal; missing=LogicLine, VariableDeclaration, List/Const declarations, inline logic, and expression helper parity; next=port the remaining InkParser logic and expression rules]
 14. `InkParser/InkParser.cs` (`deps=9`) [partial: reason=the parser wrapper now delegates comment elimination, whitespace, include, and debug metadata, but the main Parse entry point and statement hierarchy are still unported; missing=full statement parsing and parsed-object tree construction; next=port InkParser statement/content rules and the remaining ParsedHierarchy tree]

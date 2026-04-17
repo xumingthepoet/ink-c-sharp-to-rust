@@ -1,6 +1,7 @@
 // Source: ink-c-sharp/compiler/InkParser/InkParser_Expressions.cs
 
 use crate::InkParser::InkParser::InkParser;
+use crate::ParsedHierarchy::ContentList::ContentListItem;
 use crate::ParsedHierarchy::DivertTarget::DivertTarget;
 use crate::ParsedHierarchy::Expression::{
     BinaryExpression, Expression, ExpressionKind, IncDecExpression, MultipleConditionExpression,
@@ -79,7 +80,23 @@ impl InkParser {
     }
 
     pub fn DisallowIncrement(&mut self, _expr: &dyn Any) {
-        todo!("increment/decrement line handling is still pending the statement parser");
+        if let Some(expression) = _expr.downcast_ref::<Expression>() {
+            if matches!(expression.kind, ExpressionKind::IncDec(_)) {
+                self.Error(
+                    "Can't use increment/decrement here. It can only be used on a ~ line"
+                        .to_string(),
+                );
+            }
+        } else if let Some(content_list_item) = _expr.downcast_ref::<ContentListItem>() {
+            if let ContentListItem::Expression(expression) = content_list_item {
+                if matches!(expression.kind, ExpressionKind::IncDec(_)) {
+                    self.Error(
+                        "Can't use increment/decrement here. It can only be used on a ~ line"
+                            .to_string(),
+                    );
+                }
+            }
+        }
     }
 
     pub fn ParseTempKeyword(&mut self) -> bool {
