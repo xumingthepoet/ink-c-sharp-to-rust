@@ -41,7 +41,7 @@ impl VariableReference {
     // C# signature: public override void GenerateIntoContainer (Runtime.Container container)
     pub fn GenerateIntoContainer(&mut self, container: &mut ink_runtime::Container::Container) {
         if let Some(constantValue) = self.constantExpression.as_mut() {
-            constantValue.GenerateConstantIntoContainer(container.clone());
+            constantValue.GenerateConstantIntoContainer(container);
             return;
         }
 

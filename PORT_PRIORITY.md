@@ -77,7 +77,7 @@ Source area: `ink-c-sharp/compiler/`
 14. `InkParser/CommentEliminator.cs` (`deps=2`) [ported]
 15. `InkParser/InkParser_AuthorWarning.cs` (`deps=2`)
 16. `ParsedHierarchy/IncludedFile.cs` (`deps=2`) [ported]
-17. `ParsedHierarchy/Return.cs` (`deps=2`)
+17. `ParsedHierarchy/Return.cs` (`deps=2`) [ported]
 18. `ParsedHierarchy/Wrap.cs` (`deps=2`) [ported]
 19. `InkParser/InkParser_Include.cs` (`deps=3`)
 20. `InkParser/InkParser_Whitespace.cs` (`deps=3`)
@@ -116,7 +116,7 @@ Source area: `ink-c-sharp/compiler/`
 53. `InkParser/InkParser_Statements.cs` (`deps=10`)
 54. `ParsedHierarchy/Divert.cs` (`deps=10`)
 55. `ParsedHierarchy/DivertTarget.cs` (`deps=10`)
-56. `ParsedHierarchy/Expression.cs` (`deps=10`)
+56. `ParsedHierarchy/Expression.cs` (`deps=10`) [partial: reason=the wrapper now covers literal generation and recursive expression evaluation for the core AST forms, but the full upstream expression hierarchy still needs the remaining node variants and parser integrations; missing=FunctionCall/StringExpression/DivertTarget wiring and final parity for the expression node set; next=port the remaining expression-derived parser nodes and expand the wrapper variants]
 57. `Compiler.cs` (`deps=11`)
 58. `InkParser/InkParser_Knot.cs` (`deps=11`)
 59. `ParsedHierarchy/Choice.cs` (`deps=11`)

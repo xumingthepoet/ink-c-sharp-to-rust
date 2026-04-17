@@ -5,9 +5,9 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 42
-Rust skeleton: 54
-Rust partial: 2
+Rust implemented: 43
+Rust skeleton: 52
+Rust partial: 3
 Rust missing: 0
 
 | C# file | Rust target | Public types | Public members | Rust state |
@@ -43,7 +43,7 @@ Rust missing: 0
 | `ink-c-sharp/compiler/ParsedHierarchy/ContentList.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/ContentList.rs` | 1 | 8 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/Divert.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Divert.rs` | 1 | 17 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/DivertTarget.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/DivertTarget.rs` | 1 | 6 | skeleton |
-| `ink-c-sharp/compiler/ParsedHierarchy/Expression.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Expression.rs` | 5 | 28 | skeleton |
+| `ink-c-sharp/compiler/ParsedHierarchy/Expression.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Expression.rs` | 5 | 28 | partial |
 | `ink-c-sharp/compiler/ParsedHierarchy/ExternalDeclaration.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/ExternalDeclaration.rs` | 1 | 5 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/FlowBase.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/FlowBase.rs` | 3 | 26 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/FlowLevel.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/FlowLevel.rs` | 1 | 0 | implemented |
@@ -59,7 +59,7 @@ Rust missing: 0
 | `ink-c-sharp/compiler/ParsedHierarchy/Number.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Number.rs` | 1 | 6 | implemented |
 | `ink-c-sharp/compiler/ParsedHierarchy/Object.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Object.rs` | 1 | 28 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/Path.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Path.rs` | 1 | 11 | skeleton |
-| `ink-c-sharp/compiler/ParsedHierarchy/Return.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Return.rs` | 1 | 3 | skeleton |
+| `ink-c-sharp/compiler/ParsedHierarchy/Return.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Return.rs` | 1 | 3 | implemented |
 | `ink-c-sharp/compiler/ParsedHierarchy/Sequence.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Sequence.rs` | 2 | 5 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/Stitch.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Stitch.rs` | 1 | 2 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/Story.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Story.rs` | 2 | 16 | skeleton |
