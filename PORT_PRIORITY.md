@@ -10,6 +10,16 @@ Completion annotations: append `[ported]` to a file entry only after that file's
 
 Partial annotations: if a file is too large or difficult to finish in one pass and a partial implementation must be committed, append `[partial: reason=<why>; missing=<unfinished C# behavior>; next=<dependency or next step>]`. Keep this short but concrete enough that a later agent can finish the file without rediscovering the gap. Remove the partial annotation or replace it with `[ported]` when the file is completed.
 
+## Progress Summary
+
+These totals are derived from the annotations below and replace the deleted symbol inventory.
+
+| Area | Total | Ported | Partial | Remaining |
+| --- | ---: | ---: | ---: | ---: |
+| Runtime | 34 | 28 | 6 | 0 |
+| Compiler | 64 | 23 | 6 | 35 |
+| Total | 98 | 51 | 12 | 35 |
+
 ## Runtime
 
 Source area: `ink-c-sharp/ink-engine-runtime/`
