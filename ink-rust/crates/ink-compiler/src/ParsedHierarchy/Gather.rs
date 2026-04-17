@@ -9,6 +9,7 @@ use ink_runtime::Container::ContentItem;
 pub struct Gather {
     identifier: Option<Identifier>,
     indentationDepth: i32,
+    countAllVisits: bool,
 }
 
 impl Gather {
@@ -17,6 +18,7 @@ impl Gather {
         Self {
             identifier: Some(identifier),
             indentationDepth,
+            countAllVisits: false,
         }
     }
 
@@ -24,13 +26,20 @@ impl Gather {
     pub fn GenerateRuntimeObject(&mut self) -> ContentItem {
         let mut container = Container::new();
         container.set_name(self.get_name().map(|name| name.to_string()));
-        container.set_countFlags(1 | 4);
+
+        if self.countAllVisits {
+            container.set_countFlags(1 | 4);
+        } else {
+            container.set_countFlags(4);
+        }
 
         ContentItem::Container(Box::new(container))
     }
 
     // C# signature: public override void ResolveReferences (Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
+        self.countAllVisits = context.get_countAllVisits();
+
         if let Some(identifier) = &self.identifier {
             if identifier
                 .name

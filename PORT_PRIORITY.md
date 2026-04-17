@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 39 | 22 | 3 |
-| Total | 98 | 73 | 22 | 3 |
+| Compiler | 64 | 40 | 21 | 3 |
+| Total | 98 | 74 | 21 | 3 |
 
 ## Runtime
 
@@ -48,7 +48,7 @@ Source area: `ink-c-sharp/compiler/`
 16. `ParsedHierarchy/StringExpression.cs` (`deps=4`) [ported]
 17. `ParsedHierarchy/TunnelOnwards.cs` (`deps=4`) [ported]
 18. `ParsedHierarchy/Conditional.cs` (`deps=5`) [partial: reason=conditional branches now generate runtime containers, but parser integration and weave/sequence ownership are still incomplete; missing=InkParser conditional parsing, weave-style nesting, and full branch rejoin wiring; next=port InkParser_Conditional and the remaining weave helpers]
-19. `ParsedHierarchy/Gather.cs` (`deps=5`) [partial: content tree handling is still waiting on Parsed.Object/FlowBase/ContentList porting]
+19. `ParsedHierarchy/Gather.cs` (`deps=5`) [ported]
 20. `ParsedHierarchy/ListDefinition.cs` (`deps=5`) [ported]
 21. `ParsedHierarchy/Stitch.cs` (`deps=5`) [ported]
 22. `ParsedHierarchy/Sequence.cs` (`deps=6`) [partial: reason=flat sequence runtime generation is ported, but nested weave-backed branch ownership and multiline sequence reconstruction still depend on the unported weave/tree model; missing=Weave integration, nested loose-end routing, and exact multiline branch conversion; next=finish ParsedHierarchy/Weave or the remaining flow-tree hierarchy]
