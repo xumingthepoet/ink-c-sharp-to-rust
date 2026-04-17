@@ -15,14 +15,30 @@ use crate::Value::Value;
 use crate::VariablesState::VariablesState;
 use std::collections::HashMap;
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Story {
     main_content_container: Container,
     listDefinitions: ListDefinitionsOrigin,
     state: Option<Box<StoryState>>,
+    _externals: HashMap<String, ExternalFunctionDef>,
     async_saving: bool,
     allowExternalFunctionFallbacks: bool,
     pub _port_marker: (),
+}
+
+impl std::fmt::Debug for Story {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Story")
+            .field("main_content_container", &self.main_content_container)
+            .field("listDefinitions", &self.listDefinitions)
+            .field("state", &self.state.as_ref().map(|_| "<state>"))
+            .field("async_saving", &self.async_saving)
+            .field(
+                "allowExternalFunctionFallbacks",
+                &self.allowExternalFunctionFallbacks,
+            )
+            .finish()
+    }
 }
 
 impl Clone for Story {
@@ -31,6 +47,7 @@ impl Clone for Story {
             main_content_container: self.main_content_container.clone(),
             listDefinitions: self.listDefinitions.clone(),
             state: None,
+            _externals: self._externals.clone(),
             async_saving: self.async_saving,
             allowExternalFunctionFallbacks: self.allowExternalFunctionFallbacks,
             _port_marker: (),
@@ -49,9 +66,10 @@ impl Default for OutputStateChange {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct ExternalFunctionDef {
-    pub _port_marker: (),
+    pub function: Option<crate::stub::ExternalFunction>,
+    pub lookaheadSafe: bool,
 }
 
 impl Story {
@@ -64,6 +82,7 @@ impl Story {
             main_content_container: _contentContainer,
             listDefinitions: ListDefinitionsOrigin::new(lists),
             state: None,
+            _externals: HashMap::new(),
             async_saving: false,
             allowExternalFunctionFallbacks: false,
             _port_marker: (),
@@ -111,6 +130,7 @@ impl Story {
             main_content_container,
             listDefinitions: list_definitions,
             state: None,
+            _externals: HashMap::new(),
             async_saving: false,
             allowExternalFunctionFallbacks: false,
             _port_marker: (),
@@ -372,22 +392,84 @@ impl Story {
     // C# signature: public bool TryGetExternalFunction(string functionName, out ExternalFunction externalFunction)
     pub fn TryGetExternalFunction(
         &mut self,
-        _functionName: String,
-        _externalFunction: &mut crate::stub::ExternalFunction,
+        functionName: String,
+        externalFunction: &mut crate::stub::ExternalFunction,
     ) -> bool {
-        Default::default()
+        if let Some(externalFunctionDef) = self._externals.get(&functionName) {
+            if let Some(function) = &externalFunctionDef.function {
+                *externalFunction = function.clone();
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
     }
 
     // C# signature: public void CallExternalFunction(string funcName, int numberOfArguments)
-    pub fn CallExternalFunction(&mut self, _funcName: String, _numberOfArguments: i32) {}
+    pub fn CallExternalFunction(&mut self, funcName: String, numberOfArguments: i32) {
+        let Some(funcDef) = self._externals.get(&funcName) else {
+            panic!(
+                "Trying to call EXTERNAL function '{}' which has not been bound.",
+                funcName
+            );
+        };
+
+        if let Some(state) = self.state.as_mut() {
+            if !funcDef.lookaheadSafe && state.get_inStringEvaluation() {
+                self.Error(
+                    format!(
+                        "External function {} could not be called because it wasn't marked as lookaheadSafe when BindExternalFunction was called and the story is in the middle of string generation.",
+                        funcName
+                    ),
+                    false,
+                );
+                return;
+            }
+
+            let mut arguments = Vec::new();
+            for _ in 0..numberOfArguments {
+                let popped = state.PopEvaluationStack();
+                if let crate::Container::ContentItem::Value(value) = popped {
+                    arguments.push(value);
+                }
+            }
+            arguments.reverse();
+
+            if let Some(function) = &funcDef.function {
+                let return_value = (function)(&arguments);
+                match return_value {
+                    Some(value) => {
+                        state.PushEvaluationStack(crate::Container::ContentItem::Value(value))
+                    }
+                    None => state.PushEvaluationStack(crate::Container::ContentItem::Void(
+                        crate::Void::Void::new(),
+                    )),
+                }
+            } else {
+                panic!(
+                    "Trying to call EXTERNAL function '{}' which has not been bound.",
+                    funcName
+                );
+            }
+        }
+    }
 
     // C# signature: public void BindExternalFunctionGeneral(string funcName, ExternalFunction func, bool lookaheadSafe = true)
     pub fn BindExternalFunctionGeneral(
         &mut self,
-        _funcName: String,
-        _func: crate::stub::ExternalFunction,
-        _lookaheadSafe: bool,
+        funcName: String,
+        func: crate::stub::ExternalFunction,
+        lookaheadSafe: bool,
     ) {
+        self._externals.insert(
+            funcName,
+            ExternalFunctionDef {
+                function: Some(func),
+                lookaheadSafe,
+            },
+        );
     }
 
     // C# signature: public void BindExternalFunction(string funcName, Func<object> func, bool lookaheadSafe=false)
@@ -409,10 +491,31 @@ impl Story {
     }
 
     // C# signature: public void UnbindExternalFunction(string funcName)
-    pub fn UnbindExternalFunction(&mut self, _funcName: String) {}
+    pub fn UnbindExternalFunction(&mut self, funcName: String) {
+        self._externals.remove(&funcName);
+    }
 
     // C# signature: public void ValidateExternalBindings()
-    pub fn ValidateExternalBindings(&mut self) {}
+    pub fn ValidateExternalBindings(&mut self) {
+        let mut missing_externals = std::collections::HashSet::new();
+        self.ValidateExternalBindings_container(
+            &self.main_content_container,
+            &mut missing_externals,
+        );
+
+        if !missing_externals.is_empty() {
+            let mut missing = missing_externals.into_iter().collect::<Vec<_>>();
+            missing.sort();
+            self.Error(
+                format!(
+                    "ERROR: Missing function binding for external{}: '{}'",
+                    if missing.len() > 1 { "s" } else { "" },
+                    missing.join("', '")
+                ),
+                false,
+            );
+        }
+    }
 
     // C# signature: public void ObserveVariable(string variableName, VariableObserver observer)
     pub fn ObserveVariable(
@@ -436,6 +539,56 @@ impl Story {
         _observer: crate::stub::VariableObserver,
         _specificVariableName: String,
     ) {
+    }
+
+    fn ValidateExternalBindings_container(
+        &self,
+        container: &Container,
+        missingExternals: &mut std::collections::HashSet<String>,
+    ) {
+        for innerContent in container.get_content() {
+            if let crate::Container::ContentItem::Container(child) = innerContent {
+                if !child.get_hasValidName() {
+                    self.ValidateExternalBindings_content(innerContent, missingExternals);
+                }
+            } else {
+                self.ValidateExternalBindings_content(innerContent, missingExternals);
+            }
+        }
+
+        for innerKeyValue in container.get_namedContent().values() {
+            self.ValidateExternalBindings_content(innerKeyValue, missingExternals);
+        }
+    }
+
+    fn ValidateExternalBindings_content(
+        &self,
+        content: &crate::Container::ContentItem,
+        missingExternals: &mut std::collections::HashSet<String>,
+    ) {
+        if let crate::Container::ContentItem::Container(container) = content {
+            self.ValidateExternalBindings_container(container, missingExternals);
+            return;
+        }
+
+        if let crate::Container::ContentItem::Divert(divert) = content {
+            if divert.get_isExternal() {
+                let name = divert.get_targetPathString();
+                if !self._externals.contains_key(&name) {
+                    if self.allowExternalFunctionFallbacks {
+                        if !self
+                            .main_content_container
+                            .get_namedContent()
+                            .contains_key(&name)
+                        {
+                            missingExternals.insert(name);
+                        }
+                    } else {
+                        missingExternals.insert(name);
+                    }
+                }
+            }
+        }
     }
 
     // C# signature: public List<string> TagsForContentAtPath (string path)

@@ -8,6 +8,7 @@
 )]
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PortStub {
@@ -49,7 +50,8 @@ pub type ErrorHandler = PortStub;
 pub type ErrorType = PortStub;
 pub type Expression = PortStub;
 pub type ExternalDeclaration = PortStub;
-pub type ExternalFunction = PortStub;
+pub type ExternalFunction =
+    Arc<dyn Fn(&[crate::Value::Value]) -> Option<crate::Value::Value> + Send + Sync>;
 pub type ExternalFunctionDef = PortStub;
 pub type FloatValue = PortStub;
 pub type Flow = PortStub;
