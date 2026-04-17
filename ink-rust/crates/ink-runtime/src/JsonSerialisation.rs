@@ -151,7 +151,7 @@ impl Json {
                 must(writer.WriteObjectStart());
                 must(writer.WriteProperty_overload_3(
                     "*".to_string(),
-                    choicePoint.get_pathStringOnChoice(),
+                    choicePoint.get_pathStringOnChoice().unwrap_or_default(),
                 ));
                 must(writer.WriteProperty_overload_4("flg".to_string(), choicePoint.get_flags()));
                 must(writer.WriteObjectEnd());

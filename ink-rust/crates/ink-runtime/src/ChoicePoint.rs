@@ -2,6 +2,8 @@
 // Source: ink-c-sharp/ink-engine-runtime/ChoicePoint.cs
 
 use crate::Container::Container;
+use crate::Container::ContentItem;
+use crate::DebugMetadata::DebugMetadata;
 use crate::Path::Path;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -36,42 +38,39 @@ impl ChoicePoint {
 
     // C# signature: public override string ToString ()
     pub fn ToString(&self) -> String {
-        match self.pathOnChoice.as_ref() {
-            Some(path) => format!("Choice: -> {}", path),
-            None => "Choice: -> ".to_string(),
+        let Some(path) = self.get_pathOnChoice() else {
+            return "Choice: -> ".to_string();
+        };
+
+        let mut target_string = path.ToString();
+        if let Some(target_line_num) = self.debug_line_number_of_path(&path) {
+            target_string = format!(" line {}({})", target_line_num, target_string);
         }
+
+        format!("Choice: -> {}", target_string)
     }
 
     // C# signature: Path pathOnChoice { get; }
-    pub fn get_pathOnChoice(&self) -> Option<&Path> {
-        self.pathOnChoice.as_ref()
+    pub fn get_pathOnChoice(&self) -> Option<Path> {
+        let mut path = self.pathOnChoice.clone()?;
+        if path.get_isRelative() {
+            if let Some(choice_target) = self.choice_target_for_path(&path) {
+                path = choice_target.get_path().clone();
+            }
+        }
+        Some(path)
     }
 
     // C# signature: Container choiceTarget { get; }
     pub fn get_choiceTarget(&mut self) -> Option<Container> {
         let path = self.pathOnChoice.clone()?;
-        let container = self.parent.as_ref()?;
-        let root = container
-            .get_rootContentContainer()
-            .unwrap_or_else(|| container.as_ref().clone());
-        let mut search_root = if path.get_isRelative() {
-            container.as_ref().clone()
-        } else {
-            root
-        };
-
-        search_root
-            .ContentAtPath(path, 0, -1)
-            .get_container()
-            .cloned()
+        self.choice_target_for_path(&path)
     }
 
     // C# signature: string pathStringOnChoice { get; }
-    pub fn get_pathStringOnChoice(&self) -> String {
-        self.pathOnChoice
-            .as_ref()
-            .map(ToString::to_string)
-            .unwrap_or_default()
+    pub fn get_pathStringOnChoice(&self) -> Option<String> {
+        let path = self.pathOnChoice.clone()?;
+        Some(self.compact_path_string(path))
     }
 
     pub fn set_pathStringOnChoice(&mut self, value: String) {
@@ -80,6 +79,120 @@ impl ChoicePoint {
 
     pub fn set_parent(&mut self, parent: Option<Box<Container>>) {
         self.parent = parent;
+    }
+
+    fn debug_line_number_of_path(&self, path: &Path) -> Option<i32> {
+        if path.get_length() == 0 {
+            return None;
+        }
+
+        let mut root = self
+            .parent
+            .as_ref()
+            .and_then(|container| container.get_rootContentContainer())
+            .or_else(|| {
+                self.parent
+                    .as_ref()
+                    .map(|container| container.as_ref().clone())
+            })?;
+
+        let target_content = root.ContentAtPath(path.clone(), 0, -1).obj?;
+        match target_content {
+            ContentItem::Container(container) => container
+                .get_debugMetadata()
+                .map(|debug_metadata| debug_metadata.startLineNumber),
+            _ => None,
+        }
+    }
+
+    fn choice_target_for_path(&self, path: &Path) -> Option<Container> {
+        let container = self.parent.as_ref()?;
+        let mut search_root = if path.get_isRelative() {
+            container.as_ref().clone()
+        } else {
+            container
+                .get_rootContentContainer()
+                .unwrap_or_else(|| container.as_ref().clone())
+        };
+
+        search_root
+            .ContentAtPath(path.clone(), 0, -1)
+            .get_container()
+            .cloned()
+    }
+
+    fn root_content_container(&self) -> Option<Container> {
+        let parent = self.parent.as_ref()?;
+        parent.get_rootContentContainer()
+    }
+
+    fn convert_path_to_relative(&self, global_path: Path) -> Path {
+        let own_path = self
+            .parent
+            .as_ref()
+            .map(|container| container.get_path().clone())
+            .unwrap_or_default();
+        let min_path_length = own_path.get_length().min(global_path.get_length());
+        let mut last_shared_path_comp_index = -1;
+
+        for i in 0..min_path_length {
+            let Some(own_comp) = own_path.GetComponent(i) else {
+                break;
+            };
+            let Some(other_comp) = global_path.GetComponent(i) else {
+                break;
+            };
+
+            if own_comp.Equals(other_comp) {
+                last_shared_path_comp_index = i;
+            } else {
+                break;
+            }
+        }
+
+        if last_shared_path_comp_index == -1 {
+            return global_path;
+        }
+
+        let num_upwards_moves = (own_path.get_length() - 1) - last_shared_path_comp_index;
+        let mut new_path_comps = Vec::new();
+
+        for _ in 0..num_upwards_moves {
+            new_path_comps.push(Path::ToParent());
+        }
+
+        for down in (last_shared_path_comp_index + 1)..global_path.get_length() {
+            if let Some(component) = global_path.GetComponent(down) {
+                new_path_comps.push(component.clone());
+            }
+        }
+
+        Path::new_overload_3(new_path_comps, true)
+    }
+
+    fn compact_path_string(&self, other_path: Path) -> String {
+        let (relative_path_str, global_path_str) = if other_path.get_isRelative() {
+            (
+                other_path.get_componentsString(),
+                self.parent
+                    .as_ref()
+                    .map(|container| container.get_path().PathByAppendingPath(&other_path))
+                    .unwrap_or_else(|| other_path.clone())
+                    .get_componentsString(),
+            )
+        } else {
+            let relative_path = self.convert_path_to_relative(other_path.clone());
+            (
+                relative_path.get_componentsString(),
+                other_path.get_componentsString(),
+            )
+        };
+
+        if relative_path_str.len() < global_path_str.len() {
+            relative_path_str
+        } else {
+            global_path_str
+        }
     }
 
     // C# signature: bool hasCondition { get; }
@@ -170,7 +283,10 @@ mod tests {
         choice.set_hasChoiceOnlyContent(true);
 
         assert_eq!(choice.get_onceOnly(), false);
-        assert_eq!(choice.get_pathStringOnChoice(), "knot.stitch");
+        assert_eq!(
+            choice.get_pathStringOnChoice(),
+            Some("knot.stitch".to_string())
+        );
         assert_eq!(choice.get_flags(), 1 | 4);
         assert_eq!(choice.ToString(), "Choice: -> knot.stitch");
     }

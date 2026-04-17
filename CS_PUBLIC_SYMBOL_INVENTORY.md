@@ -5,8 +5,8 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 46
-Rust skeleton: 49
+Rust implemented: 47
+Rust skeleton: 48
 Rust partial: 3
 Rust missing: 0
 
@@ -78,7 +78,7 @@ Rust missing: 0
 | `ink-c-sharp/compiler/StringParser/StringParserState.cs` | `ink-rust/crates/ink-compiler/src/StringParser/StringParserState.rs` | 2 | 23 | implemented |
 | `ink-c-sharp/ink-engine-runtime/CallStack.cs` | `ink-rust/crates/ink-runtime/src/CallStack.rs` | 3 | 41 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Choice.cs` | `ink-rust/crates/ink-runtime/src/Choice.rs` | 1 | 11 | implemented |
-| `ink-c-sharp/ink-engine-runtime/ChoicePoint.cs` | `ink-rust/crates/ink-runtime/src/ChoicePoint.rs` | 1 | 12 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/ChoicePoint.cs` | `ink-rust/crates/ink-runtime/src/ChoicePoint.rs` | 1 | 12 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Container.cs` | `ink-rust/crates/ink-runtime/src/Container.rs` | 2 | 21 | skeleton |
 | `ink-c-sharp/ink-engine-runtime/ControlCommand.cs` | `ink-rust/crates/ink-runtime/src/ControlCommand.rs` | 2 | 32 | implemented |
 | `ink-c-sharp/ink-engine-runtime/DebugMetadata.cs` | `ink-rust/crates/ink-runtime/src/DebugMetadata.rs` | 1 | 9 | implemented |

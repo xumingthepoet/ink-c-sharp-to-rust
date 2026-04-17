@@ -1057,7 +1057,7 @@ impl Story {
             text: start_text.trim().to_string(),
             sourcePath: String::new(),
             index: 0,
-            targetPath: choice_point.get_pathOnChoice().cloned(),
+            targetPath: choice_point.get_pathOnChoice(),
             threadAtGeneration: Some(self.story_state_mut().ForkThread()),
             originalThreadIndex: 0,
             isInvisibleDefault: choice_point.get_isInvisibleDefault(),
