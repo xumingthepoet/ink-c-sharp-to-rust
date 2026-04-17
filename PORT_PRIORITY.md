@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 30 | 26 | 8 |
-| Total | 98 | 64 | 26 | 8 |
+| Compiler | 64 | 31 | 25 | 8 |
+| Total | 98 | 65 | 25 | 8 |
 
 ## Runtime
 
@@ -56,7 +56,7 @@ Source area: `ink-c-sharp/compiler/`
 24. `ParsedHierarchy/Knot.cs` (`deps=7`) [partial: thin flow wrapper is real, but knot/stitch ownership and cross-name collision behavior still depend on the remaining flow-tree hierarchy]
 25. `ParsedHierarchy/VariableAssignment.cs` (`deps=7`) [partial: list-definition backref is not yet modeled with the C# ownership cycle, and variable resolution is still using a reduced Story-side lookup until FlowBase/Object are ported]
 26. `ParsedHierarchy/Object.cs` (`deps=8`) [partial: reason=the shared parsed-object base now tracks ancestry, identifiers, and runtime storage, but it is not yet wired into the concrete parsed node types or the story-root ownership model; missing=concrete node inheritance/composition wiring and full Story-root lookup; next=port ParsedHierarchy/Story and the remaining flow-tree nodes onto this base]
-27. `ParsedHierarchy/Path.cs` (`deps=8`) [partial: reason=path component storage and string formatting are real, but ancestry-based resolution still depends on the unported ParsedHierarchy.Object/FlowBase tree; missing=ResolveFromContext and child lookup through the parser hierarchy; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase]
+27. `ParsedHierarchy/Path.cs` (`deps=8`) [ported]
 28. `ParsedHierarchy/FunctionCall.cs` (`deps=9`) [partial: reason=the function-call node now generates runtime output for built-ins and native calls, but the upstream object-tree validation and full count-target handling still depend on the unported ParsedHierarchy.Object/FlowBase chain; missing=Object-style error source propagation, full TURNS_SINCE/READ_COUNT validation, and parser integration for the remaining expression entry points; next=port ParsedHierarchy/Object and finish wiring the expression parser to this node]
 29. `ParsedHierarchy/VariableReference.cs` (`deps=9`) [partial: reason=constant and list-item recognition are now wired, but read-count resolution and full ancestry-based variable lookup still depend on the unported parser object tree; missing=read-count resolution, ResolveReferences parity, and runtime variable reference generation for the remaining cases; next=port ParsedHierarchy/Object and ParsedHierarchy/Path resolution]
 30. `ParsedHierarchy/Divert.cs` (`deps=10`) [partial: reason=runtime divert generation and stack/argument packaging are real, but target-content resolution, reference validation, and ancestry-based path lookup still depend on the unported parser object tree; missing=ResolveReferences parity, targetContent resolution, and argument validity checks; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase or the remaining parser ancestry helpers]
