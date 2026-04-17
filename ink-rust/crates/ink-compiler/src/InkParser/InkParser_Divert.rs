@@ -1,50 +1,141 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/compiler/InkParser/InkParser_Divert.cs
 
-use crate::stub::*;
+use crate::InkParser::InkParser::InkParser;
+use crate::ParsedHierarchy::Divert::Divert;
+use crate::ParsedHierarchy::Path::Path;
 
-#[derive(Clone, Debug, Default)]
-pub struct InkParser {
-    pub _port_marker: (),
+#[derive(Clone, Debug, PartialEq)]
+pub enum DivertPiece {
+    Divert(Divert),
+    TunnelOnwards(Divert),
 }
 
 impl InkParser {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     // C# signature: protected List<Parsed.Object> MultiDivert()
-    pub fn MultiDivert(&mut self) -> Vec<crate::stub::PortStub> {
-        Default::default()
+    pub fn MultiDivert(&mut self) -> Option<Vec<DivertPiece>> {
+        self.Whitespace();
+
+        if let Some(thread_divert) = self.StartThread() {
+            return Some(vec![DivertPiece::Divert(thread_divert)]);
+        }
+
+        let mut pieces = Vec::new();
+        let first_arrow = self.ParseDivertArrowOrTunnelOnwards()?;
+        let mut saw_tunnel = first_arrow == "->->";
+        loop {
+            self.Whitespace();
+            let maybe_divert = self.DivertIdentifierWithArguments();
+            if let Some(divert) = maybe_divert {
+                if saw_tunnel {
+                    pieces.push(DivertPiece::TunnelOnwards(divert.clone()));
+                } else {
+                    pieces.push(DivertPiece::Divert(divert));
+                }
+            } else {
+                break;
+            }
+
+            self.Whitespace();
+            let maybe_arrow = self.ParseDivertArrowOrTunnelOnwards();
+            if let Some(arrow) = maybe_arrow {
+                saw_tunnel = arrow == "->->";
+            } else {
+                break;
+            }
+        }
+
+        Some(pieces)
     }
 
     // C# signature: protected Divert StartThread()
-    pub fn StartThread(&mut self) -> crate::stub::Divert {
-        Default::default()
+    pub fn StartThread(&mut self) -> Option<Divert> {
+        self.Whitespace();
+
+        self.ParseThreadArrow()?;
+
+        self.Whitespace();
+
+        let mut divert = self.DivertIdentifierWithArguments()?;
+        divert.isThread = true;
+        Some(divert)
     }
 
     // C# signature: protected Divert DivertIdentifierWithArguments()
-    pub fn DivertIdentifierWithArguments(&mut self) -> crate::stub::Divert {
-        Default::default()
+    pub fn DivertIdentifierWithArguments(&mut self) -> Option<Divert> {
+        self.Whitespace();
+
+        let target_components = self.DotSeparatedDivertPathComponents()?;
+
+        self.Whitespace();
+
+        let arguments = self.ExpressionFunctionCallArguments().unwrap_or_default();
+
+        self.Whitespace();
+
+        let target_path = Path::new_overload_2(target_components);
+        Some(Divert::new(target_path, arguments))
     }
 
     // C# signature: protected Divert SingleDivert()
-    pub fn SingleDivert(&mut self) -> crate::stub::Divert {
-        Default::default()
+    pub fn SingleDivert(&mut self) -> Option<Divert> {
+        let diverts = self.MultiDivert()?;
+        if diverts.len() != 1 {
+            return None;
+        }
+
+        match diverts.into_iter().next()? {
+            DivertPiece::Divert(divert) if !divert.isTunnel => Some(divert),
+            _ => None,
+        }
+    }
+
+    fn DotSeparatedDivertPathComponents(
+        &mut self,
+    ) -> Option<Vec<crate::ParsedHierarchy::Identifier::Identifier>> {
+        let mut components = Vec::new();
+        let first = self.IdentifierWithMetadata()?;
+        components.push(first);
+
+        loop {
+            self.Whitespace();
+            if self.ParseString(".".to_string()).is_none() {
+                break;
+            }
+            self.Whitespace();
+            components.push(self.IdentifierWithMetadata()?);
+        }
+
+        Some(components)
     }
 
     // C# signature: protected string ParseDivertArrowOrTunnelOnwards()
-    pub fn ParseDivertArrowOrTunnelOnwards(&mut self) -> String {
-        Default::default()
+    pub fn ParseDivertArrowOrTunnelOnwards(&mut self) -> Option<String> {
+        let mut num_arrows = 0;
+        while self.ParseString("->".to_string()).is_some() {
+            num_arrows += 1;
+        }
+
+        match num_arrows {
+            0 => None,
+            1 => Some("->".to_string()),
+            2 => Some("->->".to_string()),
+            _ => {
+                self.Error(
+                    "Unexpected number of arrows in divert. Should only have '->' or '->->'"
+                        .to_string(),
+                );
+                Some("->->".to_string())
+            }
+        }
     }
 
     // C# signature: protected string ParseDivertArrow()
-    pub fn ParseDivertArrow(&mut self) -> String {
-        Default::default()
+    pub fn ParseDivertArrow(&mut self) -> Option<String> {
+        self.ParseString("->".to_string())
     }
 
     // C# signature: protected string ParseThreadArrow()
-    pub fn ParseThreadArrow(&mut self) -> String {
-        Default::default()
+    pub fn ParseThreadArrow(&mut self) -> Option<String> {
+        self.ParseString("<-".to_string())
     }
 }

@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 26 | 12 | 26 |
-| Total | 98 | 60 | 12 | 26 |
+| Compiler | 64 | 26 | 13 | 25 |
+| Total | 98 | 60 | 13 | 25 |
 
 ## Runtime
 
@@ -109,7 +109,7 @@ Source area: `ink-c-sharp/compiler/`
 36. `StringParser/StringParser.cs` (`deps=5`) [partial: reason=the core scanner, rule stack, and basic character parsing are real, but the full delegate/reflection parser ecosystem and InkParser integration are still unfinished; missing=full ParseRule plumbing, parser combinator parity, and the higher-level InkParser entry points; next=port the remaining StringParser combinator layer and wire InkParser onto it]
 37. `InkParser/InkParser_Tags.cs` (`deps=6`)
 38. `ParsedHierarchy/Sequence.cs` (`deps=6`)
-39. `InkParser/InkParser_Divert.cs` (`deps=7`)
+39. `InkParser/InkParser_Divert.cs` (`deps=7`) [partial: reason=the parser now resolves single diverts, thread diverts, and diverted path components, but full multi-divert/tunnel-onwards parity and tag/content list integration are still incomplete; missing=exact tunnel-onwards chain handling, tag/content-list integration, and the full arrow/divert sequence semantics; next=port ParsedHierarchy/TunnelOnwards, ContentList, and the remaining parser content tree]
 40. `ParsedHierarchy/ConditionalSingleBranch.cs` (`deps=7`)
 41. `ParsedHierarchy/Knot.cs` (`deps=7`)
 42. `ParsedHierarchy/VariableAssignment.cs` (`deps=7`)
@@ -131,7 +131,7 @@ Source area: `ink-c-sharp/compiler/`
 58. `Compiler.cs` (`deps=11`)
 59. `InkParser/InkParser_Knot.cs` (`deps=11`)
 60. `ParsedHierarchy/Choice.cs` (`deps=11`)
-61. `InkParser/InkParser_Expressions.cs` (`deps=15`) [partial: reason=the parser now handles temp keywords, return, infix precedence, function calls, lists, variables, and parens, but string/divert-target parsing and temp assignment still depend on unported MixedTextAndLogic, SingleDivert, and VariableAssignment/statement rules; missing=MixedTextAndLogic string parsing, divert-target expressions, and temp declaration/assignment parsing; next=port ParsedHierarchy/Object, ParsedHierarchy/VariableAssignment, and the remaining parser rules]
+61. `InkParser/InkParser_Expressions.cs` (`deps=15`) [partial: reason=the parser now handles temp keywords, return, infix precedence, function calls, lists, variables, parens, and divert targets, but string parsing and temp declaration/assignment still depend on unported MixedTextAndLogic and VariableAssignment/statement rules; missing=MixedTextAndLogic string parsing and temp declaration/assignment parsing; next=port ParsedHierarchy/VariableAssignment and the remaining parser rules]
 62. `ParsedHierarchy/FlowBase.cs` (`deps=16`)
 63. `ParsedHierarchy/Story.cs` (`deps=16`) [partial: reason=the parser-side story now handles symbol registration and list/external lookup, but top-level object processing, runtime export, and the full variable-resolution / weave-processing pipeline are still skeletons; missing=top-level AST traversal, runtime export, flattening, and variable resolution; next=port ParsedHierarchy/FlowBase, ParsedHierarchy/Object, and the remaining export pipeline]
 64. `ParsedHierarchy/Weave.cs` (`deps=16`)

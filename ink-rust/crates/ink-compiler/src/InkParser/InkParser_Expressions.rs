@@ -1,6 +1,7 @@
 // Source: ink-c-sharp/compiler/InkParser/InkParser_Expressions.cs
 
 use crate::InkParser::InkParser::InkParser;
+use crate::ParsedHierarchy::DivertTarget::DivertTarget;
 use crate::ParsedHierarchy::Expression::{
     BinaryExpression, Expression, ExpressionKind, IncDecExpression, MultipleConditionExpression,
     UnaryExpression,
@@ -168,7 +169,16 @@ impl InkParser {
     }
 
     pub fn ExpressionDivertTarget(&mut self) -> Option<Expression> {
-        todo!("divert target expressions still depend on the unported divert parser");
+        self.Whitespace();
+
+        let divert = self.SingleDivert()?;
+        if divert.get_isThread() {
+            return None;
+        }
+
+        self.Whitespace();
+
+        Some(Expression::from(DivertTarget::new(divert)))
     }
 
     pub fn ExpressionInt(&mut self) -> Option<Expression> {
