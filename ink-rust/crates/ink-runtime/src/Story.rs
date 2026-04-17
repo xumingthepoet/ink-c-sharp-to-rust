@@ -1832,6 +1832,11 @@ impl Story {
             .unwrap_or_default()
     }
 
+    // Testbed helper: replace the live state snapshot.
+    pub fn set_state(&mut self, state: StoryState) {
+        self.state = Some(Box::new(state));
+    }
+
     // C# signature: bool canContinue { get; }
     pub fn get_canContinue(&mut self) -> bool {
         self.state

@@ -103,4 +103,4 @@ Source area: `ink-c-sharp/compiler/`
 
 ## Tool Projects
 
-1. `InkTestBed/InkTestBed.cs` [partial: runtime play loop, JSON roundtrip, split-file utilities, and source compilation are ported, but the interactive input helpers, debug-source handling, and full C# testbed workflows remain incomplete]
+1. `InkTestBed/InkTestBed.cs` [ported]

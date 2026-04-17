@@ -15,12 +15,13 @@ fn main() {
     let mut args = env::args().skip(1);
     let Some(first) = args.next() else {
         eprintln!(
-            "InkTestBed currently supports JSON story playback and roundtrip. Source compilation is still pending."
+            "InkTestBed currently supports JSON story playback, roundtrip, split-file, and source compilation."
         );
         eprintln!("Usage:");
         eprintln!("  ink-testbed <story.json>");
         eprintln!("  ink-testbed --roundtrip <story.json>");
         eprintln!("  ink-testbed --split <file.ink>");
+        eprintln!("  ink-testbed <file.ink>");
         std::process::exit(1);
     };
 
@@ -36,7 +37,7 @@ fn main() {
         path if path.ends_with(".json") => run_play_json(Path::new(path)),
         path if path.ends_with(".ink") => run_compile_and_play(Path::new(path)),
         other => Err(format!(
-            "unrecognized argument '{}'; pass a .json story path, --roundtrip, or --split",
+            "unrecognized argument '{}'; pass a .json story path, .ink source path, --roundtrip, or --split",
             other
         )),
     };

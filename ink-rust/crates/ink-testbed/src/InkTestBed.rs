@@ -6,6 +6,7 @@ use ink_runtime::Error::{ErrorHandler, ErrorType};
 use ink_runtime::Story::Story;
 use ink_runtime::StoryException::StoryException;
 use std::cell::RefCell;
+use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
@@ -15,6 +16,7 @@ use std::time::Instant;
 #[derive(Default)]
 pub struct InkTestBed {
     pub story: Option<Story>,
+    pub compiler: Option<Compiler>,
 }
 
 impl InkTestBed {
@@ -205,10 +207,34 @@ impl InkTestBed {
 
     pub fn ink_changing_test(
         &mut self,
-        _test1: fn(&mut Self),
-        _test2: fn(&mut Self),
+        test1: fn(&mut Self),
+        test2: fn(&mut Self),
     ) -> Result<(), String> {
-        Err("InkChangingTest still depends on the unported compiler front-end".to_string())
+        let (ink1, ink2) = Self::split_file("test.ink")?;
+
+        self.compile(ink1)?;
+        test1(self);
+
+        let save_state = {
+            let story = self
+                .story
+                .as_mut()
+                .ok_or_else(|| "InkTestBed requires a loaded story".to_string())?;
+            let mut state = story.get_state();
+            state.ToJson()
+        };
+
+        println!("------ SECOND INK VERSION ------");
+
+        self.compile(ink2)?;
+        if let Some(story) = self.story.as_mut() {
+            let mut loaded_state = story.get_state();
+            loaded_state.LoadJson(save_state);
+            story.set_state(loaded_state);
+        }
+
+        test2(self);
+        Ok(())
     }
 
     pub fn simple_diff(s1: &str, s2: &str) {
@@ -278,24 +304,41 @@ impl InkTestBed {
         }
     }
 
-    pub fn create_compiler(&self, _filename: Option<&Path>) -> Result<(), String> {
-        Ok(())
+    pub fn create_compiler(&self, filename: Option<&Path>) -> Result<Compiler, String> {
+        let filename = filename.ok_or_else(|| "missing filename".to_string())?;
+        if filename.is_absolute() {
+            if let Some(dir) = filename.parent() {
+                env::set_current_dir(dir).map_err(|err| err.to_string())?;
+            }
+        }
+
+        let source = fs::read_to_string(filename).map_err(|err| err.to_string())?;
+        Ok(Compiler::new(
+            source,
+            self.compiler_options(Some(filename.to_string_lossy().to_string())),
+        ))
     }
 
     pub fn compile(&mut self, inkSource: String) -> Result<(), String> {
-        let mut compiler = Compiler::new(inkSource, Options::default());
+        let mut compiler = Compiler::new(inkSource, self.compiler_options(None));
         let mut story = compiler
             .Compile()
             .ok_or_else(|| "Compiler returned no runtime story".to_string())?;
         self.attach_error_handler(&mut story);
+        self.compiler = Some(compiler);
         self.story = Some(story);
         Ok(())
     }
 
     pub fn compile_file(&mut self, filename: Option<&Path>) -> Result<(), String> {
-        let filename = filename.ok_or_else(|| "missing filename".to_string())?;
-        let source = fs::read_to_string(filename).map_err(|err| err.to_string())?;
-        self.compile(source)
+        let mut compiler = self.create_compiler(filename)?;
+        let mut story = compiler
+            .Compile()
+            .ok_or_else(|| "Compiler returned no runtime story".to_string())?;
+        self.attach_error_handler(&mut story);
+        self.compiler = Some(compiler);
+        self.story = Some(story);
+        Ok(())
     }
 
     fn print_choices_if_necessary(&mut self) -> Result<(), String> {
@@ -325,22 +368,33 @@ impl InkTestBed {
     }
 
     fn attach_error_handler(&self, story: &mut Story) {
-        let handler: Rc<RefCell<ErrorHandler>> =
-            Rc::new(RefCell::new(Box::new(|message, error_type| {
-                let label = match error_type {
-                    ErrorType::Warning => "Warning",
-                    ErrorType::Author => "Author",
-                    ErrorType::Error => "Error",
-                };
+        story.on_error = Some(Self::make_error_handler());
+    }
 
-                eprintln!("{}: {}", label, message);
-                panic!(
-                    "{}",
-                    StoryException::new_overload_2(format!("{}: {}", label, message))
-                );
-            })));
+    fn compiler_options(&self, source_filename: Option<String>) -> Options {
+        Options {
+            sourceFilename: source_filename,
+            pluginDirectories: None,
+            countAllVisits: false,
+            errorHandler: Some(Self::make_error_handler()),
+            fileHandler: None,
+        }
+    }
 
-        story.on_error = Some(handler);
+    fn make_error_handler() -> Rc<RefCell<ErrorHandler>> {
+        Rc::new(RefCell::new(Box::new(|message, error_type| {
+            let label = match error_type {
+                ErrorType::Warning => "Warning",
+                ErrorType::Author => "Author",
+                ErrorType::Error => "Error",
+            };
+
+            eprintln!("{}: {}", label, message);
+            panic!(
+                "{}",
+                StoryException::new_overload_2(format!("{}: {}", label, message))
+            );
+        })))
     }
 }
 
@@ -350,6 +404,7 @@ mod tests {
     use ink_runtime::Container::Container;
     use ink_runtime::Story::Story;
     use std::fs;
+    use std::path::PathBuf;
 
     #[test]
     fn split_file_separates_versions() {
@@ -378,5 +433,28 @@ mod tests {
         let after = bed.story.as_mut().unwrap().ToJson();
 
         assert_eq!(before, after);
+    }
+
+    #[test]
+    fn ink_changing_test_roundtrips_loaded_state() {
+        let cwd = std::env::current_dir().unwrap();
+        let temp_dir = std::env::temp_dir().join("ink_testbed_changing_state");
+        let _ = fs::create_dir_all(&temp_dir);
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let path = PathBuf::from("test.ink");
+        fs::write(
+            &path,
+            "Hello world\n------ SECOND INK VERSION ------\nHello world\n",
+        )
+        .unwrap();
+
+        let mut bed = InkTestBed::new();
+        bed.ink_changing_test(|_| {}, |_| {}).unwrap();
+        assert!(bed.story.is_some());
+
+        let _ = fs::remove_file(path);
+        let _ = std::env::set_current_dir(cwd);
+        let _ = fs::remove_dir_all(temp_dir);
     }
 }
