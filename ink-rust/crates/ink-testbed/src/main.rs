@@ -25,23 +25,16 @@ fn main() {
     };
 
     let result = match first.as_str() {
-        "--roundtrip" => {
-            match args.next() {
-                Some(path) => run_roundtrip(Path::new(&path)),
-                None => Err("missing JSON path for --roundtrip".to_string()),
-            }
-        }
-        "--split" => {
-            match args.next() {
-                Some(path) => run_split(Path::new(&path)),
-                None => Err("missing file path for --split".to_string()),
-            }
-        }
+        "--roundtrip" => match args.next() {
+            Some(path) => run_roundtrip(Path::new(&path)),
+            None => Err("missing JSON path for --roundtrip".to_string()),
+        },
+        "--split" => match args.next() {
+            Some(path) => run_split(Path::new(&path)),
+            None => Err("missing file path for --split".to_string()),
+        },
         path if path.ends_with(".json") => run_play_json(Path::new(path)),
-        path if path.ends_with(".ink") => Err(
-            "source compilation is still pending in the compiler front-end; pass a compiled .json story instead"
-                .to_string(),
-        ),
+        path if path.ends_with(".ink") => run_compile_and_play(Path::new(path)),
         other => Err(format!(
             "unrecognized argument '{}'; pass a .json story path, --roundtrip, or --split",
             other
@@ -73,4 +66,10 @@ fn run_split(path: &Path) -> Result<(), String> {
     println!("--- SECOND INK VERSION ---");
     println!("{}", second);
     Ok(())
+}
+
+fn run_compile_and_play(path: &Path) -> Result<(), String> {
+    let mut bed = InkTestBed::new();
+    bed.compile_file(Some(path))?;
+    bed.play()
 }

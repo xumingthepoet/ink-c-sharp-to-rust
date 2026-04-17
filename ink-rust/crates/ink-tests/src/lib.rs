@@ -9,8 +9,23 @@
 
 #[cfg(test)]
 mod tests {
+    use ink_compiler::Compiler::Compiler;
+    use ink_compiler::Compiler::Options;
+
     #[test]
     fn skeleton_workspace_loads() {
         assert!(true);
+    }
+
+    #[test]
+    fn compiles_and_runs_simple_source_story() {
+        let mut compiler = Compiler::new("Hello world\n".to_string(), Options::default());
+        let mut story = compiler
+            .Compile()
+            .expect("source compilation should succeed");
+
+        let output = story.Continue();
+        assert_eq!(output, "Hello world\n");
+        assert!(!story.get_canContinue());
     }
 }

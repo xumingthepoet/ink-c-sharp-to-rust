@@ -17,6 +17,7 @@ version = "0.1.0"
 name = "ink-testbed"
 version = "0.1.0"
 dependencies = [
+ "ink-compiler",
  "ink-runtime",
 ]
 

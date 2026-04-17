@@ -8,17 +8,48 @@ use crate::ParsedHierarchy::FlowLevel::FlowLevel;
 use crate::ParsedHierarchy::FunctionCall::FunctionCall;
 use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::ListDefinition::{ListDefinition, ListElementDefinition};
+use crate::ParsedHierarchy::Object::{Object, ObjectKind};
+use ink_runtime::Container::{Container, ContentItem};
+use ink_runtime::ControlCommand::ControlCommand;
+use ink_runtime::Error::{ErrorHandler, ErrorType};
+use ink_runtime::Story::Story as RuntimeStory;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct Story {
+    pub content: Vec<Object>,
     pub constants: HashMap<String, Expression>,
     pub externals: HashMap<String, ExternalDeclaration>,
+    pub variableDeclarations:
+        HashMap<String, crate::ParsedHierarchy::VariableAssignment::VariableAssignment>,
     listDefs: HashMap<String, ListDefinition>,
     pub countAllVisits: bool,
     hadError: bool,
     hadWarning: bool,
     isInclude: bool,
+    errorHandler: Option<Rc<RefCell<ErrorHandler>>>,
+}
+
+impl std::fmt::Debug for Story {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Story")
+            .field("content", &self.content)
+            .field("constants", &self.constants)
+            .field("externals", &self.externals)
+            .field("variableDeclarations", &self.variableDeclarations)
+            .field("listDefs", &self.listDefs)
+            .field("countAllVisits", &self.countAllVisits)
+            .field("hadError", &self.hadError)
+            .field("hadWarning", &self.hadWarning)
+            .field("isInclude", &self.isInclude)
+            .field(
+                "errorHandler",
+                &self.errorHandler.as_ref().map(|_| "<callback>"),
+            )
+            .finish()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -34,23 +65,95 @@ pub enum SymbolType {
 
 impl Story {
     // C# signature: public Story (List<Parsed.Object> toplevelObjects, bool isInclude = false)
-    pub fn new(_toplevelObjects: Vec<crate::stub::PortStub>, isInclude: bool) -> Self {
+    pub fn new(toplevelObjects: Vec<Object>, isInclude: bool) -> Self {
         Self {
+            content: toplevelObjects,
             isInclude,
             countAllVisits: false,
+            variableDeclarations: HashMap::new(),
             ..Default::default()
         }
     }
 
     // C# signature: protected override void PreProcessTopLevelObjects(List<Parsed.Object> topLevelContent)
-    pub fn PreProcessTopLevelObjects(&mut self, _topLevelContent: Vec<crate::stub::PortStub>) {}
+    pub fn PreProcessTopLevelObjects(&mut self, topLevelContent: Vec<Object>) {
+        let mut flowsFromOtherFiles = Vec::<Object>::new();
+        let mut processed = Vec::<Object>::new();
+
+        for obj in topLevelContent {
+            if obj.kind == ObjectKind::Plain
+                && obj.get_runtimeObject().is_none()
+                && !obj.content.is_empty()
+            {
+                let mut included_content = Vec::<Object>::new();
+                for sub_obj in obj.content.into_iter() {
+                    if matches!(sub_obj.kind, ObjectKind::Knot | ObjectKind::Stitch) {
+                        flowsFromOtherFiles.push(sub_obj);
+                    } else {
+                        included_content.push(sub_obj);
+                    }
+                }
+                if !included_content.is_empty() {
+                    processed.extend(included_content);
+                    processed.push(Self::newline_object());
+                }
+                continue;
+            }
+
+            processed.push(obj);
+        }
+
+        processed.extend(flowsFromOtherFiles);
+        self.content = processed;
+    }
 
     // C# signature: public Runtime.Story ExportRuntime(ErrorHandler errorHandler = null)
     pub fn ExportRuntime(
         &mut self,
-        _errorHandler: crate::stub::ErrorHandler,
-    ) -> crate::stub::Story {
-        Default::default()
+        errorHandler: Option<Rc<RefCell<ErrorHandler>>>,
+    ) -> Option<RuntimeStory> {
+        self.errorHandler = errorHandler;
+        self.ResetError();
+
+        let content = std::mem::take(&mut self.content);
+        self.PreProcessTopLevelObjects(content);
+        self.attach_parents();
+
+        self.constants.clear();
+        self.externals.clear();
+        self.listDefs.clear();
+
+        let mut content = std::mem::take(&mut self.content);
+        for obj in &mut content {
+            obj.ResolveReferences(self);
+        }
+        self.content = content;
+
+        if self.hadError {
+            return None;
+        }
+
+        let mut rootContainer = Container::new();
+        for obj in &self.content {
+            if let Some(runtime_object) = obj.get_runtimeObject().cloned() {
+                if runtime_object.get_hasValidName() {
+                    rootContainer.AddContent(runtime_object);
+                } else {
+                    rootContainer.AddContentsOfContainer(runtime_object);
+                }
+            }
+        }
+        rootContainer.AddContent(ControlCommand::Done());
+
+        let runtimeLists = self
+            .listDefs
+            .values_mut()
+            .map(|list_def| list_def.get_runtimeListDefinition())
+            .collect::<Vec<_>>();
+
+        let mut runtimeStory = RuntimeStory::new(rootContainer, runtimeLists);
+        runtimeStory.ResetState();
+        Some(runtimeStory)
     }
 
     // C# signature: public ListDefinition ResolveList (string listName)
@@ -104,9 +207,20 @@ impl Story {
     }
 
     // C# signature: public override void Error(string message, Parsed.Object source, bool isWarning)
-    pub fn Error(&mut self, _message: String, _source: crate::stub::PortStub, isWarning: bool) {
+    pub fn Error(&mut self, message: String, _source: crate::stub::PortStub, isWarning: bool) {
         self.hadWarning = isWarning;
         self.hadError = !isWarning;
+        if let Some(handler) = &self.errorHandler {
+            let mut handler = handler.borrow_mut();
+            handler(
+                &message,
+                if isWarning {
+                    ErrorType::Warning
+                } else {
+                    ErrorType::Error
+                },
+            );
+        }
     }
 
     // C# signature: public void ResetError()
@@ -237,6 +351,46 @@ impl Story {
         }
     }
 
+    pub fn ContentWithNameAtLevel(
+        &self,
+        name: String,
+        level: Option<FlowLevel>,
+        deepSearch: bool,
+    ) -> Option<Object> {
+        for obj in &self.content {
+            let matches_level = match level {
+                Some(FlowLevel::Story) => obj.kind == ObjectKind::Story,
+                Some(FlowLevel::Knot) => obj.kind == ObjectKind::Knot,
+                Some(FlowLevel::Stitch) => obj.kind == ObjectKind::Stitch,
+                Some(FlowLevel::WeavePoint) => obj.kind == ObjectKind::WeavePoint,
+                None => true,
+            };
+            if matches_level
+                && obj
+                    .identifier
+                    .as_ref()
+                    .and_then(|identifier| identifier.name.as_deref())
+                    == Some(name.as_str())
+            {
+                return Some(obj.clone());
+            }
+
+            if deepSearch {
+                if let Some(found) = obj.FindAll(None).into_iter().find(|candidate| {
+                    candidate
+                        .identifier
+                        .as_ref()
+                        .and_then(|identifier| identifier.name.as_deref())
+                        == Some(name.as_str())
+                }) {
+                    return Some(found);
+                }
+            }
+        }
+
+        None
+    }
+
     pub fn register_constant(&mut self, name: String, expr: Expression) {
         self.constants.insert(name, expr);
     }
@@ -245,6 +399,38 @@ impl Story {
         if let Some(name) = list_def.get_name().map(|name| name.to_string()) {
             self.listDefs.insert(name, list_def);
         }
+    }
+
+    pub fn ResolveReferences(&mut self) {
+        let mut content = std::mem::take(&mut self.content);
+        for obj in &mut content {
+            obj.ResolveReferences(self);
+        }
+        self.content = content;
+    }
+
+    pub fn TryAddNewVariableDeclaration(
+        &mut self,
+        varDecl: crate::ParsedHierarchy::VariableAssignment::VariableAssignment,
+    ) {
+        let varName = varDecl.get_variableName();
+        if varName.is_empty() {
+            return;
+        }
+
+        if self.variableDeclarations.contains_key(&varName) {
+            self.Error(
+                format!(
+                    "found declaration variable '{}' that was already declared",
+                    varName
+                ),
+                Default::default(),
+                false,
+            );
+            return;
+        }
+
+        self.variableDeclarations.insert(varName, varDecl);
     }
 
     pub fn ResolveVariableWithName(
@@ -263,6 +449,16 @@ impl Story {
         }
 
         if self.listDefs.contains_key(&varName) {
+            return VariableResolveResult {
+                found: true,
+                isGlobal: true,
+                isArgument: false,
+                isTemporary: false,
+                ownerFlow: Some("Story".to_string()),
+            };
+        }
+
+        if self.variableDeclarations.contains_key(&varName) {
             return VariableResolveResult {
                 found: true,
                 isGlobal: true,
@@ -300,5 +496,36 @@ impl Story {
 
     pub fn set_countAllVisits(&mut self, value: bool) {
         self.countAllVisits = value;
+    }
+
+    fn attach_parents(&mut self) {
+        fn attach_object_parent(parent: &Object, child: &mut Object) {
+            child.set_parent(Some(Box::new(parent.clone())));
+            let parent_clone = child.clone();
+            for nested in &mut child.content {
+                attach_object_parent(&parent_clone, nested);
+            }
+        }
+
+        let roots = self.content.clone();
+        for child in &mut self.content {
+            let parentless_root = Object::with_kind(ObjectKind::Story);
+            let root_parent = if child.identifier.is_some() {
+                let mut root = parentless_root.clone();
+                root.content = roots.clone();
+                root
+            } else {
+                parentless_root
+            };
+            attach_object_parent(&root_parent, child);
+        }
+    }
+
+    fn newline_object() -> Object {
+        let mut obj = Object::with_kind(ObjectKind::Plain);
+        let mut runtime = Container::new();
+        runtime.AddContent(ink_runtime::Value::StringValue::new("\n".to_string()));
+        obj.set_runtimeObject(Some(runtime));
+        obj
     }
 }

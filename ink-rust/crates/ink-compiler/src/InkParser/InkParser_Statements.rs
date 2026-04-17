@@ -157,7 +157,8 @@ impl InkParser {
     }
 
     fn wrap_included_file(included: crate::ParsedHierarchy::IncludedFile::IncludedFile) -> Object {
-        let obj = Object::with_kind(ObjectKind::Plain);
+        let mut obj = Object::with_kind(ObjectKind::Plain);
+        obj.content = included.get_includedStory().content.clone();
         let _ = included.GenerateRuntimeObject();
         obj
     }

@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 30 | 23 | 11 |
-| Total | 98 | 64 | 23 | 11 |
+| Compiler | 64 | 30 | 24 | 10 |
+| Total | 98 | 64 | 24 | 10 |
 
 ## Runtime
 
@@ -64,7 +64,7 @@ Source area: `ink-c-sharp/compiler/`
 32. `ParsedHierarchy/Expression.cs` (`deps=10`) [partial: reason=the wrapper now covers literal generation plus function-call, divert-target, and variable-reference expression forms, but the upstream parser still needs the remaining entry points and parse-tree wiring; missing=InkParser expression integration and the rest of the expression grammar surface; next=port InkParser/InkParser_Expressions and the remaining parser rules]
 33. `ParsedHierarchy/Choice.cs` (`deps=11`) [partial: choice runtime generation and reference resolution are real, but the full parsed-object ownership chain, count-all-visits hookup, and flow-tree integration are still not modeled; missing=base-object content propagation and owning-story visit-count wiring; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase]
 34. `ParsedHierarchy/FlowBase.cs` (`deps=16`) [partial: reason=variable lookup and basic runtime export now work against a standalone flow base, but weave splitting, sub-flow ownership, and full C# hierarchy parity still depend on the unported story/flow object tree; missing=weave/subflow construction, flow-parent wiring, and exact story-root resolution; next=port ParsedHierarchy/Weave and the remaining flow-tree wrappers onto this base]
-35. `ParsedHierarchy/Story.cs` (`deps=16`) [partial: reason=the parser-side story now handles symbol registration and list/external lookup, but top-level object processing, runtime export, and the full variable-resolution / weave-processing pipeline are still skeletons; missing=top-level AST traversal, runtime export, flattening, and variable resolution; next=port ParsedHierarchy/FlowBase, ParsedHierarchy/Object, and the remaining export pipeline]
+35. `ParsedHierarchy/Story.cs` (`deps=16`) [partial: reason=the parser-side story now owns top-level content, handles include preprocessing, and exports runtime stories, but the full variable-resolution / weave-processing pipeline is still incomplete; missing=complete const/list/variable collection, exact weave processing, and full naming-collision parity; next=finish ParsedHierarchy/FlowBase and the remaining story-tree helpers]
 36. `ParsedHierarchy/Weave.cs` (`deps=16`)
 
 ### InkParser
@@ -82,7 +82,7 @@ Source area: `ink-c-sharp/compiler/`
 11. `InkParser/InkParser_Content.cs` (`deps=8`) [partial: reason=text/tag/glue line parsing is real, but full inline logic, choice-specific content rules, and weave integration are still incomplete; missing=multi-branch inline logic and choice-aware content handling; next=port InkParser_Choices/InkParser_Conditional and the remaining hierarchy tree]
 12. `InkParser/InkParser_Sequences.cs` (`deps=8`)
 13. `InkParser/InkParser_Logic.cs` (`deps=9`) [partial: reason=identifier parsing is real, but the line/variable/list/inline logic parser family is still skeletal; missing=LogicLine, VariableDeclaration, List/Const declarations, inline logic, and expression helper parity; next=port the remaining InkParser logic and expression rules]
-14. `InkParser/InkParser.cs` (`deps=9`) [partial: reason=the parser wrapper now delegates comment elimination, whitespace, include, and debug metadata, but the main Parse entry point and statement hierarchy are still unported; missing=full statement parsing and parsed-object tree construction; next=port InkParser statement/content rules and the remaining ParsedHierarchy tree]
+14. `InkParser/InkParser.cs` (`deps=9`) [partial: reason=the parser wrapper now delegates comment elimination, whitespace, include, debug metadata, and top-level Parse construction, but the full statement hierarchy and declaration grammar remain incomplete; missing=LogicLine, declarations, and the remaining statement branches; next=port the remaining InkParser logic and ParsedHierarchy tree]
 15. `InkParser/InkParser_Statements.cs` (`deps=10`) [partial: reason=the parser helper now dispatches knots, stitches, choices, gathers, divert lines, and text lines, but the logic-line family, sequence/conditional branches, and full top-level story export still depend on the remaining hierarchy tree; missing=LogicLine/VariableDeclaration/ListDeclaration/ConstDeclaration and the sequence/conditional parser surface; next=port the remaining parsed hierarchy nodes that feed statement dispatch]
 16. `InkParser/InkParser_Tags.cs` (`deps=10`) [ported]
 17. `InkParser/InkParser_Knot.cs` (`deps=11`) [partial: knot and stitch declarations now parse and wrap runtime containers, but full recovery, statement ownership, and story-root integration still depend on the remaining parser/story tree]
@@ -100,8 +100,8 @@ Source area: `ink-c-sharp/compiler/`
 8. `Plugins/PluginManager.cs` (`deps=4`)
 9. `StringParser/StringParser.cs` (`deps=5`) [ported]
 10. `Stats.cs` (`deps=7`)
-11. `Compiler.cs` (`deps=11`)
+11. `Compiler.cs` (`deps=11`) [partial: source compilation now reaches Parsed.Story and Runtime.Story for simple stories, but plugin processing, full command-line handling, and debug-source bookkeeping remain incomplete; missing=plugin directories, parse error plumbing, immediate-mode commands, and debug range recovery; next=finish the remaining compiler front-end helpers]
 
 ## Tool Projects
 
-1. `InkTestBed/InkTestBed.cs` [partial: runtime play loop, JSON roundtrip, split-file utilities, diff helper, and input loop are ported, but source compilation and ink-file loading still depend on the unported compiler front-end]
+1. `InkTestBed/InkTestBed.cs` [partial: runtime play loop, JSON roundtrip, split-file utilities, and source compilation are ported, but the interactive input helpers, debug-source handling, and full C# testbed workflows remain incomplete]

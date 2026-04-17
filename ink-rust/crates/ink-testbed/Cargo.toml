@@ -9,4 +9,5 @@ name = "ink-testbed"
 path = "src/main.rs"
 
 [dependencies]
+ink-compiler = { path = "../ink-compiler" }
 ink-runtime = { path = "../ink-runtime" }

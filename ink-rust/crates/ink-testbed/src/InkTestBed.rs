@@ -1,11 +1,7 @@
 //! InkTestBed is a lightweight interactive harness for runtime/debugging.
-//!
-//! The original C# testbed is compiler-centric. The Rust port currently
-//! provides the runtime-facing play loop, JSON roundtrip, and file utilities
-//! that are already usable. Source compilation remains blocked on the
-//! compiler front-end port, so the compiler entry points return explicit
-//! errors instead of faking success.
 
+use ink_compiler::Compiler::Compiler;
+use ink_compiler::Compiler::Options;
 use ink_runtime::Error::{ErrorHandler, ErrorType};
 use ink_runtime::Story::Story;
 use ink_runtime::StoryException::StoryException;
@@ -283,18 +279,23 @@ impl InkTestBed {
     }
 
     pub fn create_compiler(&self, _filename: Option<&Path>) -> Result<(), String> {
-        Err(
-            "InkTestBed::CreateCompiler still depends on the unported compiler front-end"
-                .to_string(),
-        )
+        Ok(())
     }
 
-    pub fn compile(&mut self, _inkSource: String) -> Result<(), String> {
-        Err("InkTestBed::Compile still depends on the unported compiler front-end".to_string())
+    pub fn compile(&mut self, inkSource: String) -> Result<(), String> {
+        let mut compiler = Compiler::new(inkSource, Options::default());
+        let mut story = compiler
+            .Compile()
+            .ok_or_else(|| "Compiler returned no runtime story".to_string())?;
+        self.attach_error_handler(&mut story);
+        self.story = Some(story);
+        Ok(())
     }
 
-    pub fn compile_file(&mut self, _filename: Option<&Path>) -> Result<(), String> {
-        Err("InkTestBed::CompileFile still depends on the unported compiler front-end".to_string())
+    pub fn compile_file(&mut self, filename: Option<&Path>) -> Result<(), String> {
+        let filename = filename.ok_or_else(|| "missing filename".to_string())?;
+        let source = fs::read_to_string(filename).map_err(|err| err.to_string())?;
+        self.compile(source)
     }
 
     fn print_choices_if_necessary(&mut self) -> Result<(), String> {

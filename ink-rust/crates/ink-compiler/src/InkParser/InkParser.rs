@@ -54,7 +54,11 @@ impl InkParser {
 
     // C# signature: public Parsed.Story Parse()
     pub fn Parse(&mut self) -> crate::ParsedHierarchy::Story::Story {
-        todo!("InkParser.Parse still depends on the unported statement and hierarchy parser tree");
+        let top_level_objects = self
+            .StatementsAtLevel(crate::InkParser::InkParser_Statements::StatementLevel::Top)
+            .unwrap_or_default();
+
+        crate::ParsedHierarchy::Story::Story::new(top_level_objects, false)
     }
 
     // C# signature: protected List<T> SeparatedList<T> (SpecificParseRule<T> mainRule, ParseRule separatorRule)
