@@ -26,6 +26,7 @@ pub struct Story {
         HashMap<String, crate::ParsedHierarchy::VariableAssignment::VariableAssignment>,
     listDefs: HashMap<String, ListDefinition>,
     pub countAllVisits: bool,
+    dontFlattenContainers: Vec<Container>,
     hadError: bool,
     hadWarning: bool,
     isInclude: bool,
@@ -41,6 +42,7 @@ impl std::fmt::Debug for Story {
             .field("variableDeclarations", &self.variableDeclarations)
             .field("listDefs", &self.listDefs)
             .field("countAllVisits", &self.countAllVisits)
+            .field("dontFlattenContainers", &self.dontFlattenContainers.len())
             .field("hadError", &self.hadError)
             .field("hadWarning", &self.hadWarning)
             .field("isInclude", &self.isInclude)
@@ -70,6 +72,7 @@ impl Story {
             content: toplevelObjects,
             isInclude,
             countAllVisits: false,
+            dontFlattenContainers: Vec::new(),
             variableDeclarations: HashMap::new(),
             ..Default::default()
         }
@@ -122,6 +125,7 @@ impl Story {
         self.constants.clear();
         self.externals.clear();
         self.listDefs.clear();
+        self.dontFlattenContainers.clear();
 
         let mut content = std::mem::take(&mut self.content);
         for obj in &mut content {
@@ -150,6 +154,8 @@ impl Story {
             .values_mut()
             .map(|list_def| list_def.get_runtimeListDefinition())
             .collect::<Vec<_>>();
+
+        self.flatten_containers_in(&mut rootContainer);
 
         let mut runtimeStory = RuntimeStory::new(rootContainer, runtimeLists);
         runtimeStory.ResetState();
@@ -250,7 +256,15 @@ impl Story {
     }
 
     // C# signature: public void DontFlattenContainer (Runtime.Container container)
-    pub fn DontFlattenContainer(&mut self, _container: crate::stub::Container) {}
+    pub fn DontFlattenContainer(&mut self, container: Container) {
+        if !self
+            .dontFlattenContainers
+            .iter()
+            .any(|known| known == &container)
+        {
+            self.dontFlattenContainers.push(container);
+        }
+    }
 
     // C# signature: public static bool IsReservedKeyword (string name)
     pub fn IsReservedKeyword(name: String) -> bool {
@@ -518,6 +532,56 @@ impl Story {
                 parentless_root
             };
             attach_object_parent(&root_parent, child);
+        }
+    }
+
+    fn flatten_containers_in(&self, container: &mut Container) {
+        *container = self.flatten_container(container.clone());
+    }
+
+    fn flatten_container(&self, container: Container) -> Container {
+        let mut flattened = Container::new();
+        flattened.set_name(Some(container.get_name().to_string()).filter(|name| !name.is_empty()));
+        flattened.set_countFlags(container.get_countFlags());
+        flattened.set_debugMetadata(container.get_debugMetadata().cloned());
+
+        for content in container.get_content().iter().cloned() {
+            match content {
+                ContentItem::Container(child) => {
+                    let child_container = self.flatten_container(*child);
+                    let should_flatten = !child_container.get_hasValidName()
+                        && child_container.get_namedContent().is_empty()
+                        && !self
+                            .dontFlattenContainers
+                            .iter()
+                            .any(|known| known == &child_container);
+                    if should_flatten {
+                        flattened.AddContentsOfContainer(child_container);
+                    } else {
+                        flattened.AddContent(ContentItem::Container(Box::new(child_container)));
+                    }
+                }
+                other => flattened.AddContent(other),
+            }
+        }
+
+        if let Some(named_only_content) = container.get_namedOnlyContent() {
+            let named_only_content = named_only_content
+                .into_iter()
+                .map(|(name, content)| (name, self.flatten_content_item(content)))
+                .collect::<HashMap<_, _>>();
+            flattened.set_namedOnlyContent(Some(named_only_content));
+        }
+
+        flattened
+    }
+
+    fn flatten_content_item(&self, content: ContentItem) -> ContentItem {
+        match content {
+            ContentItem::Container(container) => {
+                ContentItem::Container(Box::new(self.flatten_container(*container)))
+            }
+            other => other,
         }
     }
 
