@@ -8,7 +8,7 @@ use ink_runtime::ListDefinition::ListDefinition as RuntimeListDefinition;
 use ink_runtime::Value::ListValue;
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ListDefinition {
     pub identifier: Option<Identifier>,
     pub itemDefinitions: Vec<ListElementDefinition>,
@@ -16,7 +16,7 @@ pub struct ListDefinition {
     elementsByName: Option<HashMap<String, usize>>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ListElementDefinition {
     pub identifier: Option<Identifier>,
     pub explicitValue: Option<i32>,

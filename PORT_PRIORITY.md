@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 26 | 14 | 24 |
-| Total | 98 | 60 | 14 | 24 |
+| Compiler | 64 | 26 | 15 | 23 |
+| Total | 98 | 60 | 15 | 23 |
 
 ## Runtime
 
@@ -54,7 +54,7 @@ Source area: `ink-c-sharp/compiler/`
 22. `ParsedHierarchy/Sequence.cs` (`deps=6`)
 23. `ParsedHierarchy/ConditionalSingleBranch.cs` (`deps=7`)
 24. `ParsedHierarchy/Knot.cs` (`deps=7`)
-25. `ParsedHierarchy/VariableAssignment.cs` (`deps=7`)
+25. `ParsedHierarchy/VariableAssignment.cs` (`deps=7`) [partial: list-definition backref is not yet modeled with the C# ownership cycle, and variable resolution is still using a reduced Story-side lookup until FlowBase/Object are ported]
 26. `ParsedHierarchy/Object.cs` (`deps=8`)
 27. `ParsedHierarchy/Path.cs` (`deps=8`) [partial: reason=path component storage and string formatting are real, but ancestry-based resolution still depends on the unported ParsedHierarchy.Object/FlowBase tree; missing=ResolveFromContext and child lookup through the parser hierarchy; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase]
 28. `ParsedHierarchy/FunctionCall.cs` (`deps=9`) [partial: reason=the function-call node now generates runtime output for built-ins and native calls, but the upstream object-tree validation and full count-target handling still depend on the unported ParsedHierarchy.Object/FlowBase chain; missing=Object-style error source propagation, full TURNS_SINCE/READ_COUNT validation, and parser integration for the remaining expression entry points; next=port ParsedHierarchy/Object and finish wiring the expression parser to this node]

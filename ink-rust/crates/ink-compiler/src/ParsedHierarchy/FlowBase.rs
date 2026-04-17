@@ -13,9 +13,13 @@ pub struct Argument {
     pub _port_marker: (),
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct VariableResolveResult {
-    pub _port_marker: (),
+    pub found: bool,
+    pub isGlobal: bool,
+    pub isArgument: bool,
+    pub isTemporary: bool,
+    pub ownerFlow: Option<String>,
 }
 
 impl FlowBase {

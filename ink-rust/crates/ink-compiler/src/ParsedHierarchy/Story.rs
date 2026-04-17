@@ -3,6 +3,7 @@
 use crate::ParsedHierarchy::ConstantDeclaration::ConstantDeclaration;
 use crate::ParsedHierarchy::Expression::Expression;
 use crate::ParsedHierarchy::ExternalDeclaration::ExternalDeclaration;
+use crate::ParsedHierarchy::FlowBase::VariableResolveResult;
 use crate::ParsedHierarchy::FlowLevel::FlowLevel;
 use crate::ParsedHierarchy::FunctionCall::FunctionCall;
 use crate::ParsedHierarchy::Identifier::Identifier;
@@ -14,6 +15,7 @@ pub struct Story {
     pub constants: HashMap<String, Expression>,
     pub externals: HashMap<String, ExternalDeclaration>,
     listDefs: HashMap<String, ListDefinition>,
+    pub countAllVisits: bool,
     hadError: bool,
     hadWarning: bool,
     isInclude: bool,
@@ -35,6 +37,7 @@ impl Story {
     pub fn new(_toplevelObjects: Vec<crate::stub::PortStub>, isInclude: bool) -> Self {
         Self {
             isInclude,
+            countAllVisits: false,
             ..Default::default()
         }
     }
@@ -244,6 +247,34 @@ impl Story {
         }
     }
 
+    pub fn ResolveVariableWithName(
+        &self,
+        varName: String,
+        _fromNode: crate::stub::PortStub,
+    ) -> VariableResolveResult {
+        if self.constants.contains_key(&varName) {
+            return VariableResolveResult {
+                found: true,
+                isGlobal: true,
+                isArgument: false,
+                isTemporary: false,
+                ownerFlow: Some("Story".to_string()),
+            };
+        }
+
+        if self.listDefs.contains_key(&varName) {
+            return VariableResolveResult {
+                found: true,
+                isGlobal: true,
+                isArgument: false,
+                isTemporary: false,
+                ownerFlow: Some("Story".to_string()),
+            };
+        }
+
+        VariableResolveResult::default()
+    }
+
     // FlowBase/Story compatibility surface
     pub fn get_flowLevel(&self) -> FlowLevel {
         FlowLevel::Story
@@ -261,5 +292,13 @@ impl Story {
 
     pub fn get_isInclude(&self) -> bool {
         self.isInclude
+    }
+
+    pub fn get_countAllVisits(&self) -> bool {
+        self.countAllVisits
+    }
+
+    pub fn set_countAllVisits(&mut self, value: bool) {
+        self.countAllVisits = value;
     }
 }
