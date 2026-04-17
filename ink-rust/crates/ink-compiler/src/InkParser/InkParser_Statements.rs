@@ -4,7 +4,7 @@ use crate::InkParser::InkParser::InkParser;
 use crate::ParsedHierarchy::ContentList::{ContentList, ContentListItem};
 use crate::ParsedHierarchy::Divert::Divert;
 use crate::ParsedHierarchy::FlowLevel::FlowLevel;
-use crate::ParsedHierarchy::Object::{Object, ObjectKind};
+use crate::ParsedHierarchy::Object::Object;
 use crate::ParsedHierarchy::Return::Return;
 use crate::ParsedHierarchy::Tag::Tag;
 use crate::ParsedHierarchy::Text::Text;
@@ -78,6 +78,17 @@ impl InkParser {
             .or_else(|| {
                 self.ParseObject(|parser| parser.AuthorWarning())
                     .map(Self::wrap_author_warning)
+            })
+            .or_else(|| self.parse_declaration_line(|parser| parser.ListDeclaration()))
+            .or_else(|| self.parse_declaration_line(|parser| parser.VariableDeclaration()))
+            .or_else(|| self.parse_declaration_line(|parser| parser.ConstDeclaration()))
+            .or_else(|| {
+                let declaration = self.ParseObject(|parser| parser.ExternalDeclaration())?;
+                if self.EndOfLine().is_none() {
+                    self.Error("Expected end of line".to_string());
+                    let _ = self.SkipToNextLine();
+                }
+                Some(Object::from_external_declaration(declaration))
             })
             .or_else(|| {
                 self.ParseObject(|parser| parser.IncludeStatement())
@@ -154,91 +165,68 @@ impl InkParser {
         }
     }
 
-    fn wrap_choice(mut choice: crate::ParsedHierarchy::Choice::Choice) -> Object {
-        let mut obj = Object::with_kind(ObjectKind::WeavePoint);
-        obj.set_identifier(choice.get_name().map(|name| {
-            crate::ParsedHierarchy::Identifier::Identifier {
-                name: Some(name.to_string()),
-                debugMetadata: None,
-            }
-        }));
-        obj.set_indentationDepth(choice.get_indentationDepth());
-        if let ContentItem::Container(container) = choice.GenerateRuntimeObject() {
-            obj.set_runtimeObject(Some(*container));
+    fn parse_declaration_line<R>(&mut self, mut rule: R) -> Option<Object>
+    where
+        R: FnMut(&mut InkParser) -> Option<Box<dyn Any>>,
+    {
+        let result = self.ParseObject(&mut rule)?;
+        if self.EndOfLine().is_none() {
+            self.Error("Expected end of line".to_string());
+            let _ = self.SkipToNextLine();
         }
-        obj
+        Some(Self::wrap_logic_line(result))
     }
 
-    fn wrap_gather(mut gather: crate::ParsedHierarchy::Gather::Gather) -> Object {
-        let mut obj = Object::with_kind(ObjectKind::WeavePoint);
-        obj.set_identifier(gather.get_identifier().cloned());
-        obj.set_indentationDepth(gather.get_indentationDepth());
-        if let ContentItem::Container(container) = gather.GenerateRuntimeObject() {
-            obj.set_runtimeObject(Some(*container));
-        }
-        obj
+    fn wrap_choice(choice: crate::ParsedHierarchy::Choice::Choice) -> Object {
+        Object::from_choice(choice)
+    }
+
+    fn wrap_gather(gather: crate::ParsedHierarchy::Gather::Gather) -> Object {
+        Object::from_gather(gather)
     }
 
     fn wrap_included_file(included: crate::ParsedHierarchy::IncludedFile::IncludedFile) -> Object {
-        let mut obj = Object::with_kind(ObjectKind::Plain);
-        obj.content = included.get_includedStory().content.clone();
-        let _ = included.GenerateRuntimeObject();
-        obj
+        Object::from_included_file(included)
     }
 
     fn wrap_author_warning(
-        _warning: crate::ParsedHierarchy::AuthorWarning::AuthorWarning,
+        warning: crate::ParsedHierarchy::AuthorWarning::AuthorWarning,
     ) -> Object {
-        Object::with_kind(ObjectKind::Plain)
+        Object::from_author_warning(warning)
     }
 
     fn wrap_logic_line(result: Box<dyn Any>) -> Object {
         let result = match result.downcast::<ContentList>() {
-            Ok(mut content_list) => {
-                let mut obj = Object::with_kind(ObjectKind::Plain);
-                obj.set_runtimeObject(Some(content_list.GenerateRuntimeObject()));
-                return obj;
-            }
+            Ok(content_list) => return Object::from_content_list(*content_list),
             Err(result) => result,
         };
 
         let result = match result.downcast::<crate::ParsedHierarchy::Expression::Expression>() {
-            Ok(expression) => {
-                let mut obj = Object::with_kind(ObjectKind::Plain);
-                obj.set_runtimeObject(Some(expression.GenerateRuntimeObject()));
-                return obj;
-            }
+            Ok(expression) => return Object::from_expression(*expression),
             Err(result) => result,
         };
 
         let result = match result.downcast::<Return>() {
-            Ok(returned) => {
-                let mut obj = Object::with_kind(ObjectKind::Plain);
-                obj.set_runtimeObject(Some(returned.GenerateRuntimeObject()));
-                return obj;
-            }
+            Ok(returned) => return Object::from_return(*returned),
             Err(result) => result,
         };
 
-        if let Ok(assignment) = result.downcast::<VariableAssignment>() {
-            let mut obj = Object::with_kind(ObjectKind::Plain);
-            if let Some(runtime_object) = assignment.clone().GenerateRuntimeObject() {
-                if let ContentItem::Container(container) = runtime_object {
-                    obj.set_runtimeObject(Some(*container));
-                }
-            }
-            return obj;
+        let result = match result.downcast::<VariableAssignment>() {
+            Ok(assignment) => return Object::from_variable_assignment(*assignment),
+            Err(result) => result,
+        };
+
+        if let Ok(declaration) =
+            result.downcast::<crate::ParsedHierarchy::ConstantDeclaration::ConstantDeclaration>()
+        {
+            return Object::from_constant_declaration(*declaration);
         }
 
-        Object::with_kind(ObjectKind::Plain)
+        Object::new()
     }
 
     fn wrap_content_line(items: Vec<ContentListItem>) -> Object {
-        let mut content_list = ContentList::new(items);
-        let runtime = content_list.GenerateRuntimeObject();
-        let mut obj = Object::with_kind(ObjectKind::Plain);
-        obj.set_runtimeObject(Some(runtime));
-        obj
+        Object::from_content_list(ContentList::new(items))
     }
 
     fn wrap_divert_line(pieces: Vec<crate::InkParser::InkParser_Divert::DivertPiece>) -> Object {
@@ -264,11 +252,38 @@ impl InkParser {
 #[cfg(test)]
 mod tests {
     use super::StatementLevel;
+    use crate::InkParser::InkParser::InkParser;
+    use crate::ParsedHierarchy::Object::ObjectPayload;
 
     #[test]
     fn statement_levels_sort_in_expected_order() {
         assert!(StatementLevel::InnerBlock < StatementLevel::Stitch);
         assert!(StatementLevel::Stitch < StatementLevel::Knot);
         assert!(StatementLevel::Knot < StatementLevel::Top);
+    }
+
+    #[test]
+    fn top_level_declarations_remain_typed_objects() {
+        let mut parser = InkParser::new(
+            "VAR score = 5\nCONST MAX = 10\nEXTERNAL host\n".to_string(),
+            None,
+            None,
+            None,
+        );
+
+        let statements = parser.StatementsAtLevel(StatementLevel::Top).unwrap();
+
+        assert!(matches!(
+            statements[0].payload.as_ref(),
+            Some(ObjectPayload::VariableAssignment(_))
+        ));
+        assert!(matches!(
+            statements[1].payload.as_ref(),
+            Some(ObjectPayload::ConstantDeclaration(_))
+        ));
+        assert!(matches!(
+            statements[2].payload.as_ref(),
+            Some(ObjectPayload::ExternalDeclaration(_))
+        ));
     }
 }

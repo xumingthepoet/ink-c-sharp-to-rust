@@ -1,6 +1,6 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/Weave.cs
 
-use crate::ParsedHierarchy::Object::{Object, ObjectKind};
+use crate::ParsedHierarchy::Object::{Object, ObjectKind, ObjectPayload};
 use crate::ParsedHierarchy::Story::Story;
 use ink_runtime::Container::{Container, ContentItem};
 use ink_runtime::Divert::Divert as RuntimeDivert;
@@ -155,7 +155,7 @@ impl Weave {
                 if let ContentItem::Container(nested_root) = nested.GenerateRuntimeObject() {
                     root_container.AddContent(*nested_root);
                 }
-            } else if let Some(runtime_object) = obj.get_runtimeObject().cloned() {
+            } else if let Some(runtime_object) = obj.EnsureRuntimeObject() {
                 root_container.AddContent(runtime_object);
             }
         }
@@ -173,8 +173,6 @@ impl Weave {
 
     // C# signature: public override void ResolveReferences(Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
-        self.base.ResolveReferences(context);
-
         for obj in &mut self.base.content {
             if obj.kind == ObjectKind::Weave {
                 let mut nested = Weave::new(obj.content.clone(), -1);
@@ -228,6 +226,10 @@ impl Weave {
                 continue;
             }
 
+            if Self::is_global_declaration(obj) {
+                continue;
+            }
+
             break;
         }
 
@@ -254,12 +256,26 @@ impl Weave {
                 )
             })
     }
+
+    fn is_global_declaration(obj: &Object) -> bool {
+        match obj.payload.as_ref() {
+            Some(ObjectPayload::ConstantDeclaration(_)) => true,
+            Some(ObjectPayload::VariableAssignment(assignment)) => {
+                assignment.get_isGlobalDeclaration() && assignment.get_isDeclaration()
+            }
+            _ => false,
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::Weave;
+    use crate::ParsedHierarchy::Expression::{Expression, ExpressionKind};
+    use crate::ParsedHierarchy::Identifier::Identifier;
+    use crate::ParsedHierarchy::Number::{Number, NumberValue};
     use crate::ParsedHierarchy::Object::{Object, ObjectKind};
+    use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
     use ink_runtime::Container::Container;
     use ink_runtime::Value::StringValue;
 
@@ -310,6 +326,39 @@ mod tests {
         newline.set_runtimeObject(Some(newline_runtime));
 
         let mut weave = Weave::new(vec![normal.clone(), newline], -1);
+
+        assert_eq!(
+            weave
+                .get_lastParsedSignificantObject()
+                .as_ref()
+                .map(|obj| obj.get_typeName()),
+            Some(normal.get_typeName())
+        );
+    }
+
+    #[test]
+    fn last_significant_object_skips_global_declarations() {
+        let mut normal = Object::with_kind(ObjectKind::Plain);
+        let mut normal_runtime = Container::new();
+        normal_runtime.AddContent(StringValue::new("hello".to_string()));
+        normal.set_runtimeObject(Some(normal_runtime));
+
+        let mut declaration = VariableAssignment::new(
+            Identifier {
+                name: Some("score".to_string()),
+                debugMetadata: None,
+            },
+            Expression::from_kind(ExpressionKind::Number(Number::new(NumberValue::Int(1)))),
+        );
+        declaration.set_isGlobalDeclaration(true);
+
+        let mut weave = Weave::new(
+            vec![
+                normal.clone(),
+                Object::from_variable_assignment(declaration),
+            ],
+            -1,
+        );
 
         assert_eq!(
             weave

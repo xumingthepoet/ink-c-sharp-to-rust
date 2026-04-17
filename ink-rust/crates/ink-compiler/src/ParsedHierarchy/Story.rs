@@ -8,11 +8,12 @@ use crate::ParsedHierarchy::FlowLevel::FlowLevel;
 use crate::ParsedHierarchy::FunctionCall::FunctionCall;
 use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::ListDefinition::{ListDefinition, ListElementDefinition};
-use crate::ParsedHierarchy::Object::{Object, ObjectKind};
+use crate::ParsedHierarchy::Object::{Object, ObjectKind, ObjectPayload};
 use ink_runtime::Container::{Container, ContentItem};
 use ink_runtime::ControlCommand::ControlCommand;
 use ink_runtime::Error::{ErrorHandler, ErrorType};
 use ink_runtime::Story::Story as RuntimeStory;
+use ink_runtime::VariableAssignment::VariableAssignment as RuntimeVariableAssignment;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -84,10 +85,7 @@ impl Story {
         let mut processed = Vec::<Object>::new();
 
         for obj in topLevelContent {
-            if obj.kind == ObjectKind::Plain
-                && obj.get_runtimeObject().is_none()
-                && !obj.content.is_empty()
-            {
+            if let Some(ObjectPayload::IncludedFile(_)) = obj.payload.as_ref() {
                 let mut included_content = Vec::<Object>::new();
                 for sub_obj in obj.content.into_iter() {
                     if matches!(sub_obj.kind, ObjectKind::Knot | ObjectKind::Stitch) {
@@ -126,20 +124,22 @@ impl Story {
         self.externals.clear();
         self.listDefs.clear();
         self.dontFlattenContainers.clear();
+        self.variableDeclarations.clear();
+        self.CollectDeclarations();
 
         let mut content = std::mem::take(&mut self.content);
         for obj in &mut content {
             obj.ResolveReferences(self);
         }
-        self.content = content;
 
         if self.hadError {
+            self.content = content;
             return None;
         }
 
         let mut rootContainer = Container::new();
-        for obj in &self.content {
-            if let Some(runtime_object) = obj.get_runtimeObject().cloned() {
+        for obj in &mut content {
+            if let Some(runtime_object) = obj.EnsureRuntimeObject() {
                 if runtime_object.get_hasValidName() {
                     rootContainer.AddContent(runtime_object);
                 } else {
@@ -147,13 +147,48 @@ impl Story {
                 }
             }
         }
-        rootContainer.AddContent(ControlCommand::Done());
 
-        let runtimeLists = self
-            .listDefs
-            .values_mut()
-            .map(|list_def| list_def.get_runtimeListDefinition())
-            .collect::<Vec<_>>();
+        let mut runtimeLists = Vec::new();
+        let mut variableInitialisation = Container::new();
+        variableInitialisation.AddContent(ControlCommand::EvalStart());
+
+        for (varName, varDecl) in self.variableDeclarations.iter_mut() {
+            if !varDecl.get_isGlobalDeclaration() {
+                continue;
+            }
+
+            if let Some(listDefinition) = varDecl.get_listDefinition().cloned() {
+                let mut listDefinition = listDefinition;
+                self.listDefs
+                    .insert(varName.clone(), listDefinition.clone());
+                variableInitialisation.AddContent(listDefinition.GenerateRuntimeObject());
+                runtimeLists.push(listDefinition.get_runtimeListDefinition());
+            } else if let Some(expression) = varDecl.get_expression() {
+                expression.GenerateIntoContainer(&mut variableInitialisation);
+            }
+
+            let mut runtimeVarAss = RuntimeVariableAssignment::new(varName.clone(), true);
+            runtimeVarAss.set_isGlobal(true);
+            variableInitialisation.AddContent(runtimeVarAss);
+        }
+
+        variableInitialisation.AddContent(ControlCommand::EvalEnd());
+        variableInitialisation.AddContent(ControlCommand::End());
+
+        if !self.variableDeclarations.is_empty() {
+            variableInitialisation.set_name(Some("global decl".to_string()));
+            rootContainer.AddToNamedContentOnly(variableInitialisation);
+        }
+
+        for list_def in self.listDefs.values_mut() {
+            let runtime_list = list_def.get_runtimeListDefinition();
+            if !runtimeLists.iter().any(|known| known == &runtime_list) {
+                runtimeLists.push(runtime_list);
+            }
+        }
+
+        rootContainer.AddContent(ControlCommand::Done());
+        self.content = content;
 
         self.flatten_containers_in(&mut rootContainer);
 
@@ -442,6 +477,56 @@ impl Story {
         self.content = content;
     }
 
+    pub fn CollectDeclarations(&mut self) {
+        let content = self.content.clone();
+        for obj in &content {
+            self.CollectDeclarationsFromObject(obj);
+        }
+    }
+
+    fn CollectDeclarationsFromObject(&mut self, obj: &Object) {
+        match obj.payload.as_ref() {
+            Some(ObjectPayload::ConstantDeclaration(declaration)) => {
+                if let (Some(name), Some(expression)) =
+                    (declaration.get_constantName(), declaration.get_expression())
+                {
+                    if let Some(existing) = self.constants.get(name) {
+                        if existing != expression {
+                            self.Error(
+                                format!(
+                                    "CONST '{}' has been redefined with a different value.",
+                                    name
+                                ),
+                                obj.clone(),
+                                false,
+                            );
+                        }
+                    }
+                    self.constants.insert(name.to_string(), expression.clone());
+                }
+            }
+            Some(ObjectPayload::ExternalDeclaration(declaration)) => {
+                self.AddExternal((**declaration).clone());
+            }
+            Some(ObjectPayload::VariableAssignment(assignment)) => {
+                if assignment.get_isDeclaration() {
+                    self.TryAddNewVariableDeclaration((**assignment).clone());
+                    if let Some(list_definition) = assignment.get_listDefinition().cloned() {
+                        if let Some(name) = list_definition.get_name().map(|name| name.to_string())
+                        {
+                            self.listDefs.insert(name, list_definition);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        for child in &obj.content {
+            self.CollectDeclarationsFromObject(child);
+        }
+    }
+
     pub fn TryAddNewVariableDeclaration(
         &mut self,
         varDecl: crate::ParsedHierarchy::VariableAssignment::VariableAssignment,
@@ -610,5 +695,118 @@ impl Story {
         runtime.AddContent(ink_runtime::Value::StringValue::new("\n".to_string()));
         obj.set_runtimeObject(Some(runtime));
         obj
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Story;
+    use crate::ParsedHierarchy::ConstantDeclaration::ConstantDeclaration;
+    use crate::ParsedHierarchy::Expression::{Expression, ExpressionKind};
+    use crate::ParsedHierarchy::ExternalDeclaration::ExternalDeclaration;
+    use crate::ParsedHierarchy::Identifier::Identifier;
+    use crate::ParsedHierarchy::ListDefinition::{ListDefinition, ListElementDefinition};
+    use crate::ParsedHierarchy::Number::{Number, NumberValue};
+    use crate::ParsedHierarchy::Object::{Object, ObjectKind};
+    use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
+
+    #[test]
+    fn content_with_name_finds_top_level_matches() {
+        let mut obj = Object::with_kind(ObjectKind::Plain);
+        obj.set_identifier(Some(Identifier {
+            name: Some("label".to_string()),
+            debugMetadata: None,
+        }));
+        let story = Story::new(vec![obj], false);
+
+        assert!(story
+            .ContentWithNameAtLevel("label".to_string(), None, false)
+            .is_some());
+    }
+
+    #[test]
+    fn collect_declarations_preserves_typed_payloads() {
+        let const_decl = ConstantDeclaration::new(
+            Identifier {
+                name: Some("MAX".to_string()),
+                debugMetadata: None,
+            },
+            Some(Expression::from_kind(ExpressionKind::Number(Number::new(
+                NumberValue::Int(10),
+            )))),
+        );
+
+        let mut var_decl = VariableAssignment::new(
+            Identifier {
+                name: Some("score".to_string()),
+                debugMetadata: None,
+            },
+            Expression::from_kind(ExpressionKind::Number(Number::new(NumberValue::Int(0)))),
+        );
+        var_decl.set_isGlobalDeclaration(true);
+
+        let mut list_definition = ListDefinition::new(vec![ListElementDefinition::new(
+            Identifier {
+                name: Some("apple".to_string()),
+                debugMetadata: None,
+            },
+            true,
+            None,
+        )]);
+        list_definition.identifier = Some(Identifier {
+            name: Some("food".to_string()),
+            debugMetadata: None,
+        });
+        let list_decl = VariableAssignment::new_overload_2(
+            Identifier {
+                name: Some("food".to_string()),
+                debugMetadata: None,
+            },
+            list_definition,
+        );
+
+        let external = ExternalDeclaration::new(
+            Identifier {
+                name: Some("host_func".to_string()),
+                debugMetadata: None,
+            },
+            vec![],
+        );
+
+        let mut story = Story::new(
+            vec![
+                Object::from_constant_declaration(const_decl),
+                Object::from_variable_assignment(var_decl),
+                Object::from_variable_assignment(list_decl),
+                Object::from_external_declaration(external),
+            ],
+            false,
+        );
+
+        story.CollectDeclarations();
+
+        assert!(story.constants.contains_key("MAX"));
+        assert!(story.variableDeclarations.contains_key("score"));
+        assert!(story.variableDeclarations.contains_key("food"));
+        assert!(story.ResolveList("food".to_string()).is_some());
+        assert!(story.IsExternal("host_func".to_string()));
+    }
+
+    #[test]
+    fn export_runtime_hoists_global_variable_initialisation() {
+        let mut var_decl = VariableAssignment::new(
+            Identifier {
+                name: Some("score".to_string()),
+                debugMetadata: None,
+            },
+            Expression::from_kind(ExpressionKind::Number(Number::new(NumberValue::Int(3)))),
+        );
+        var_decl.set_isGlobalDeclaration(true);
+
+        let mut story = Story::new(vec![Object::from_variable_assignment(var_decl)], false);
+        let mut runtime_story = story.ExportRuntime(None).expect("runtime story");
+        let root = runtime_story.get_mainContentContainer();
+
+        assert!(root.get_namedContent().contains_key("global decl"));
     }
 }

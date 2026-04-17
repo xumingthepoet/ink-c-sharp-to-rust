@@ -1,8 +1,17 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/Object.cs
 
+use crate::ParsedHierarchy::AuthorWarning::AuthorWarning;
+use crate::ParsedHierarchy::Choice::Choice;
+use crate::ParsedHierarchy::ConstantDeclaration::ConstantDeclaration;
 use crate::ParsedHierarchy::ContentList::ContentList;
+use crate::ParsedHierarchy::Expression::Expression;
+use crate::ParsedHierarchy::ExternalDeclaration::ExternalDeclaration;
 use crate::ParsedHierarchy::FlowLevel::FlowLevel;
+use crate::ParsedHierarchy::Gather::Gather;
 use crate::ParsedHierarchy::Identifier::Identifier;
+use crate::ParsedHierarchy::IncludedFile::IncludedFile;
+use crate::ParsedHierarchy::Return::Return;
+use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
 use crate::ParsedHierarchy::Weave::Weave;
 use ink_runtime::Container::Container;
 use ink_runtime::Container::ContentItem;
@@ -29,7 +38,22 @@ impl Default for ObjectKind {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug)]
+pub enum ObjectPayload {
+    AuthorWarning(AuthorWarning),
+    Choice(Box<Choice>),
+    ConstantDeclaration(Box<ConstantDeclaration>),
+    ContentList(Box<ContentList>),
+    Expression(Box<Expression>),
+    ExternalDeclaration(Box<ExternalDeclaration>),
+    Gather(Box<Gather>),
+    IncludedFile(Box<IncludedFile>),
+    Return(Box<Return>),
+    VariableAssignment(Box<VariableAssignment>),
+    Weave(Box<Weave>),
+}
+
+#[derive(Clone, Debug, Default)]
 pub struct Object {
     pub kind: ObjectKind,
     pub identifier: Option<Identifier>,
@@ -37,10 +61,23 @@ pub struct Object {
     pub isFunction: bool,
     pub parent: Option<Box<Object>>,
     pub content: Vec<Object>,
+    pub payload: Option<ObjectPayload>,
     debugMetadata: Option<DebugMetadata>,
     runtimeObject: Option<Container>,
     alreadyHadError: bool,
     alreadyHadWarning: bool,
+}
+
+impl PartialEq for Object {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+            && self.identifier == other.identifier
+            && self.indentationDepth == other.indentationDepth
+            && self.isFunction == other.isFunction
+            && self.content == other.content
+            && self.debugMetadata == other.debugMetadata
+            && self.runtimeObject == other.runtimeObject
+    }
 }
 
 impl Object {
@@ -66,6 +103,94 @@ impl Object {
 
     pub fn set_indentationDepth(&mut self, indentationDepth: i32) {
         self.indentationDepth = indentationDepth;
+    }
+
+    pub fn from_author_warning(author_warning: AuthorWarning) -> Self {
+        let mut object = Object::with_kind(ObjectKind::Plain);
+        object.payload = Some(ObjectPayload::AuthorWarning(author_warning));
+        object
+    }
+
+    pub fn from_choice(mut choice: Choice) -> Self {
+        let identifier = choice.get_identifier().cloned();
+        let indentationDepth = choice.get_indentationDepth();
+        let runtimeObject = Self::container_from_content_item(choice.GenerateRuntimeObject());
+
+        let mut object = Object::with_kind(ObjectKind::WeavePoint);
+        object.set_identifier(identifier);
+        object.set_indentationDepth(indentationDepth);
+        object.set_runtimeObject(runtimeObject);
+        object.payload = Some(ObjectPayload::Choice(Box::new(choice)));
+        object
+    }
+
+    pub fn from_constant_declaration(declaration: ConstantDeclaration) -> Self {
+        let mut object = Object::with_kind(ObjectKind::Plain);
+        object.set_identifier(declaration.get_constantIdentifier().cloned());
+        object.payload = Some(ObjectPayload::ConstantDeclaration(Box::new(declaration)));
+        object
+    }
+
+    pub fn from_content_list(mut content_list: ContentList) -> Self {
+        let runtimeObject = Some(content_list.GenerateRuntimeObject());
+        let mut object = Object::with_kind(ObjectKind::Plain);
+        object.set_runtimeObject(runtimeObject);
+        object.payload = Some(ObjectPayload::ContentList(Box::new(content_list)));
+        object
+    }
+
+    pub fn from_expression(expression: Expression) -> Self {
+        let runtimeObject = Some(expression.GenerateRuntimeObject());
+        let mut object = Object::with_kind(ObjectKind::Plain);
+        object.set_runtimeObject(runtimeObject);
+        object.payload = Some(ObjectPayload::Expression(Box::new(expression)));
+        object
+    }
+
+    pub fn from_external_declaration(declaration: ExternalDeclaration) -> Self {
+        let mut object = Object::with_kind(ObjectKind::Plain);
+        object.set_identifier(declaration.get_identifier().cloned());
+        object.payload = Some(ObjectPayload::ExternalDeclaration(Box::new(declaration)));
+        object
+    }
+
+    pub fn from_gather(mut gather: Gather) -> Self {
+        let identifier = gather.get_identifier().cloned();
+        let indentationDepth = gather.get_indentationDepth();
+        let runtimeObject = Self::container_from_content_item(gather.GenerateRuntimeObject());
+
+        let mut object = Object::with_kind(ObjectKind::WeavePoint);
+        object.set_identifier(identifier);
+        object.set_indentationDepth(indentationDepth);
+        object.set_runtimeObject(runtimeObject);
+        object.payload = Some(ObjectPayload::Gather(Box::new(gather)));
+        object
+    }
+
+    pub fn from_included_file(included: IncludedFile) -> Self {
+        let mut object = Object::with_kind(ObjectKind::Plain);
+        object.content = included.get_includedStory().content.clone();
+        object.payload = Some(ObjectPayload::IncludedFile(Box::new(included)));
+        object
+    }
+
+    pub fn from_return(returned: Return) -> Self {
+        let runtimeObject = Some(returned.GenerateRuntimeObject());
+        let mut object = Object::with_kind(ObjectKind::Plain);
+        object.set_runtimeObject(runtimeObject);
+        object.payload = Some(ObjectPayload::Return(Box::new(returned)));
+        object
+    }
+
+    pub fn from_variable_assignment(mut assignment: VariableAssignment) -> Self {
+        let runtimeObject = assignment
+            .GenerateRuntimeObject()
+            .and_then(Self::container_from_content_item);
+        let mut object = Object::with_kind(ObjectKind::Plain);
+        object.set_identifier(assignment.get_variableIdentifier().cloned());
+        object.set_runtimeObject(runtimeObject);
+        object.payload = Some(ObjectPayload::VariableAssignment(Box::new(assignment)));
+        object
     }
 
     pub fn PathRelativeTo(&self, otherObj: &Object) -> Option<Path> {
@@ -209,12 +334,104 @@ impl Object {
     }
 
     pub fn GenerateRuntimeObject(&mut self) -> Container {
-        panic!("Object::GenerateRuntimeObject is abstract in C# and needs a concrete port");
+        self.EnsureRuntimeObject().unwrap_or_else(|| {
+            panic!("Object::GenerateRuntimeObject called for parsed object with no runtime output")
+        })
+    }
+
+    pub fn EnsureRuntimeObject(&mut self) -> Option<Container> {
+        if self.runtimeObject.is_some() {
+            return self.runtimeObject.clone();
+        }
+
+        let generated = match self.payload.as_mut() {
+            Some(ObjectPayload::AuthorWarning(warning)) => {
+                let _ = warning.GenerateRuntimeObject();
+                None
+            }
+            Some(ObjectPayload::Choice(choice)) => {
+                Self::container_from_content_item(choice.GenerateRuntimeObject())
+            }
+            Some(ObjectPayload::ConstantDeclaration(declaration)) => {
+                let _ = declaration.GenerateRuntimeObject();
+                None
+            }
+            Some(ObjectPayload::ContentList(content_list)) => {
+                Some(content_list.GenerateRuntimeObject())
+            }
+            Some(ObjectPayload::Expression(expression)) => Some(expression.GenerateRuntimeObject()),
+            Some(ObjectPayload::ExternalDeclaration(declaration)) => {
+                let _ = declaration.GenerateRuntimeObject();
+                None
+            }
+            Some(ObjectPayload::Gather(gather)) => {
+                Self::container_from_content_item(gather.GenerateRuntimeObject())
+            }
+            Some(ObjectPayload::IncludedFile(included)) => {
+                let _ = included.GenerateRuntimeObject();
+                None
+            }
+            Some(ObjectPayload::Return(returned)) => Some(returned.GenerateRuntimeObject()),
+            Some(ObjectPayload::VariableAssignment(assignment)) => assignment
+                .GenerateRuntimeObject()
+                .and_then(Self::container_from_content_item),
+            Some(ObjectPayload::Weave(weave)) => {
+                Self::container_from_content_item(weave.GenerateRuntimeObject())
+            }
+            None => None,
+        };
+
+        if let Some(mut generated) = generated {
+            if generated.get_debugMetadata().is_none() {
+                generated.set_debugMetadata(self.get_debugMetadata().cloned());
+            }
+            self.runtimeObject = Some(generated);
+        }
+
+        self.runtimeObject.clone()
     }
 
     pub fn ResolveReferences(&mut self, context: &mut crate::ParsedHierarchy::Story::Story) {
-        for obj in &mut self.content {
-            obj.ResolveReferences(context);
+        let handled_by_payload = match self.payload.as_mut() {
+            Some(ObjectPayload::AuthorWarning(_)) => true,
+            Some(ObjectPayload::Choice(choice)) => {
+                choice.ResolveReferences(context);
+                true
+            }
+            Some(ObjectPayload::ConstantDeclaration(declaration)) => {
+                declaration.ResolveReferences(context);
+                true
+            }
+            Some(ObjectPayload::ContentList(content_list)) => {
+                content_list.ResolveReferences(context);
+                true
+            }
+            Some(ObjectPayload::Expression(expression)) => {
+                expression.ResolveReferences(context);
+                true
+            }
+            Some(ObjectPayload::ExternalDeclaration(_)) => true,
+            Some(ObjectPayload::Gather(gather)) => {
+                gather.ResolveReferences(context);
+                true
+            }
+            Some(ObjectPayload::IncludedFile(_)) => true,
+            Some(ObjectPayload::Return(_)) => true,
+            Some(ObjectPayload::VariableAssignment(assignment)) => {
+                assignment.ResolveReferences(context);
+                true
+            }
+            Some(ObjectPayload::Weave(weave)) => {
+                weave.ResolveReferences(context);
+                true
+            }
+            None => false,
+        };
+
+        if !handled_by_payload {
+            for obj in &mut self.content {
+                obj.ResolveReferences(context);
+            }
         }
     }
 
@@ -335,6 +552,17 @@ impl Object {
         self.runtimeObject.clone()
     }
 
+    fn container_from_content_item(content_item: ContentItem) -> Option<Container> {
+        match content_item {
+            ContentItem::Container(container) => Some(*container),
+            other => {
+                let mut container = Container::new();
+                container.AddContent(other);
+                Some(container)
+            }
+        }
+    }
+
     pub fn get_ancestry(&self) -> Vec<Object> {
         let mut result = Vec::new();
         let mut ancestor = self.parent.as_deref();
@@ -393,12 +621,8 @@ impl Object {
 }
 
 impl From<ContentList> for Object {
-    fn from(mut value: ContentList) -> Self {
-        let runtimeObject = Some(value.GenerateRuntimeObject());
-
-        let mut object = Object::with_kind(ObjectKind::Plain);
-        object.set_runtimeObject(runtimeObject);
-        object
+    fn from(value: ContentList) -> Self {
+        Object::from_content_list(value)
     }
 }
 
@@ -409,8 +633,9 @@ impl From<Weave> for Object {
             _ => None,
         };
 
-        let mut object = value.base;
+        let mut object = value.base.clone();
         object.set_runtimeObject(runtimeObject);
+        object.payload = Some(ObjectPayload::Weave(Box::new(value)));
         object
     }
 }
