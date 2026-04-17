@@ -270,8 +270,7 @@ impl FunctionCall {
             variableReference.ResolveReferences(context);
             if variableReference
                 .get_runtimeVarRef()
-                .map(|var_ref| var_ref.get_pathForCount())
-                .flatten()
+                .and_then(|var_ref| var_ref.get_pathForCount().cloned())
                 .is_some()
             {
                 context.Error(

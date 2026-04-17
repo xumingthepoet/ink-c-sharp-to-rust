@@ -5,6 +5,7 @@ use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::Path::Path;
 use crate::ParsedHierarchy::Story::Story;
 use ink_runtime::VariableReference::VariableReference as RuntimeVariableReference;
+use std::cell::RefCell;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct VariableReference {
@@ -12,7 +13,7 @@ pub struct VariableReference {
     path: Vec<String>,
     name: String,
     singleIdentifier: Option<Identifier>,
-    runtimeVarRef: Option<RuntimeVariableReference>,
+    runtimeVarRef: RefCell<Option<RuntimeVariableReference>>,
     constantExpression: Option<Box<Expression>>,
     pub isConstantReference: bool,
     pub isListItemReference: bool,
@@ -31,7 +32,7 @@ impl VariableReference {
             pathIdentifiers,
             path,
             singleIdentifier: None,
-            runtimeVarRef: None,
+            runtimeVarRef: RefCell::new(None),
             constantExpression: None,
             isConstantReference: false,
             isListItemReference: false,
@@ -45,7 +46,9 @@ impl VariableReference {
             return;
         }
 
-        container.AddContent(RuntimeVariableReference::new(self.name.clone()));
+        let runtime_var_ref = RuntimeVariableReference::new(self.name.clone());
+        *self.runtimeVarRef.borrow_mut() = Some(runtime_var_ref.clone());
+        container.AddContent(runtime_var_ref);
     }
 
     // C# signature: public override void ResolveReferences (Story context)
@@ -76,7 +79,10 @@ impl VariableReference {
             return;
         }
 
-        self.runtimeVarRef = Some(RuntimeVariableReference::new(self.name.clone()));
+        if self.runtimeVarRef.borrow().is_none() {
+            *self.runtimeVarRef.borrow_mut() =
+                Some(RuntimeVariableReference::new(self.name.clone()));
+        }
 
         // Full read-count and variable-resolution parity still depends on
         // the unported object/path ancestry pipeline.
@@ -116,8 +122,8 @@ impl VariableReference {
     }
 
     // C# signature: Runtime.VariableReference runtimeVarRef { get; }
-    pub fn get_runtimeVarRef(&self) -> Option<&RuntimeVariableReference> {
-        self.runtimeVarRef.as_ref()
+    pub fn get_runtimeVarRef(&self) -> Option<RuntimeVariableReference> {
+        self.runtimeVarRef.borrow().clone()
     }
 }
 
@@ -142,5 +148,19 @@ mod tests {
         assert_eq!(var.get_name(), "alpha.beta");
         assert_eq!(var.ToString(), "alpha.beta");
         assert_eq!(var.get_path(), &["alpha".to_string(), "beta".to_string()]);
+    }
+
+    #[test]
+    fn stores_runtime_variable_reference_when_generated() {
+        let var = VariableReference::new(vec![Identifier {
+            name: Some("score".to_string()),
+            debugMetadata: None,
+        }]);
+        let mut container = ink_runtime::Container::Container::new();
+
+        var.GenerateIntoContainer(&mut container);
+
+        assert!(var.get_runtimeVarRef().is_some());
+        assert_eq!(container.get_content().len(), 1);
     }
 }
