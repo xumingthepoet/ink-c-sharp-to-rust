@@ -6,7 +6,7 @@ use crate::ListDefinitionsOrigin::ListDefinitionsOrigin;
 use crate::SimpleJson::{JsonObject, Writer};
 use crate::StatePatch::StatePatch;
 use crate::StoryException::StoryException;
-use crate::Value::{ListValue, Value, VariablePointerValue};
+use crate::Value::{ListValue, Value, ValueInput, VariablePointerValue};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -161,6 +161,24 @@ impl VariablesState {
     // C# signature: public IEnumerator<string> GetEnumerator()
     pub fn GetEnumerator(&self) -> std::collections::hash_map::Keys<'_, String, Value> {
         self.globalVariables.keys()
+    }
+
+    pub fn GetIndexedValue(&mut self, variableName: String) -> Option<Value> {
+        self.GetVariableWithName(variableName)
+    }
+
+    pub fn SetIndexedValue(&mut self, variableName: String, value: Option<ValueInput>) {
+        if !self.defaultGlobalVariables.contains_key(&variableName) {
+            panic!(
+                "Cannot assign to a variable ({}) that hasn't been declared in the story",
+                variableName
+            );
+        }
+
+        let value = value.unwrap_or_else(|| panic!("Cannot pass null to VariableState"));
+        let val = Value::Create(value)
+            .unwrap_or_else(|| panic!("Invalid value passed to VariableState: {}", variableName));
+        self.SetGlobal(variableName, val);
     }
 
     // C# signature: public void ApplyPatch()
@@ -478,7 +496,7 @@ mod tests {
     use crate::ListDefinitionsOrigin::ListDefinitionsOrigin;
     use crate::PushPop::PushPopType;
     use crate::StatePatch::StatePatch;
-    use crate::Value::{Value, VariablePointerValue};
+    use crate::Value::{Value, ValueInput, VariablePointerValue};
     use std::sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -546,5 +564,21 @@ mod tests {
 
         vars.SetGlobal("score".to_string(), Value::new_int(2));
         assert!(called.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn supports_indexer_style_get_and_set_shim() {
+        let story = crate::Story::Story::default();
+        let callstack = CallStack::new(story);
+        let mut vars = VariablesState::new(callstack, ListDefinitionsOrigin::default());
+        vars.SetGlobal("score".to_string(), Value::new_int(1));
+        vars.SnapshotDefaultGlobals();
+
+        vars.SetIndexedValue("score".to_string(), Some(ValueInput::Int(4)));
+
+        assert!(matches!(
+            vars.GetIndexedValue("score".to_string()),
+            Some(Value::Int(_))
+        ));
     }
 }

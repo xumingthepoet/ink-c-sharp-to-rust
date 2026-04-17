@@ -5,8 +5,8 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 51
-Rust skeleton: 43
+Rust implemented: 52
+Rust skeleton: 42
 Rust partial: 4
 Rust missing: 0
 
@@ -108,5 +108,5 @@ Rust missing: 0
 | `ink-c-sharp/ink-engine-runtime/Value.cs` | `ink-rust/crates/ink-runtime/src/Value.rs` | 10 | 57 | implemented |
 | `ink-c-sharp/ink-engine-runtime/VariableAssignment.cs` | `ink-rust/crates/ink-runtime/src/VariableAssignment.rs` | 1 | 6 | implemented |
 | `ink-c-sharp/ink-engine-runtime/VariableReference.cs` | `ink-rust/crates/ink-runtime/src/VariableReference.rs` | 1 | 7 | implemented |
-| `ink-c-sharp/ink-engine-runtime/VariablesState.cs` | `ink-rust/crates/ink-runtime/src/VariablesState.rs` | 1 | 22 | skeleton |
+| `ink-c-sharp/ink-engine-runtime/VariablesState.cs` | `ink-rust/crates/ink-runtime/src/VariablesState.rs` | 1 | 22 | implemented |
 | `ink-c-sharp/ink-engine-runtime/Void.cs` | `ink-rust/crates/ink-runtime/src/Void.rs` | 1 | 1 | implemented |
