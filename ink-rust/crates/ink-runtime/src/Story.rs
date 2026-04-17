@@ -185,7 +185,11 @@ impl Story {
     }
 
     // C# signature: public void ResetCallstack()
-    pub fn ResetCallstack(&mut self) {}
+    pub fn ResetCallstack(&mut self) {
+        if let Some(state) = self.state.as_mut() {
+            state.ForceEnd();
+        }
+    }
 
     // C# signature: public void SwitchFlow(string flowName)
     pub fn SwitchFlow(&mut self, flowName: String) {
@@ -307,21 +311,31 @@ impl Story {
     // C# signature: public void ChoosePathString (string path, bool resetCallstack = true, params object [] arguments)
     pub fn ChoosePathString(
         &mut self,
-        _path: String,
-        _resetCallstack: bool,
-        _arguments: Vec<crate::stub::PortStub>,
+        path: String,
+        resetCallstack: bool,
+        arguments: Vec<crate::stub::PortStub>,
     ) {
-        let _ = (_path, _resetCallstack, _arguments);
+        let _ = arguments;
+        if let Some(state) = self.state.as_mut() {
+            if resetCallstack {
+                state.ForceEnd();
+            }
+            state.ChoosePath(Path::new_overload_4(path), true);
+        }
     }
 
     // C# signature: public void ChoosePath(Path p, bool incrementingTurnIndex = true)
-    pub fn ChoosePath(&mut self, p: crate::stub::Path, incrementingTurnIndex: bool) {
-        let _ = (p, incrementingTurnIndex);
+    pub fn ChoosePath(&mut self, p: Path, incrementingTurnIndex: bool) {
+        if let Some(state) = self.state.as_mut() {
+            state.ChoosePath(p, incrementingTurnIndex);
+        }
     }
 
     // C# signature: public void ChooseChoiceIndex(int choiceIdx)
     pub fn ChooseChoiceIndex(&mut self, choiceIdx: i32) {
-        let _ = choiceIdx;
+        if let Some(state) = self.state.as_mut() {
+            state.ChooseChoiceIndex(choiceIdx);
+        }
     }
 
     // C# signature: public bool HasFunction (string functionName)
@@ -351,10 +365,7 @@ impl Story {
     }
 
     // C# signature: public Runtime.Object EvaluateExpression(Runtime.Container exprContainer)
-    pub fn EvaluateExpression(
-        &mut self,
-        _exprContainer: crate::stub::Container,
-    ) -> crate::stub::PortStub {
+    pub fn EvaluateExpression(&mut self, _exprContainer: Container) -> crate::stub::PortStub {
         Default::default()
     }
 

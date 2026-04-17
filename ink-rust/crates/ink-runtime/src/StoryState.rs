@@ -711,6 +711,36 @@ impl StoryState {
         }
     }
 
+    // C# signature: public void ChoosePath(Path path, bool incrementingTurnIndex = true)
+    pub fn ChoosePath(&mut self, path: Path, incrementingTurnIndex: bool) {
+        self.SetChosenPath(path, incrementingTurnIndex);
+    }
+
+    // C# signature: public void ChooseChoiceIndex(int choiceIdx)
+    pub fn ChooseChoiceIndex(&mut self, choiceIdx: i32) {
+        let visible_choices: Vec<Choice> = self
+            .currentFlow
+            .currentChoices
+            .iter()
+            .filter(|choice| !choice.isInvisibleDefault)
+            .cloned()
+            .collect();
+
+        if choiceIdx < 0 || (choiceIdx as usize) >= visible_choices.len() {
+            panic!("choice out of range");
+        }
+
+        let choice_to_choose = visible_choices[choiceIdx as usize].clone();
+        if let Some(thread_at_generation) = choice_to_choose.threadAtGeneration.clone() {
+            self.currentFlow
+                .callStack
+                .set_currentThread(thread_at_generation);
+        }
+
+        let target_path = choice_to_choose.targetPath.unwrap_or_else(|| Path::new());
+        self.SetChosenPath(target_path, true);
+    }
+
     // C# signature: public void StartFunctionEvaluationFromGame (Container funcContainer, params object[] arguments)
     pub fn StartFunctionEvaluationFromGame(
         &mut self,

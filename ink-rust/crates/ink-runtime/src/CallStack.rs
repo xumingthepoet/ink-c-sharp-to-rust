@@ -484,6 +484,14 @@ impl CallStack {
             .expect("call stack should always contain at least one thread")
     }
 
+    pub fn set_currentThread(&mut self, thread: Thread) {
+        let last = self
+            .threads
+            .last_mut()
+            .expect("call stack should always contain at least one thread");
+        *last = thread;
+    }
+
     // C# signature: bool canPop { get; }
     pub fn canPop(&self) -> bool {
         self.callStack().len() > 1
