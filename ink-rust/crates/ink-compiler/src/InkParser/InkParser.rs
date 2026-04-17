@@ -161,6 +161,14 @@ impl InkParser {
             .ParseCharactersFromCharSet(charSet, shouldIncludeChars, maxCount)
     }
 
+    pub fn ParseInt(&mut self) -> Option<i32> {
+        self.parser.ParseInt()
+    }
+
+    pub fn ParseFloat(&mut self) -> Option<f32> {
+        self.parser.ParseFloat()
+    }
+
     pub fn ParseObject<T, R>(&mut self, mut rule: R) -> Option<T>
     where
         R: FnMut(&mut Self) -> Option<T>,
@@ -187,6 +195,118 @@ impl InkParser {
         T: 'static,
     {
         self.ParseObject(&mut rule)
+    }
+
+    pub fn Peek<T, R>(&mut self, mut rule: R) -> Option<T>
+    where
+        R: FnMut(&mut Self) -> Option<T>,
+        T: 'static,
+    {
+        let rule_id = self.parser.BeginRule();
+        let result = rule(self);
+        self.parser.CancelRule(rule_id);
+        result
+    }
+
+    pub fn OneOf<T>(&mut self, mut array: Vec<Box<dyn FnMut(&mut Self) -> Option<T>>>) -> Option<T>
+    where
+        T: 'static,
+    {
+        for rule in array.iter_mut() {
+            if let Some(result) = self.ParseObject(|parser| rule(parser)) {
+                return Some(result);
+            }
+        }
+        None
+    }
+
+    pub fn Optional<T, R>(mut rule: R) -> Box<dyn FnMut(&mut Self) -> Option<()> + 'static>
+    where
+        R: FnMut(&mut Self) -> Option<T> + 'static,
+        T: 'static,
+    {
+        Box::new(move |parser| {
+            let _ = parser.ParseObject(&mut rule);
+            Some(())
+        })
+    }
+
+    pub fn Exclude<T, R>(mut rule: R) -> Box<dyn FnMut(&mut Self) -> Option<()> + 'static>
+    where
+        R: FnMut(&mut Self) -> Option<T> + 'static,
+        T: 'static,
+    {
+        Box::new(move |parser| {
+            if parser.ParseObject(&mut rule).is_some() {
+                Some(())
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn OptionalExclude<T, R>(mut rule: R) -> Box<dyn FnMut(&mut Self) -> Option<()> + 'static>
+    where
+        R: FnMut(&mut Self) -> Option<T> + 'static,
+        T: 'static,
+    {
+        Box::new(move |parser| {
+            let _ = parser.ParseObject(&mut rule);
+            Some(())
+        })
+    }
+
+    pub fn String(&mut self, str: String) -> Box<dyn FnMut(&mut Self) -> Option<String> + 'static> {
+        Box::new(move |parser| parser.ParseString(str.clone()))
+    }
+
+    pub fn Interleave<T, RA, RB>(
+        &mut self,
+        mut ruleA: RA,
+        mut ruleB: RB,
+        mut untilTerminator: Option<Box<dyn FnMut(&mut Self) -> Option<T>>>,
+        flatten: bool,
+    ) -> Option<Vec<T>>
+    where
+        RA: FnMut(&mut Self) -> Option<T>,
+        RB: FnMut(&mut Self) -> Option<T>,
+        T: 'static,
+    {
+        let rule_id = self.parser.BeginRule();
+        let mut results = Vec::new();
+
+        let first_a = self.ParseObject(&mut ruleA)?;
+        self.TryAddResultToList(Some(first_a), &mut results, flatten);
+
+        loop {
+            if let Some(ref mut until_rule) = untilTerminator {
+                if self.Peek(|parser| until_rule(parser)).is_some() {
+                    break;
+                }
+            }
+
+            let Some(last_main_value) = self.ParseObject(&mut ruleB) else {
+                break;
+            };
+            self.TryAddResultToList(Some(last_main_value), &mut results, flatten);
+
+            let Some(outer_value) = self.ParseObject(&mut ruleA) else {
+                break;
+            };
+            self.TryAddResultToList(Some(outer_value), &mut results, flatten);
+        }
+
+        if results.is_empty() {
+            self.parser.FailRule(rule_id)
+        } else {
+            Some(self.parser.SucceedRule(rule_id, results))
+        }
+    }
+
+    fn TryAddResultToList<T>(&mut self, result: Option<T>, list: &mut Vec<T>, _flatten: bool) {
+        if let Some(result) = result {
+            list.push(result);
+        }
     }
 
     pub fn ParseCharactersFromString(&mut self, str: String, maxCount: i32) -> Option<String> {

@@ -6,14 +6,14 @@ use crate::ParsedHierarchy::Path::Path;
 use crate::ParsedHierarchy::Story::Story;
 use ink_runtime::VariableReference::VariableReference as RuntimeVariableReference;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct VariableReference {
     pub pathIdentifiers: Vec<Identifier>,
     path: Vec<String>,
     name: String,
     singleIdentifier: Option<Identifier>,
     runtimeVarRef: Option<RuntimeVariableReference>,
-    constantExpression: Option<Expression>,
+    constantExpression: Option<Box<Expression>>,
     pub isConstantReference: bool,
     pub isListItemReference: bool,
 }
@@ -39,23 +39,19 @@ impl VariableReference {
     }
 
     // C# signature: public override void GenerateIntoContainer (Runtime.Container container)
-    pub fn GenerateIntoContainer(&mut self, container: &mut ink_runtime::Container::Container) {
-        if let Some(constantValue) = self.constantExpression.as_mut() {
+    pub fn GenerateIntoContainer(&self, container: &mut ink_runtime::Container::Container) {
+        if let Some(constantValue) = self.constantExpression.as_ref() {
             constantValue.GenerateConstantIntoContainer(container);
             return;
         }
 
-        self.runtimeVarRef = Some(RuntimeVariableReference::new(self.name.clone()));
-
-        if let Some(runtimeVarRef) = self.runtimeVarRef.as_ref() {
-            container.AddContent(runtimeVarRef.clone());
-        }
+        container.AddContent(RuntimeVariableReference::new(self.name.clone()));
     }
 
     // C# signature: public override void ResolveReferences (Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
         if let Some(constantValue) = context.constants.get(&self.name).cloned() {
-            self.constantExpression = Some(constantValue);
+            self.constantExpression = Some(Box::new(constantValue));
             self.isConstantReference = true;
             return;
         }
@@ -79,6 +75,8 @@ impl VariableReference {
         if self.isConstantReference || self.isListItemReference {
             return;
         }
+
+        self.runtimeVarRef = Some(RuntimeVariableReference::new(self.name.clone()));
 
         // Full read-count and variable-resolution parity still depends on
         // the unported object/path ancestry pipeline.

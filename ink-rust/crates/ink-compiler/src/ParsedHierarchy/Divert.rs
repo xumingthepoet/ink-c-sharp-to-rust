@@ -8,7 +8,7 @@ use ink_runtime::Divert::Divert as RuntimeDivert;
 use ink_runtime::PushPop::PushPopType;
 use ink_runtime::Value::VariablePointerValue;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Divert {
     pub target: Option<Path>,
     pub targetContent: Option<crate::stub::PortStub>,
@@ -89,7 +89,7 @@ impl Divert {
     }
 
     // C# signature: public string PathAsVariableName()
-    pub fn PathAsVariableName(&mut self) -> String {
+    pub fn PathAsVariableName(&self) -> String {
         self.target
             .as_ref()
             .and_then(|path| path.get_firstComponent().map(|s| s.to_string()))
@@ -109,7 +109,7 @@ impl Divert {
     pub fn Error(&mut self, _message: String, _source: crate::stub::PortStub, _isWarning: bool) {}
 
     // C# signature: public override string ToString ()
-    pub fn ToString(&mut self) -> String {
+    pub fn ToString(&self) -> String {
         if let Some(target) = &self.target {
             target.ToString()
         } else {
@@ -118,47 +118,47 @@ impl Divert {
     }
 
     // C# signature: Parsed.Path target { get; }
-    pub fn get_target(&mut self) -> Option<&Path> {
+    pub fn get_target(&self) -> Option<&Path> {
         self.target.as_ref()
     }
 
     // C# signature: Parsed.Object targetContent { get; }
-    pub fn get_targetContent(&mut self) -> Option<&crate::stub::PortStub> {
+    pub fn get_targetContent(&self) -> Option<&crate::stub::PortStub> {
         self.targetContent.as_ref()
     }
 
     // C# signature: List<Expression> arguments { get; }
-    pub fn get_arguments(&mut self) -> &[Expression] {
+    pub fn get_arguments(&self) -> &[Expression] {
         &self.arguments
     }
 
     // C# signature: Runtime.Divert runtimeDivert { get; }
-    pub fn get_runtimeDivert(&mut self) -> Option<&RuntimeDivert> {
+    pub fn get_runtimeDivert(&self) -> Option<&RuntimeDivert> {
         self.runtimeDivert.as_ref()
     }
 
     // C# signature: bool isFunctionCall { get; }
-    pub fn get_isFunctionCall(&mut self) -> bool {
+    pub fn get_isFunctionCall(&self) -> bool {
         self.isFunctionCall
     }
 
     // C# signature: bool isEmpty { get; }
-    pub fn get_isEmpty(&mut self) -> bool {
+    pub fn get_isEmpty(&self) -> bool {
         self.isEmpty
     }
 
     // C# signature: bool isTunnel { get; }
-    pub fn get_isTunnel(&mut self) -> bool {
+    pub fn get_isTunnel(&self) -> bool {
         self.isTunnel
     }
 
     // C# signature: bool isThread { get; }
-    pub fn get_isThread(&mut self) -> bool {
+    pub fn get_isThread(&self) -> bool {
         self.isThread
     }
 
     // C# signature: bool isEnd { get; }
-    pub fn get_isEnd(&mut self) -> bool {
+    pub fn get_isEnd(&self) -> bool {
         self.target
             .as_ref()
             .map(|target| target.get_dotSeparatedComponents() == "END")
@@ -166,7 +166,7 @@ impl Divert {
     }
 
     // C# signature: bool isDone { get; }
-    pub fn get_isDone(&mut self) -> bool {
+    pub fn get_isDone(&self) -> bool {
         self.target
             .as_ref()
             .map(|target| target.get_dotSeparatedComponents() == "DONE")
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn stringifies_variable_and_stack_diverts() {
-        let mut divert = Divert::new(
+        let divert = Divert::new(
             Path::new_overload_2(vec![Identifier {
                 name: Some("foo".to_string()),
                 debugMetadata: None,

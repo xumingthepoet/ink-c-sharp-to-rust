@@ -1,8 +1,11 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/Expression.cs
 
+use crate::ParsedHierarchy::DivertTarget::DivertTarget;
+use crate::ParsedHierarchy::FunctionCall::FunctionCall;
 use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::Number::{Number, NumberValue};
 use crate::ParsedHierarchy::Text::Text;
+use crate::ParsedHierarchy::VariableReference::VariableReference;
 use ink_runtime::Container::{Container as RuntimeContainer, ContentItem};
 use ink_runtime::ControlCommand::ControlCommand;
 use ink_runtime::NativeFunctionCall::NativeFunctionCall as RuntimeNativeFunctionCall;
@@ -25,6 +28,9 @@ pub enum ExpressionKind {
     Unary(UnaryExpression),
     IncDec(IncDecExpression),
     MultipleCondition(MultipleConditionExpression),
+    FunctionCall(Box<FunctionCall>),
+    DivertTarget(Box<DivertTarget>),
+    VariableReference(Box<VariableReference>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -106,6 +112,15 @@ impl Expression {
             ExpressionKind::MultipleCondition(multiple) => {
                 multiple.GenerateIntoContainer(container)
             }
+            ExpressionKind::FunctionCall(function_call) => {
+                function_call.GenerateIntoContainer(container)
+            }
+            ExpressionKind::DivertTarget(divert_target) => {
+                divert_target.GenerateIntoContainer(container)
+            }
+            ExpressionKind::VariableReference(variable_reference) => {
+                variable_reference.GenerateIntoContainer(container)
+            }
         }
     }
 
@@ -118,6 +133,15 @@ impl Expression {
             ExpressionKind::Unary(unary) => unary.ResolveReferences(_context),
             ExpressionKind::IncDec(inc_dec) => inc_dec.ResolveReferences(_context),
             ExpressionKind::MultipleCondition(multiple) => multiple.ResolveReferences(_context),
+            ExpressionKind::FunctionCall(function_call) => {
+                function_call.ResolveReferences(_context)
+            }
+            ExpressionKind::DivertTarget(divert_target) => {
+                divert_target.ResolveReferences(_context)
+            }
+            ExpressionKind::VariableReference(variable_reference) => {
+                variable_reference.ResolveReferences(_context)
+            }
         }
     }
 
@@ -131,6 +155,9 @@ impl Expression {
             ExpressionKind::Unary(unary) => unary.ToString(),
             ExpressionKind::IncDec(inc_dec) => inc_dec.ToString(),
             ExpressionKind::MultipleCondition(multiple) => multiple.ToString(),
+            ExpressionKind::FunctionCall(function_call) => function_call.ToString(),
+            ExpressionKind::DivertTarget(divert_target) => divert_target.ToString(),
+            ExpressionKind::VariableReference(variable_reference) => variable_reference.ToString(),
         }
     }
 
@@ -197,6 +224,9 @@ impl Expression {
                 sub_expressions
             }
             ExpressionKind::MultipleCondition(multiple) => multiple.subExpressions.clone(),
+            ExpressionKind::FunctionCall(function_call) => function_call.get_arguments().to_vec(),
+            ExpressionKind::DivertTarget(_) => Vec::new(),
+            ExpressionKind::VariableReference(_) => Vec::new(),
             _ => Vec::new(),
         }
     }
@@ -402,6 +432,24 @@ impl From<Number> for Expression {
 impl From<Text> for Expression {
     fn from(value: Text) -> Self {
         Expression::from_kind(ExpressionKind::Text(value))
+    }
+}
+
+impl From<FunctionCall> for Expression {
+    fn from(value: FunctionCall) -> Self {
+        Expression::from_kind(ExpressionKind::FunctionCall(Box::new(value)))
+    }
+}
+
+impl From<DivertTarget> for Expression {
+    fn from(value: DivertTarget) -> Self {
+        Expression::from_kind(ExpressionKind::DivertTarget(Box::new(value)))
+    }
+}
+
+impl From<VariableReference> for Expression {
+    fn from(value: VariableReference) -> Self {
+        Expression::from_kind(ExpressionKind::VariableReference(Box::new(value)))
     }
 }
 
