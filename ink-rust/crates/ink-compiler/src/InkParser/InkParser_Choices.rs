@@ -107,7 +107,13 @@ impl InkParser {
                         }
                     }
                     crate::InkParser::InkParser_Divert::DivertPiece::TunnelOnwards(divert) => {
-                        inner_content.AddContent(ContentListItem::Divert(divert));
+                        if divert.get_isEmpty() {
+                            inner_content.AddContent(ContentListItem::TunnelOnwards(
+                                crate::ParsedHierarchy::TunnelOnwards::TunnelOnwards::new(),
+                            ));
+                        } else {
+                            inner_content.AddContent(ContentListItem::Divert(divert));
+                        }
                     }
                 }
             }

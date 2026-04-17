@@ -115,7 +115,9 @@ impl InkParser {
                 DivertPiece::Divert(divert) => ContentListItem::Divert(divert),
                 DivertPiece::TunnelOnwards(divert) => {
                     let mut tunnel = TunnelOnwards::new();
-                    tunnel.set_divertAfter(Some(divert));
+                    if !divert.get_isEmpty() {
+                        tunnel.set_divertAfter(Some(divert));
+                    }
                     ContentListItem::TunnelOnwards(tunnel)
                 }
             }));

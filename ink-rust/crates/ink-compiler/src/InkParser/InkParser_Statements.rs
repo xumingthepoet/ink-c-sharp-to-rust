@@ -250,7 +250,9 @@ impl InkParser {
                 }
                 crate::InkParser::InkParser_Divert::DivertPiece::TunnelOnwards(tunnel) => {
                     let mut parsed_tunnel = TunnelOnwards::new();
-                    parsed_tunnel.set_divertAfter(Some(tunnel));
+                    if !tunnel.get_isEmpty() {
+                        parsed_tunnel.set_divertAfter(Some(tunnel));
+                    }
                     items.push(ContentListItem::TunnelOnwards(parsed_tunnel));
                 }
             }

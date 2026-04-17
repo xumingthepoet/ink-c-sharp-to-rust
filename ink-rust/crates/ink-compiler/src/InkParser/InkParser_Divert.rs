@@ -10,6 +10,12 @@ pub enum DivertPiece {
     TunnelOnwards(Divert),
 }
 
+#[derive(Clone, Debug, PartialEq)]
+enum DivertParseItem {
+    Arrow(String),
+    Divert(Divert),
+}
+
 impl InkParser {
     // C# signature: protected List<Parsed.Object> MultiDivert()
     pub fn MultiDivert(&mut self) -> Option<Vec<DivertPiece>> {
@@ -19,32 +25,75 @@ impl InkParser {
             return Some(vec![DivertPiece::Divert(thread_divert)]);
         }
 
-        let mut pieces = Vec::new();
-        let first_arrow = self.ParseDivertArrowOrTunnelOnwards()?;
-        let mut saw_tunnel = first_arrow == "->->";
-        loop {
-            self.Whitespace();
-            let maybe_divert = self.DivertIdentifierWithArguments();
-            if let Some(divert) = maybe_divert {
-                if saw_tunnel {
-                    pieces.push(DivertPiece::TunnelOnwards(divert.clone()));
-                } else {
-                    pieces.push(DivertPiece::Divert(divert));
-                }
-            } else {
-                break;
-            }
+        let arrows_and_diverts = self.Interleave(
+            |parser| {
+                parser
+                    .ParseDivertArrowOrTunnelOnwards()
+                    .map(DivertParseItem::Arrow)
+            },
+            |parser| {
+                parser
+                    .DivertIdentifierWithArguments()
+                    .map(DivertParseItem::Divert)
+            },
+            None,
+            false,
+        )?;
 
-            self.Whitespace();
-            let maybe_arrow = self.ParseDivertArrowOrTunnelOnwards();
-            if let Some(arrow) = maybe_arrow {
-                saw_tunnel = arrow == "->->";
-            } else {
-                break;
+        let mut diverts = Vec::new();
+
+        for i in 0..arrows_and_diverts.len() {
+            match &arrows_and_diverts[i] {
+                DivertParseItem::Arrow(arrow) => {
+                    if arrow == "->->" {
+                        let tunnel_onwards_placement_valid = i == 0
+                            || i == arrows_and_diverts.len() - 1
+                            || i == arrows_and_diverts.len() - 2;
+                        if !tunnel_onwards_placement_valid {
+                            self.Error("Tunnel onwards '->->' must only come at the begining or the start of a divert".to_string());
+                        }
+
+                        let mut tunnel_onwards_divert = Divert::default();
+                        if i < arrows_and_diverts.len() - 1 {
+                            if let DivertParseItem::Divert(tunnel_onward_divert) =
+                                &arrows_and_diverts[i + 1]
+                            {
+                                tunnel_onwards_divert = tunnel_onward_divert.clone();
+                            }
+                        } else {
+                            tunnel_onwards_divert.isEmpty = true;
+                        }
+
+                        diverts.push(DivertPiece::TunnelOnwards(tunnel_onwards_divert));
+                        break;
+                    }
+                }
+                DivertParseItem::Divert(divert) => {
+                    let mut divert = divert.clone();
+                    if i < arrows_and_diverts.len() - 1 {
+                        divert.isTunnel = true;
+                    }
+                    diverts.push(DivertPiece::Divert(divert));
+                }
             }
         }
 
-        Some(pieces)
+        if diverts.is_empty() && arrows_and_diverts.len() == 1 {
+            let mut gather_divert = Divert::default();
+            gather_divert.isEmpty = true;
+
+            if !self.get_parsingChoice() {
+                self.Error("Empty diverts (->) are only valid on choices".to_string());
+            }
+
+            if matches!(&arrows_and_diverts[0], DivertParseItem::Arrow(arrow) if arrow == "->->") {
+                diverts.push(DivertPiece::TunnelOnwards(gather_divert));
+            } else {
+                diverts.push(DivertPiece::Divert(gather_divert));
+            }
+        }
+
+        Some(diverts)
     }
 
     // C# signature: protected Divert StartThread()
@@ -137,5 +186,38 @@ impl InkParser {
     // C# signature: protected string ParseThreadArrow()
     pub fn ParseThreadArrow(&mut self) -> Option<String> {
         self.ParseString("<-".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DivertPiece, InkParser};
+
+    #[test]
+    fn parses_tunnel_onwards_with_target() {
+        let mut parser = InkParser::new("->-> knot".to_string(), None, None, None);
+        let pieces = parser.MultiDivert().expect("expected tunnel divert");
+        assert_eq!(pieces.len(), 1);
+        match &pieces[0] {
+            DivertPiece::TunnelOnwards(divert) => {
+                assert!(!divert.get_isEmpty());
+                assert_eq!(
+                    divert.get_target().unwrap().ToString(),
+                    "-> knot".to_string()
+                );
+            }
+            other => panic!("unexpected piece: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parses_bare_tunnel_onwards_as_empty_divert() {
+        let mut parser = InkParser::new("->->".to_string(), None, None, None);
+        let pieces = parser.MultiDivert().expect("expected empty tunnel divert");
+        assert_eq!(pieces.len(), 1);
+        match &pieces[0] {
+            DivertPiece::TunnelOnwards(divert) => assert!(divert.get_isEmpty()),
+            other => panic!("unexpected piece: {:?}", other),
+        }
     }
 }

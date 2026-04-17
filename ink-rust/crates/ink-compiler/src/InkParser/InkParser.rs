@@ -300,7 +300,10 @@ impl InkParser {
         let rule_id = self.parser.BeginRule();
         let mut results = Vec::new();
 
-        let first_a = self.ParseObject(&mut ruleA)?;
+        let Some(first_a) = self.ParseObject(&mut ruleA) else {
+            self.parser.FailRule::<Vec<T>>(rule_id);
+            return None;
+        };
         self.TryAddResultToList(Some(first_a), &mut results, flatten);
 
         loop {
@@ -322,7 +325,7 @@ impl InkParser {
         }
 
         if results.is_empty() {
-            self.parser.FailRule(rule_id)
+            self.parser.FailRule::<Vec<T>>(rule_id)
         } else {
             Some(self.parser.SucceedRule(rule_id, results))
         }
