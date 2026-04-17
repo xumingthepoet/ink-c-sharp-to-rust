@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 32 | 28 | 4 |
-| Total | 98 | 66 | 28 | 4 |
+| Compiler | 64 | 34 | 26 | 4 |
+| Total | 98 | 68 | 26 | 4 |
 
 ## Runtime
 
@@ -70,7 +70,7 @@ Source area: `ink-c-sharp/compiler/`
 ### InkParser
 
 1. `InkParser/CommentEliminator.cs` (`deps=2`) [ported]
-2. `InkParser/InkParser_AuthorWarning.cs` (`deps=2`) [partial: reason=the parser wrapper is real, but identifier-with-metadata parsing is still simplified; missing=IdentifierWithMetadata parity and exact TODO token handling; next=port identifier parsing into InkParser and reuse it here]
+2. `InkParser/InkParser_AuthorWarning.cs` (`deps=2`) [ported]
 3. `InkParser/InkParser_Include.cs` (`deps=3`) [partial: reason=include loading is wired, but root-parser recursion tracking and exact error recovery are simplified; missing=root-parser chained include semantics and full open-file bookkeeping parity; next=port the remaining parser hierarchy so include can match C# recursion behavior]
 4. `InkParser/InkParser_Whitespace.cs` (`deps=3`) [ported]
 5. `InkParser/InkParser_CharacterRanges.cs` (`deps=4`) [ported]
@@ -81,9 +81,9 @@ Source area: `ink-c-sharp/compiler/`
 10. `InkParser/InkParser_Conditional.cs` (`deps=8`) [partial: reason=conditional grammar is now real enough to parse branches, but the branch-content wrapping and source-aware error recovery still use simplified compatibility paths; missing=exact ErrorWithParsedObject parity and inline/branch ownership wiring; next=continue the remaining flow-tree/parser ownership work]
 11. `InkParser/InkParser_Content.cs` (`deps=8`) [partial: reason=text/tag/glue line parsing is real, but full inline logic, choice-specific content rules, and weave integration are still incomplete; missing=multi-branch inline logic and choice-aware content handling; next=port InkParser_Choices/InkParser_Conditional and the remaining hierarchy tree]
 12. `InkParser/InkParser_Sequences.cs` (`deps=8`) [partial: reason=inline sequence annotations and single-line parsing are wired, but multiline sequence reconstruction still depends on the unported weave/tree conversion path; missing=multiline branch conversion from parsed statements into ContentList values and weave-backed nested sequence ownership; next=finish ParsedHierarchy/Weave or the remaining statement-tree conversion]
-13. `InkParser/InkParser_Logic.cs` (`deps=9`) [partial: reason=identifier parsing is real, but the line/variable/list/inline logic parser family is still skeletal; missing=LogicLine, VariableDeclaration, List/Const declarations, inline logic, and expression helper parity; next=port the remaining InkParser logic and expression rules]
+13. `InkParser/InkParser_Logic.cs` (`deps=9`) [ported]
 14. `InkParser/InkParser.cs` (`deps=9`) [partial: reason=the parser wrapper now delegates comment elimination, whitespace, include, debug metadata, and top-level Parse construction, but the full statement hierarchy and declaration grammar remain incomplete; missing=LogicLine, declarations, and the remaining statement branches; next=port the remaining InkParser logic and ParsedHierarchy tree]
-15. `InkParser/InkParser_Statements.cs` (`deps=10`) [partial: reason=the parser helper now dispatches knots, stitches, choices, gathers, divert lines, and text lines, but the logic-line family, sequence/conditional branches, and full top-level story export still depend on the remaining hierarchy tree; missing=LogicLine/VariableDeclaration/ListDeclaration/ConstDeclaration and the sequence/conditional parser surface; next=port the remaining parsed hierarchy nodes that feed statement dispatch]
+15. `InkParser/InkParser_Statements.cs` (`deps=10`) [partial: reason=the parser helper now dispatches knots, stitches, choices, gathers, divert lines, text lines, and logic lines, but the remaining sequence/conditional statement branches and the full top-level story export still depend on the unfinished hierarchy tree; missing=the remaining statement-tree branches that belong to sequence/conditional and story export; next=port the remaining parsed hierarchy nodes that feed statement dispatch]
 16. `InkParser/InkParser_Tags.cs` (`deps=10`) [ported]
 17. `InkParser/InkParser_Knot.cs` (`deps=11`) [partial: knot and stitch declarations now parse and wrap runtime containers, but full recovery, statement ownership, and story-root integration still depend on the remaining parser/story tree]
 18. `InkParser/InkParser_Expressions.cs` (`deps=15`) [partial: reason=the parser now handles temp keywords, return, infix precedence, function calls, lists, variables, parens, divert targets, and temp declaration/assignment, but string parsing still depends on unported MixedTextAndLogic and remaining parser rules; missing=MixedTextAndLogic string parsing; next=port the remaining parser content rules]

@@ -5,11 +5,14 @@ use crate::ParsedHierarchy::ContentList::{ContentList, ContentListItem};
 use crate::ParsedHierarchy::Divert::Divert;
 use crate::ParsedHierarchy::FlowLevel::FlowLevel;
 use crate::ParsedHierarchy::Object::{Object, ObjectKind};
+use crate::ParsedHierarchy::Return::Return;
 use crate::ParsedHierarchy::Tag::Tag;
 use crate::ParsedHierarchy::Text::Text;
 use crate::ParsedHierarchy::TunnelOnwards::TunnelOnwards;
+use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
 use ink_runtime::Container::Container;
 use ink_runtime::Container::ContentItem;
+use std::any::Any;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum StatementLevel {
@@ -48,26 +51,46 @@ impl InkParser {
     // C# signature: protected object StatementAtLevel(StatementLevel level)
     pub fn StatementAtLevel(&mut self, level: StatementLevel) -> Option<Object> {
         let statement = self
-            .MultiDivert()
+            .ParseObject(|parser| parser.MultiDivert())
             .map(|pieces| Self::wrap_divert_line(pieces))
             .or_else(|| {
                 if level >= StatementLevel::Top {
-                    self.KnotDefinition()
+                    self.ParseObject(|parser| parser.KnotDefinition())
                 } else {
                     None
                 }
             })
-            .or_else(|| self.Choice().map(Self::wrap_choice))
-            .or_else(|| self.Gather().map(Self::wrap_gather))
+            .or_else(|| {
+                self.ParseObject(|parser| parser.Choice())
+                    .map(Self::wrap_choice)
+            })
+            .or_else(|| {
+                self.ParseObject(|parser| parser.Gather())
+                    .map(Self::wrap_gather)
+            })
             .or_else(|| {
                 if level >= StatementLevel::Knot {
-                    self.StitchDefinition()
+                    self.ParseObject(|parser| parser.StitchDefinition())
                 } else {
                     None
                 }
             })
-            .or_else(|| self.IncludeStatement().map(Self::wrap_included_file))
-            .or_else(|| self.LineOfMixedTextAndLogic().map(Self::wrap_content_line));
+            .or_else(|| {
+                self.ParseObject(|parser| parser.AuthorWarning())
+                    .map(Self::wrap_author_warning)
+            })
+            .or_else(|| {
+                self.ParseObject(|parser| parser.IncludeStatement())
+                    .map(Self::wrap_included_file)
+            })
+            .or_else(|| {
+                self.ParseObject(|parser| parser.LogicLine())
+                    .map(Self::wrap_logic_line)
+            })
+            .or_else(|| {
+                self.ParseObject(|parser| parser.LineOfMixedTextAndLogic())
+                    .map(Self::wrap_content_line)
+            });
 
         statement
     }
@@ -161,6 +184,53 @@ impl InkParser {
         obj.content = included.get_includedStory().content.clone();
         let _ = included.GenerateRuntimeObject();
         obj
+    }
+
+    fn wrap_author_warning(
+        _warning: crate::ParsedHierarchy::AuthorWarning::AuthorWarning,
+    ) -> Object {
+        Object::with_kind(ObjectKind::Plain)
+    }
+
+    fn wrap_logic_line(result: Box<dyn Any>) -> Object {
+        let result = match result.downcast::<ContentList>() {
+            Ok(mut content_list) => {
+                let mut obj = Object::with_kind(ObjectKind::Plain);
+                obj.set_runtimeObject(Some(content_list.GenerateRuntimeObject()));
+                return obj;
+            }
+            Err(result) => result,
+        };
+
+        let result = match result.downcast::<crate::ParsedHierarchy::Expression::Expression>() {
+            Ok(expression) => {
+                let mut obj = Object::with_kind(ObjectKind::Plain);
+                obj.set_runtimeObject(Some(expression.GenerateRuntimeObject()));
+                return obj;
+            }
+            Err(result) => result,
+        };
+
+        let result = match result.downcast::<Return>() {
+            Ok(returned) => {
+                let mut obj = Object::with_kind(ObjectKind::Plain);
+                obj.set_runtimeObject(Some(returned.GenerateRuntimeObject()));
+                return obj;
+            }
+            Err(result) => result,
+        };
+
+        if let Ok(assignment) = result.downcast::<VariableAssignment>() {
+            let mut obj = Object::with_kind(ObjectKind::Plain);
+            if let Some(runtime_object) = assignment.clone().GenerateRuntimeObject() {
+                if let ContentItem::Container(container) = runtime_object {
+                    obj.set_runtimeObject(Some(*container));
+                }
+            }
+            return obj;
+        }
+
+        Object::with_kind(ObjectKind::Plain)
     }
 
     fn wrap_content_line(items: Vec<ContentListItem>) -> Object {
