@@ -11,7 +11,10 @@ use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::List::List;
 use crate::ParsedHierarchy::Number::{Number, NumberValue};
 use crate::ParsedHierarchy::StringExpression::StringExpression;
+use crate::ParsedHierarchy::Text::Text;
+use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
 use crate::ParsedHierarchy::VariableReference::VariableReference;
+use std::any::Any;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct InfixOperator {
@@ -31,19 +34,56 @@ impl InfixOperator {
 }
 
 impl InkParser {
-    pub fn TempDeclarationOrAssignment(
-        &mut self,
-    ) -> Option<crate::ParsedHierarchy::Object::Object> {
-        todo!("temp declarations still depend on ParsedHierarchy.Object and VariableAssignment");
+    pub fn TempDeclarationOrAssignment(&mut self) -> Option<Box<dyn Any>> {
+        self.Whitespace();
+
+        let isNewDeclaration = self.ParseTempKeyword();
+
+        self.Whitespace();
+
+        let varIdentifier: crate::ParsedHierarchy::Identifier::Identifier = if isNewDeclaration {
+            self.ParseObject(|parser| parser.IdentifierWithMetadata())?
+        } else {
+            self.ParseObject(|parser| parser.IdentifierWithMetadata())?
+        };
+
+        self.Whitespace();
+
+        let isIncrement = self.ParseString("+".to_string()).is_some();
+        let isDecrement = self.ParseString("-".to_string()).is_some();
+        if isIncrement && isDecrement {
+            self.Error("Unexpected sequence '+-'".to_string());
+        }
+
+        if self.ParseString("=".to_string()).is_none() {
+            if isNewDeclaration {
+                self.Error("Expected '='".to_string());
+            }
+            return None;
+        }
+
+        let assignedExpression = self.ParseObject(|parser| parser.Expression())?;
+
+        if isIncrement || isDecrement {
+            let result = IncDecExpression::new_with_expression(
+                varIdentifier,
+                assignedExpression,
+                isIncrement,
+            );
+            Some(Box::new(result))
+        } else {
+            let mut result = VariableAssignment::new(varIdentifier, assignedExpression);
+            result.set_isNewTemporaryDeclaration(isNewDeclaration);
+            Some(Box::new(result))
+        }
     }
 
-    pub fn DisallowIncrement(&mut self, _expr: &crate::ParsedHierarchy::Object::Object) {
+    pub fn DisallowIncrement(&mut self, _expr: &dyn Any) {
         todo!("increment/decrement line handling is still pending the statement parser");
     }
 
     pub fn ParseTempKeyword(&mut self) -> bool {
-        matches!(self.Peek(|parser| parser.Identifier()), Some(ref identifier) if identifier == "temp")
-            && self.ParseObject(|parser| parser.Identifier()).as_deref() == Some("temp")
+        self.ParseObject(|parser| parser.Identifier()).as_deref() == Some("temp")
     }
 
     pub fn ReturnStatement(&mut self) -> Option<crate::ParsedHierarchy::Return::Return> {
@@ -151,7 +191,7 @@ impl InkParser {
     }
 
     pub fn ExpressionNot(&mut self) -> Option<String> {
-        let id = self.Identifier()?;
+        let id = self.ParseObject(|parser| parser.Identifier())?;
         if id == "not" {
             Some(id)
         } else {
@@ -188,6 +228,10 @@ impl InkParser {
     }
 
     pub fn ExpressionFloat(&mut self) -> Option<Expression> {
+        if !Self::looks_like_float_literal(self.get_remainingString()) {
+            return None;
+        }
+
         self.ParseFloat().map(|value| {
             Expression::from_kind(ExpressionKind::Number(Number::new(NumberValue::Float(
                 value,
@@ -196,7 +240,35 @@ impl InkParser {
     }
 
     pub fn ExpressionString(&mut self) -> Option<Expression> {
-        todo!("string expression parsing still depends on MixedTextAndLogic");
+        self.ParseString("\"".to_string())?;
+
+        let was_parsing_string = self.get_parsingStringExpression();
+        self.set_flag(
+            crate::InkParser::InkParser::CustomFlags::ParsingString,
+            true,
+        );
+
+        let content = self
+            .ParseUntilCharactersFromString("\"".to_string())
+            .unwrap_or_default();
+
+        if self.ParseString("\"".to_string()).is_none() {
+            self.Error("close quote for string expression".to_string());
+            self.set_flag(
+                crate::InkParser::InkParser::CustomFlags::ParsingString,
+                was_parsing_string,
+            );
+            return None;
+        }
+
+        self.set_flag(
+            crate::InkParser::InkParser::CustomFlags::ParsingString,
+            was_parsing_string,
+        );
+
+        Some(Expression::from_kind(ExpressionKind::Text(Text::new(
+            content,
+        ))))
     }
 
     pub fn ExpressionBool(&mut self) -> Option<Expression> {
@@ -391,5 +463,74 @@ impl InkParser {
             InfixOperator::new("%".to_string(), 8, false),
             InfixOperator::new("mod".to_string(), 8, true),
         ]
+    }
+
+    fn looks_like_float_literal(remaining: String) -> bool {
+        let mut saw_digit = false;
+
+        for ch in remaining.chars() {
+            if ch.is_ascii_digit() {
+                saw_digit = true;
+                continue;
+            }
+
+            if ch == '-' && !saw_digit {
+                continue;
+            }
+
+            if ch == '.' && saw_digit {
+                return true;
+            }
+
+            if ch.is_whitespace() {
+                break;
+            }
+
+            break;
+        }
+
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::InkParser;
+    use crate::ParsedHierarchy::Expression::{Expression, ExpressionKind};
+    use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
+
+    #[test]
+    fn parses_temp_declaration_into_runtime_any() {
+        let mut parser = InkParser::new("temp score = 1".to_string(), None, None, None);
+        let parsed = parser
+            .TempDeclarationOrAssignment()
+            .expect("temp assignment");
+        assert!(parsed.is::<VariableAssignment>());
+    }
+
+    #[test]
+    fn parses_simple_binary_expression() {
+        let mut parser = InkParser::new("1 + 2".to_string(), None, None, None);
+        let expr = parser.Expression().expect("expression");
+        assert!(matches!(expr.kind, ExpressionKind::Binary(_)));
+    }
+
+    #[test]
+    fn parses_simple_integer_expression() {
+        let mut parser = InkParser::new("1".to_string(), None, None, None);
+        let expr = parser.ExpressionInt().expect("integer");
+        assert!(matches!(expr.kind, ExpressionKind::Number(_)));
+    }
+
+    #[test]
+    fn parses_immediate_expression_as_any_statement() {
+        let mut parser = InkParser::new("1 + 2".to_string(), None, None, None);
+        let input = parser.CommandLineUserInput().unwrap();
+        let statement = input
+            .userImmediateModeStatement
+            .expect("immediate mode statement");
+        assert!(statement.is::<Expression>());
+        let expr = statement.as_ref().downcast_ref::<Expression>().unwrap();
+        assert!(matches!(expr.kind, ExpressionKind::Binary(_)));
     }
 }

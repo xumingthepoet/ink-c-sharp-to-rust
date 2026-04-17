@@ -3,6 +3,9 @@
 use crate::CharacterSet::CharacterSet;
 use crate::CommandLineInput::CommandLineInput;
 use crate::InkParser::InkParser::InkParser;
+use crate::ParsedHierarchy::Divert::Divert;
+use crate::ParsedHierarchy::Expression::Expression;
+use std::any::Any;
 
 impl InkParser {
     pub fn CommandLineUserInput(&mut self) -> Option<CommandLineInput> {
@@ -22,19 +25,12 @@ impl InkParser {
             return Some(result);
         }
 
-        if let Some(debug_source) = self.DebugSource() {
-            return Some(debug_source);
-        }
-
-        if let Some(debug_path) = self.DebugPathLookup() {
-            return Some(debug_path);
-        }
-
-        if let Some(choice) = self.UserChoiceNumber() {
-            return Some(choice);
-        }
-
-        None
+        self.OneOf(vec![
+            Box::new(|parser: &mut InkParser| parser.DebugSource()),
+            Box::new(|parser: &mut InkParser| parser.DebugPathLookup()),
+            Box::new(|parser: &mut InkParser| parser.UserChoiceNumber()),
+            Box::new(|parser: &mut InkParser| parser.UserImmediateModeStatement()),
+        ])
     }
 
     fn DebugSource(&mut self) -> Option<CommandLineInput> {
@@ -100,11 +96,35 @@ impl InkParser {
         inputStruct.choiceInput = Some(number);
         Some(inputStruct)
     }
+
+    fn UserImmediateModeStatement(&mut self) -> Option<CommandLineInput> {
+        let statement = self.OneOf(vec![
+            Box::new(|parser: &mut InkParser| {
+                parser
+                    .SingleDivert()
+                    .map(|divert| Box::new(divert) as Box<dyn Any>)
+            }),
+            Box::new(|parser: &mut InkParser| parser.TempDeclarationOrAssignment()),
+            Box::new(|parser: &mut InkParser| {
+                parser
+                    .Expression()
+                    .map(|expression| Box::new(expression) as Box<dyn Any>)
+            }),
+        ]);
+
+        statement.map(|statement| {
+            let mut inputStruct = CommandLineInput::new();
+            inputStruct.userImmediateModeStatement = Some(statement);
+            inputStruct
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::InkParser;
+    use crate::ParsedHierarchy::Divert::Divert;
+    use crate::ParsedHierarchy::Expression::Expression;
 
     #[test]
     fn parses_help_exit_and_choice_number_inputs() {
@@ -143,5 +163,24 @@ mod tests {
                 .as_deref(),
             Some("knot.stitch")
         );
+    }
+
+    #[test]
+    fn parses_immediate_mode_statement() {
+        let mut divert_parser = InkParser::new("-> knot".to_string(), None, None, None);
+        let input = divert_parser.CommandLineUserInput().unwrap();
+        assert!(input
+            .userImmediateModeStatement
+            .as_ref()
+            .expect("statement")
+            .is::<Divert>());
+
+        let mut expr_parser = InkParser::new("1 + 2".to_string(), None, None, None);
+        let input = expr_parser.CommandLineUserInput().unwrap();
+        assert!(input
+            .userImmediateModeStatement
+            .as_ref()
+            .expect("statement")
+            .is::<Expression>());
     }
 }

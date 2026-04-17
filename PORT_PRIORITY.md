@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 27 | 15 | 22 |
-| Total | 98 | 61 | 15 | 22 |
+| Compiler | 64 | 28 | 14 | 22 |
+| Total | 98 | 62 | 14 | 22 |
 
 ## Runtime
 
@@ -74,7 +74,7 @@ Source area: `ink-c-sharp/compiler/`
 3. `InkParser/InkParser_Include.cs` (`deps=3`) [partial: reason=include loading is wired, but root-parser recursion tracking and exact error recovery are simplified; missing=root-parser chained include semantics and full open-file bookkeeping parity; next=port the remaining parser hierarchy so include can match C# recursion behavior]
 4. `InkParser/InkParser_Whitespace.cs` (`deps=3`) [ported]
 5. `InkParser/InkParser_CharacterRanges.cs` (`deps=4`) [ported]
-6. `InkParser/InkParser_CommandLineInput.cs` (`deps=4`) [partial: reason=the parser helper now handles help, exit, DebugSource, DebugPath, and choice-number inputs, but immediate-mode statement parsing is still omitted; missing=UserImmediateModeStatement and the statement/expression tree it depends on; next=port the statement hierarchy and expression parser enough to support immediate-mode input]
+6. `InkParser/InkParser_CommandLineInput.cs` (`deps=4`) [ported]
 7. `InkParser/InkParser_Tags.cs` (`deps=6`)
 8. `InkParser/InkParser_Divert.cs` (`deps=7`) [partial: reason=the parser now resolves single diverts, thread diverts, and diverted path components, but full multi-divert/tunnel-onwards parity and tag/content list integration are still incomplete; missing=exact tunnel-onwards chain handling, tag/content-list integration, and the full arrow/divert sequence semantics; next=port ParsedHierarchy/TunnelOnwards, ContentList, and the remaining parser content tree]
 9. `InkParser/InkParser_Choices.cs` (`deps=8`)
@@ -85,7 +85,7 @@ Source area: `ink-c-sharp/compiler/`
 14. `InkParser/InkParser.cs` (`deps=9`) [partial: reason=the parser wrapper now delegates comment elimination, whitespace, include, and debug metadata, but the main Parse entry point and statement hierarchy are still unported; missing=full statement parsing and parsed-object tree construction; next=port InkParser statement/content rules and the remaining ParsedHierarchy tree]
 15. `InkParser/InkParser_Statements.cs` (`deps=10`) [partial: reason=the parser helper now defines statement levels and line/skip helpers, but the real statement dispatcher still depends on the unported parsed hierarchy tree; missing=StatementsAtLevel/StatementAtLevel rule tables and end-to-end statement parsing; next=port the remaining parsed hierarchy nodes that feed statement dispatch]
 16. `InkParser/InkParser_Knot.cs` (`deps=11`)
-17. `InkParser/InkParser_Expressions.cs` (`deps=15`) [partial: reason=the parser now handles temp keywords, return, infix precedence, function calls, lists, variables, parens, and divert targets, but string parsing and temp declaration/assignment still depend on unported MixedTextAndLogic and VariableAssignment/statement rules; missing=MixedTextAndLogic string parsing and temp declaration/assignment parsing; next=port ParsedHierarchy/VariableAssignment and the remaining parser rules]
+17. `InkParser/InkParser_Expressions.cs` (`deps=15`) [partial: reason=the parser now handles temp keywords, return, infix precedence, function calls, lists, variables, parens, divert targets, and temp declaration/assignment, but string parsing still depends on unported MixedTextAndLogic and remaining parser rules; missing=MixedTextAndLogic string parsing; next=port the remaining parser content rules]
 
 ### Outer Files
 

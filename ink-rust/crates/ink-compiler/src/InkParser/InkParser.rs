@@ -169,6 +169,10 @@ impl InkParser {
         self.parser.ParseFloat()
     }
 
+    pub fn get_remainingString(&self) -> String {
+        self.parser.get_remainingString()
+    }
+
     pub fn ParseObject<T, R>(&mut self, mut rule: R) -> Option<T>
     where
         R: FnMut(&mut Self) -> Option<T>,
