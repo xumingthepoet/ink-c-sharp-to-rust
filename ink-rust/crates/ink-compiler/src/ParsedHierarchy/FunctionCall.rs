@@ -4,6 +4,7 @@ use crate::ParsedHierarchy::Divert::Divert;
 use crate::ParsedHierarchy::DivertTarget::DivertTarget;
 use crate::ParsedHierarchy::Expression::{Expression, ExpressionKind};
 use crate::ParsedHierarchy::Identifier::Identifier;
+use crate::ParsedHierarchy::Number::NumberValue;
 use crate::ParsedHierarchy::VariableReference::VariableReference;
 use crate::ParsedHierarchy::{ListDefinition::ListDefinition, Story::Story};
 use ink_runtime::Container::{Container as RuntimeContainer, ContentItem};
@@ -214,6 +215,49 @@ impl FunctionCall {
                             Some(Box::new((**variable_reference).clone()));
                     }
                     _ => {}
+                }
+            }
+        }
+
+        if self.get_isRandom() {
+            if self.arguments.len() != 2 {
+                context.Error(
+                    "RANDOM should take 2 parameters: a minimum and a maximum integer".to_string(),
+                    Default::default(),
+                    false,
+                );
+            }
+
+            for (index, argument) in self.arguments.iter().enumerate() {
+                if let ExpressionKind::Number(number) = &argument.kind {
+                    if !matches!(number.value, NumberValue::Int(_)) {
+                        let param_name = if index == 0 { "minimum" } else { "maximum" };
+                        context.Error(
+                            format!("RANDOM's {} parameter should be an integer", param_name),
+                            Default::default(),
+                            false,
+                        );
+                    }
+                }
+            }
+        } else if self.get_isSeedRandom() {
+            if self.arguments.len() != 1 {
+                context.Error(
+                    "SEED_RANDOM should take 1 parameter - an integer seed".to_string(),
+                    Default::default(),
+                    false,
+                );
+            }
+
+            if let Some(argument) = self.arguments.first() {
+                if let ExpressionKind::Number(number) = &argument.kind {
+                    if !matches!(number.value, NumberValue::Int(_)) {
+                        context.Error(
+                            "SEED_RANDOM's parameter should be an integer seed".to_string(),
+                            Default::default(),
+                            false,
+                        );
+                    }
                 }
             }
         }
