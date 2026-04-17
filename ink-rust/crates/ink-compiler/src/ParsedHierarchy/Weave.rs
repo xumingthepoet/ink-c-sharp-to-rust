@@ -216,23 +216,43 @@ impl Weave {
 
     // C# signature: Parsed.Object lastParsedSignificantObject { get; }
     pub fn get_lastParsedSignificantObject(&mut self) -> Option<Object> {
-        for obj in self.base.content.iter().rev() {
-            if let Some(name) = obj
-                .identifier
-                .as_ref()
-                .and_then(|identifier| identifier.name.clone())
-            {
-                if !name.is_empty() {
-                    return Some(obj.clone());
-                }
-            }
-
-            if obj.kind != ObjectKind::Plain {
-                return Some(obj.clone());
-            }
+        if self.base.content.is_empty() {
+            return None;
         }
 
-        None
+        let mut last_object: Option<Object> = None;
+        for obj in self.base.content.iter().rev() {
+            last_object = Some(obj.clone());
+
+            if Self::is_terminal_newline(obj) {
+                continue;
+            }
+
+            break;
+        }
+
+        if let Some(last_weave) = last_object
+            .as_ref()
+            .filter(|obj| obj.kind == ObjectKind::Weave)
+        {
+            let mut nested = Weave::new(last_weave.content.clone(), -1);
+            return nested.get_lastParsedSignificantObject();
+        }
+
+        last_object
+    }
+
+    fn is_terminal_newline(obj: &Object) -> bool {
+        obj.get_runtimeObject()
+            .and_then(|runtime| runtime.get_content().last())
+            .is_some_and(|content| {
+                matches!(
+                    content,
+                    ink_runtime::Container::ContentItem::Value(ink_runtime::Value::Value::String(
+                        string_value
+                    )) if string_value.value == "\n"
+                )
+            })
     }
 }
 
@@ -240,6 +260,8 @@ impl Weave {
 mod tests {
     use super::Weave;
     use crate::ParsedHierarchy::Object::{Object, ObjectKind};
+    use ink_runtime::Container::Container;
+    use ink_runtime::Value::StringValue;
 
     #[test]
     fn determine_base_indentation_uses_first_weave_point() {
@@ -273,5 +295,28 @@ mod tests {
             .content
             .iter()
             .any(|obj| obj.kind == ObjectKind::Weave));
+    }
+
+    #[test]
+    fn last_significant_object_skips_terminal_newline_runtime_content() {
+        let mut normal = Object::with_kind(ObjectKind::Plain);
+        let mut normal_runtime = Container::new();
+        normal_runtime.AddContent(StringValue::new("hello".to_string()));
+        normal.set_runtimeObject(Some(normal_runtime));
+
+        let mut newline = Object::with_kind(ObjectKind::Plain);
+        let mut newline_runtime = Container::new();
+        newline_runtime.AddContent(StringValue::new("\n".to_string()));
+        newline.set_runtimeObject(Some(newline_runtime));
+
+        let mut weave = Weave::new(vec![normal.clone(), newline], -1);
+
+        assert_eq!(
+            weave
+                .get_lastParsedSignificantObject()
+                .as_ref()
+                .map(|obj| obj.get_typeName()),
+            Some(normal.get_typeName())
+        );
     }
 }
