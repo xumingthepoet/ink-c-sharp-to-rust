@@ -388,18 +388,18 @@ impl Container {
     // C# signature: public void BuildStringOfHierarchy(StringBuilder sb, int indentation, Runtime.Object pointedObj)
     pub fn BuildStringOfHierarchy(
         &mut self,
-        mut sb: crate::stub::StringBuilder,
+        mut sb: crate::StringBuilder::StringBuilder,
         indentation: i32,
         pointedPath: Option<Path>,
     ) {
-        fn append_indentation(sb: &mut crate::stub::StringBuilder, indentation: i32) {
+        fn append_indentation(sb: &mut crate::StringBuilder::StringBuilder, indentation: i32) {
             for _ in 0..(indentation.max(0) as usize * 4) {
                 sb.AppendChar(' ');
             }
         }
 
         fn append_content(
-            sb: &mut crate::stub::StringBuilder,
+            sb: &mut crate::StringBuilder::StringBuilder,
             indentation: i32,
             content: &ContentItem,
             pointedPath: &Option<Path>,
@@ -523,7 +523,7 @@ impl Container {
 
     // C# signature: public virtual string BuildStringOfHierarchy()
     pub fn BuildStringOfHierarchy_overload_2(&mut self) -> String {
-        let sb = crate::stub::StringBuilder::new();
+        let sb = crate::StringBuilder::StringBuilder::new();
         self.BuildStringOfHierarchy(sb.clone(), 0, None);
         sb.ToString()
     }

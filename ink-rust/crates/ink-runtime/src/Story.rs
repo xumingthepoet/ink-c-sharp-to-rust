@@ -1,6 +1,5 @@
 // Source: ink-c-sharp/ink-engine-runtime/Story.cs
 
-use crate::stub::*;
 use crate::Choice::Choice;
 use crate::ChoicePoint::ChoicePoint;
 use crate::Container::{Container, ContentItem};
@@ -26,6 +25,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
+
+pub type ExternalFunction = Arc<dyn Fn(&[ValueInput]) -> Option<Value> + Send + Sync>;
 
 #[derive(Default)]
 pub struct Story {
@@ -154,7 +155,7 @@ impl Default for OutputStateChange {
 
 #[derive(Clone, Default)]
 pub struct ExternalFunctionDef {
-    pub function: Option<crate::stub::ExternalFunction>,
+    pub function: Option<ExternalFunction>,
     pub lookaheadSafe: bool,
 }
 
@@ -642,7 +643,7 @@ impl Story {
     pub fn TryGetExternalFunction(
         &mut self,
         functionName: String,
-        externalFunction: &mut crate::stub::ExternalFunction,
+        externalFunction: &mut ExternalFunction,
     ) -> bool {
         if let Some(externalFunctionDef) = self._externals.get(&functionName) {
             if let Some(function) = &externalFunctionDef.function {
@@ -677,11 +678,11 @@ impl Story {
                 return;
             }
 
-            let mut arguments = Vec::new();
+            let mut arguments: Vec<ValueInput> = Vec::new();
             for _ in 0..numberOfArguments {
                 let popped = state.PopEvaluationStack();
                 if let crate::Container::ContentItem::Value(value) = popped {
-                    arguments.push(value);
+                    arguments.push(value.value_object());
                 }
             }
             arguments.reverse();
@@ -709,7 +710,7 @@ impl Story {
     pub fn BindExternalFunctionGeneral(
         &mut self,
         funcName: String,
-        func: crate::stub::ExternalFunction,
+        func: ExternalFunction,
         lookaheadSafe: bool,
     ) {
         self.IfAsyncWeCant("bind an external function");
@@ -731,7 +732,7 @@ impl Story {
     pub fn BindExternalFunction(
         &mut self,
         funcName: String,
-        func: crate::stub::ExternalFunction,
+        func: ExternalFunction,
         lookaheadSafe: bool,
     ) {
         self.BindExternalFunctionGeneral(funcName, func, lookaheadSafe);
@@ -741,7 +742,7 @@ impl Story {
     pub fn BindExternalFunction_overload_2(
         &mut self,
         funcName: String,
-        act: crate::stub::ExternalFunction,
+        act: ExternalFunction,
         lookaheadSafe: bool,
     ) {
         self.BindExternalFunctionGeneral(funcName, act, lookaheadSafe);
@@ -863,7 +864,7 @@ impl Story {
     // C# signature: public virtual string BuildStringOfHierarchy()
     pub fn BuildStringOfHierarchy(&mut self) -> String {
         let mut container = self.main_content_container_ref().clone();
-        let sb = crate::stub::StringBuilder::new();
+        let sb = crate::StringBuilder::StringBuilder::new();
         container.BuildStringOfHierarchy(
             sb.clone(),
             0,
