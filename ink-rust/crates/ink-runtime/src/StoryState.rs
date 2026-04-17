@@ -921,6 +921,50 @@ impl StoryState {
         self.currentFlow.currentChoices.clone()
     }
 
+    // C# signature: internal void AddGeneratedChoice(Choice choice)
+    pub fn AddGeneratedChoice(&mut self, choice: Choice) {
+        self.currentFlow.currentChoices.push(choice);
+    }
+
+    // C# signature: internal void ClearGeneratedChoices()
+    pub fn ClearGeneratedChoices(&mut self) {
+        self.currentFlow.currentChoices.clear();
+    }
+
+    // C# signature: internal void PushCallstack(PushPopType type, int externalEvaluationStackHeight = 0, int outputStreamLengthWithPushed = 0)
+    pub fn PushCallstack(
+        &mut self,
+        type_: crate::PushPop::PushPopType,
+        externalEvaluationStackHeight: i32,
+        outputStreamLengthWithPushed: i32,
+    ) {
+        self.currentFlow.callStack.Push(
+            type_,
+            externalEvaluationStackHeight,
+            outputStreamLengthWithPushed,
+        );
+    }
+
+    // C# signature: internal void SetCurrentThread(CallStack.Thread thread)
+    pub fn SetCurrentThread(&mut self, thread: crate::CallStack::Thread) {
+        self.currentFlow.callStack.set_currentThread(thread);
+    }
+
+    // C# signature: internal CallStack.Thread ForkThread()
+    pub fn ForkThread(&mut self) -> crate::CallStack::Thread {
+        self.currentFlow.callStack.ForkThread()
+    }
+
+    // C# signature: internal void PushThread()
+    pub fn PushThread(&mut self) {
+        self.currentFlow.callStack.PushThread();
+    }
+
+    // C# signature: internal void PopThread()
+    pub fn PopThread(&mut self) {
+        self.currentFlow.callStack.PopThread();
+    }
+
     pub fn get_currentErrors(&self) -> Vec<String> {
         self.currentErrors.clone().unwrap_or_default()
     }

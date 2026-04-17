@@ -11,7 +11,10 @@ check:
 	cargo check --workspace
 
 test: require-timeout
-	$(TIMEOUT) 5s cargo test --workspace
+	$(TIMEOUT) 5s cargo test -p ink-compiler
+	$(TIMEOUT) 5s cargo test -p ink-runtime
+	$(TIMEOUT) 5s cargo test -p ink-tests
+	$(TIMEOUT) 5s cargo test -p inklecate
 
 require-timeout:
 	@test -n "$(TIMEOUT)" || (echo "error: install timeout or gtimeout" >&2; exit 1)
