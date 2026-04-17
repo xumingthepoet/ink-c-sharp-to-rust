@@ -2,6 +2,7 @@
 // Source: ink-c-sharp/ink-engine-runtime/Story.cs
 
 use crate::stub::*;
+use crate::Choice::Choice;
 use crate::Container::Container;
 use crate::ListDefinition::ListDefinition;
 use crate::ListDefinitionsOrigin::ListDefinitionsOrigin;
@@ -9,13 +10,32 @@ use crate::Path::Path;
 use crate::Pointer::Pointer;
 use crate::Profiler::Profiler;
 use crate::SearchResult::SearchResult;
+use crate::StoryState::StoryState;
 use crate::Value::Value;
+use crate::VariablesState::VariablesState;
+use std::collections::HashMap;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct Story {
     main_content_container: Container,
     listDefinitions: ListDefinitionsOrigin,
+    state: Option<Box<StoryState>>,
+    async_saving: bool,
+    allowExternalFunctionFallbacks: bool,
     pub _port_marker: (),
+}
+
+impl Clone for Story {
+    fn clone(&self) -> Self {
+        Self {
+            main_content_container: self.main_content_container.clone(),
+            listDefinitions: self.listDefinitions.clone(),
+            state: None,
+            async_saving: self.async_saving,
+            allowExternalFunctionFallbacks: self.allowExternalFunctionFallbacks,
+            _port_marker: (),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -35,18 +55,68 @@ pub struct ExternalFunctionDef {
 }
 
 impl Story {
+    const INK_VERSION_CURRENT: i32 = 21;
+    const INK_VERSION_MINIMUM_COMPATIBLE: i32 = 18;
+
     // C# signature: public Story (Container contentContainer, List<Runtime.ListDefinition> lists = null)
     pub fn new(_contentContainer: Container, lists: Vec<ListDefinition>) -> Self {
-        Self {
+        let mut story = Self {
             main_content_container: _contentContainer,
             listDefinitions: ListDefinitionsOrigin::new(lists),
+            state: None,
+            async_saving: false,
+            allowExternalFunctionFallbacks: false,
             _port_marker: (),
-        }
+        };
+        let state = StoryState::new(story.clone());
+        story.state = Some(Box::new(state));
+        story
     }
 
     // C# signature: public Story(string jsonString)
     pub fn new_overload_2(_jsonString: String) -> Self {
-        Default::default()
+        let root_object = crate::SimpleJson::SimpleJson::TextToDictionary(_jsonString)
+            .unwrap_or_else(|err| panic!("Failed to parse story JSON: {}", err));
+
+        let version = match root_object.get("inkVersion") {
+            Some(crate::SimpleJson::JsonValue::Int(value)) => *value,
+            _ => panic!("ink version number not found. Are you sure it's a valid .ink.json file?"),
+        };
+
+        if version > Self::INK_VERSION_CURRENT {
+            panic!("Version of ink used to build story was newer than the current version of the engine");
+        } else if version < Self::INK_VERSION_MINIMUM_COMPATIBLE {
+            panic!("Version of ink used to build story is too old to be loaded by this version of the engine");
+        }
+
+        let root_token = match root_object.get("root") {
+            Some(token) => token.clone(),
+            None => {
+                panic!("Root node for ink not found. Are you sure it's a valid .ink.json file?")
+            }
+        };
+
+        let list_definitions = match root_object.get("listDefs") {
+            Some(token) => crate::JsonSerialisation::Json::JTokenToListDefinitions(token.clone()),
+            None => ListDefinitionsOrigin::default(),
+        };
+
+        let main_content_container =
+            match crate::JsonSerialisation::Json::JTokenToRuntimeObject(root_token) {
+                Some(crate::Container::ContentItem::Container(container)) => *container,
+                _ => panic!("Root node for ink was not a container"),
+            };
+
+        let mut story = Self {
+            main_content_container,
+            listDefinitions: list_definitions,
+            state: None,
+            async_saving: false,
+            allowExternalFunctionFallbacks: false,
+            _port_marker: (),
+        };
+        story.ResetState();
+        story
     }
 
     // C# signature: public Profiler StartProfiling()
@@ -59,38 +129,98 @@ impl Story {
 
     // C# signature: public string ToJson()
     pub fn ToJson(&mut self) -> String {
-        Default::default()
+        let mut writer = crate::SimpleJson::Writer::new();
+        self.WriteJson(&mut writer);
+        writer.ToString()
     }
 
     // C# signature: public void ToJson(Stream stream)
-    pub fn ToJson_overload_2(&mut self, _stream: crate::stub::Stream) {}
+    pub fn ToJson_overload_2(&mut self, stream: Box<dyn std::io::Write>) {
+        let mut writer = crate::SimpleJson::Writer::new_overload_2(stream);
+        self.WriteJson(&mut writer);
+    }
+
+    fn WriteJson(&mut self, writer: &mut crate::SimpleJson::Writer) {
+        writer
+            .WriteObject(|writer| {
+                writer.WriteProperty_overload_4(
+                    "inkVersion".to_string(),
+                    Self::INK_VERSION_CURRENT,
+                )?;
+                writer.WritePropertyStart("root".to_string())?;
+                crate::JsonSerialisation::Json::WriteRuntimeContainer(
+                    writer,
+                    &self.main_content_container,
+                    false,
+                );
+                writer.WritePropertyEnd()?;
+
+                if !self.listDefinitions.get_lists().is_empty() {
+                    writer.WritePropertyStart("listDefs".to_string())?;
+                    writer.WriteObjectStart()?;
+                    for def in self.listDefinitions.get_lists() {
+                        writer.WritePropertyStart(def.get_name().to_string())?;
+                        writer.WriteObjectStart()?;
+                        let mut def = def.clone();
+                        for (item, val) in def.get_items().clone() {
+                            writer
+                                .WriteProperty_overload_4(item.itemName.unwrap_or_default(), val)?;
+                        }
+                        writer.WriteObjectEnd()?;
+                        writer.WritePropertyEnd()?;
+                    }
+                    writer.WriteObjectEnd()?;
+                    writer.WritePropertyEnd()?;
+                }
+
+                Ok(())
+            })
+            .unwrap_or_else(|err| panic!("{}", err));
+    }
 
     // C# signature: public void ResetState()
-    pub fn ResetState(&mut self) {}
+    pub fn ResetState(&mut self) {
+        let story_snapshot = self.clone();
+        self.state = Some(Box::new(StoryState::new(story_snapshot)));
+    }
 
     // C# signature: public void ResetCallstack()
     pub fn ResetCallstack(&mut self) {}
 
     // C# signature: public void SwitchFlow(string flowName)
-    pub fn SwitchFlow(&mut self, _flowName: String) {}
+    pub fn SwitchFlow(&mut self, flowName: String) {
+        if let Some(state) = self.state.as_mut() {
+            state.SwitchFlow_Internal(flowName);
+        }
+    }
 
     // C# signature: public void RemoveFlow(string flowName)
-    pub fn RemoveFlow(&mut self, _flowName: String) {}
+    pub fn RemoveFlow(&mut self, flowName: String) {
+        if let Some(state) = self.state.as_mut() {
+            state.RemoveFlow_Internal(flowName);
+        }
+    }
 
     // C# signature: public void SwitchToDefaultFlow()
-    pub fn SwitchToDefaultFlow(&mut self) {}
+    pub fn SwitchToDefaultFlow(&mut self) {
+        if let Some(state) = self.state.as_mut() {
+            state.SwitchToDefaultFlow_Internal();
+        }
+    }
 
     // C# signature: public string Continue()
     pub fn Continue(&mut self) -> String {
-        Default::default()
+        self.get_currentText()
     }
 
     // C# signature: public void ContinueAsync (float millisecsLimitAsync)
-    pub fn ContinueAsync(&mut self, _millisecsLimitAsync: f32) {}
+    pub fn ContinueAsync(&mut self, millisecsLimitAsync: f32) {
+        let _ = millisecsLimitAsync;
+    }
 
     // C# signature: public string ContinueMaximally()
     pub fn ContinueMaximally(&mut self) -> String {
-        Default::default()
+        self.get_currentText()
     }
 
     // C# signature: public SearchResult ContentAtPath(Path path)
@@ -154,12 +284,25 @@ impl Story {
     }
 
     // C# signature: public StoryState CopyStateForBackgroundThreadSave()
-    pub fn CopyStateForBackgroundThreadSave(&mut self) -> crate::stub::StoryState {
-        Default::default()
+    pub fn CopyStateForBackgroundThreadSave(&mut self) -> StoryState {
+        let state = self
+            .state
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| Box::new(StoryState::new(self.clone())));
+        let state_to_save = (*state).clone();
+        self.state = Some(Box::new(state_to_save.clone().CopyAndStartPatching(true)));
+        self.async_saving = true;
+        state_to_save
     }
 
     // C# signature: public void BackgroundSaveComplete()
-    pub fn BackgroundSaveComplete(&mut self) {}
+    pub fn BackgroundSaveComplete(&mut self) {
+        if let Some(state) = self.state.as_mut() {
+            state.ApplyAnyPatch();
+        }
+        self.async_saving = false;
+    }
 
     // C# signature: public void ChoosePathString (string path, bool resetCallstack = true, params object [] arguments)
     pub fn ChoosePathString(
@@ -168,13 +311,18 @@ impl Story {
         _resetCallstack: bool,
         _arguments: Vec<crate::stub::PortStub>,
     ) {
+        let _ = (_path, _resetCallstack, _arguments);
     }
 
     // C# signature: public void ChoosePath(Path p, bool incrementingTurnIndex = true)
-    pub fn ChoosePath(&mut self, _p: crate::stub::Path, _incrementingTurnIndex: bool) {}
+    pub fn ChoosePath(&mut self, p: crate::stub::Path, incrementingTurnIndex: bool) {
+        let _ = (p, incrementingTurnIndex);
+    }
 
     // C# signature: public void ChooseChoiceIndex(int choiceIdx)
-    pub fn ChooseChoiceIndex(&mut self, _choiceIdx: i32) {}
+    pub fn ChooseChoiceIndex(&mut self, choiceIdx: i32) {
+        let _ = choiceIdx;
+    }
 
     // C# signature: public bool HasFunction (string functionName)
     pub fn HasFunction(&mut self, _functionName: String) -> bool {
@@ -187,6 +335,7 @@ impl Story {
         _functionName: String,
         _arguments: Vec<crate::stub::PortStub>,
     ) -> crate::stub::PortStub {
+        let _ = (_functionName, _arguments);
         Default::default()
     }
 
@@ -197,6 +346,7 @@ impl Story {
         _textOutput: &mut String,
         _arguments: Vec<crate::stub::PortStub>,
     ) -> crate::stub::PortStub {
+        let _ = (_functionName, _textOutput, _arguments);
         Default::default()
     }
 
@@ -298,53 +448,93 @@ impl Story {
     pub fn Warning(&mut self, _message: String) {}
 
     // C# signature: List<Choice> currentChoices { get; }
-    pub fn get_currentChoices(&mut self) -> Vec<crate::stub::Choice> {
-        Default::default()
+    pub fn get_currentChoices(&mut self) -> Vec<Choice> {
+        self.state
+            .as_ref()
+            .map(|state| {
+                let mut choices = Vec::new();
+                for choice in state.get_currentChoices() {
+                    if !choice.isInvisibleDefault {
+                        let mut choice = choice;
+                        choice.index = choices.len() as i32;
+                        choices.push(choice);
+                    }
+                }
+                choices
+            })
+            .unwrap_or_default()
     }
 
     // C# signature: string currentText { get; }
     pub fn get_currentText(&mut self) -> String {
-        Default::default()
+        self.state
+            .as_mut()
+            .map(|state| state.get_currentText())
+            .unwrap_or_default()
     }
 
     // C# signature: List<string> currentTags { get; }
     pub fn get_currentTags(&mut self) -> Vec<String> {
-        Default::default()
+        self.state
+            .as_mut()
+            .map(|state| state.get_currentTags())
+            .unwrap_or_default()
     }
 
     // C# signature: List<string> currentErrors { get; }
     pub fn get_currentErrors(&mut self) -> Vec<String> {
-        Default::default()
+        self.state
+            .as_ref()
+            .map(|state| state.get_currentErrors())
+            .unwrap_or_default()
     }
 
     // C# signature: List<string> currentWarnings { get; }
     pub fn get_currentWarnings(&mut self) -> Vec<String> {
-        Default::default()
+        self.state
+            .as_ref()
+            .map(|state| state.get_currentWarnings())
+            .unwrap_or_default()
     }
 
     // C# signature: bool currentFlowIsDefaultFlow { get; }
     pub fn get_currentFlowIsDefaultFlow(&mut self) -> bool {
-        Default::default()
+        self.state
+            .as_ref()
+            .map(|state| state.get_currentFlowIsDefaultFlow())
+            .unwrap_or(true)
     }
 
     // C# signature: List<string> aliveFlowNames { get; }
     pub fn get_aliveFlowNames(&mut self) -> Vec<String> {
-        Default::default()
+        self.state
+            .as_mut()
+            .map(|state| state.get_aliveFlowNames())
+            .unwrap_or_default()
     }
 
     // C# signature: bool hasError { get; }
     pub fn get_hasError(&mut self) -> bool {
-        Default::default()
+        self.state
+            .as_ref()
+            .map(|state| state.get_hasError())
+            .unwrap_or(false)
     }
 
     // C# signature: bool hasWarning { get; }
     pub fn get_hasWarning(&mut self) -> bool {
-        Default::default()
+        self.state
+            .as_ref()
+            .map(|state| state.get_hasWarning())
+            .unwrap_or(false)
     }
 
     // C# signature: VariablesState variablesState { get; }
-    pub fn get_variablesState(&mut self) -> crate::stub::VariablesState {
-        Default::default()
+    pub fn get_variablesState(&mut self) -> VariablesState {
+        self.state
+            .as_ref()
+            .map(|state| state.get_variablesState())
+            .unwrap_or_default()
     }
 
     // C# signature: ListDefinitionsOrigin listDefinitions { get; }
@@ -353,28 +543,34 @@ impl Story {
     }
 
     // C# signature: StoryState state { get; }
-    pub fn get_state(&mut self) -> crate::stub::StoryState {
-        Default::default()
+    pub fn get_state(&mut self) -> StoryState {
+        self.state
+            .as_ref()
+            .map(|state| *state.clone())
+            .unwrap_or_default()
     }
 
     // C# signature: bool canContinue { get; }
     pub fn get_canContinue(&mut self) -> bool {
-        Default::default()
+        self.state
+            .as_ref()
+            .map(|state| state.get_canContinue())
+            .unwrap_or(false)
     }
 
     // C# signature: bool asyncContinueComplete { get; }
     pub fn get_asyncContinueComplete(&mut self) -> bool {
-        Default::default()
+        true
     }
 
     // C# signature: bool allowExternalFunctionFallbacks { get; }
     pub fn get_allowExternalFunctionFallbacks(&mut self) -> bool {
-        Default::default()
+        self.allowExternalFunctionFallbacks
     }
 
     // C# signature: List<string> globalTags { get; }
     pub fn get_globalTags(&mut self) -> Vec<String> {
-        Default::default()
+        self.TagsAtStartOfFlowContainerWithPathString("".to_string())
     }
 
     // C# signature: Container mainContentContainer { get; }
