@@ -1,5 +1,6 @@
 // Source: ink-c-sharp/compiler/InkParser/InkParser.cs
 
+use crate::CharacterSet::CharacterSet;
 use crate::FileHandler::{DefaultFileHandler, IFileHandler};
 use crate::StringParser::StringParser::{ErrorHandler, StringParser};
 use ink_runtime::DebugMetadata::DebugMetadata;
@@ -138,8 +139,69 @@ impl InkParser {
         self.fileHandler.as_ref()
     }
 
+    pub fn clone_fileHandler(&self) -> Arc<dyn IFileHandler + Send + Sync> {
+        Arc::clone(&self.fileHandler)
+    }
+
+    pub fn ParseString(&mut self, str: String) -> Option<String> {
+        self.parser.ParseString(str)
+    }
+
+    pub fn ParseNewline(&mut self) -> Option<String> {
+        self.parser.ParseNewline()
+    }
+
+    pub fn ParseCharactersFromCharSet(
+        &mut self,
+        charSet: CharacterSet,
+        shouldIncludeChars: bool,
+        maxCount: i32,
+    ) -> Option<String> {
+        self.parser
+            .ParseCharactersFromCharSet(charSet, shouldIncludeChars, maxCount)
+    }
+
+    pub fn ParseCharactersFromString(&mut self, str: String, maxCount: i32) -> Option<String> {
+        self.parser.ParseCharactersFromString(str, maxCount)
+    }
+
+    pub fn ParseUntilCharactersFromString(&mut self, str: String) -> Option<String> {
+        self.parser.ParseUntilCharactersFromString(str, -1)
+    }
+
+    pub fn ParseUntilCharactersFromCharSet(
+        &mut self,
+        charSet: CharacterSet,
+        maxCount: i32,
+    ) -> Option<String> {
+        self.parser
+            .ParseUntilCharactersFromCharSet(charSet, maxCount)
+    }
+
+    pub fn get_endOfInput(&self) -> bool {
+        self.parser.get_endOfInput()
+    }
+
+    pub fn get_currentCharacter(&self) -> char {
+        self.parser.get_currentCharacter()
+    }
+
+    pub fn get_lineIndex(&self) -> i32 {
+        self.parser.lineIndex()
+    }
+
+    pub fn get_characterInLineIndex(&self) -> i32 {
+        self.parser.characterInLineIndex()
+    }
+
     pub fn get_externalErrorHandler(&self) -> Option<ErrorHandler> {
         self.externalErrorHandler.clone()
+    }
+
+    pub fn Error(&mut self, message: String) {
+        if let Some(handler) = &self.externalErrorHandler {
+            handler(message, 0, 0, false);
+        }
     }
 
     pub fn get_openFilenames(&self) -> &HashSet<String> {
@@ -156,6 +218,14 @@ impl InkParser {
 
     pub fn parser_mut(&mut self) -> &mut StringParser {
         &mut self.parser
+    }
+
+    pub fn AddOpenFilenameShared(&mut self, fullFilename: String) {
+        self.openFilenames.insert(fullFilename);
+    }
+
+    pub fn RemoveOpenFilenameShared(&mut self, fullFilename: String) {
+        self.openFilenames.remove(&fullFilename);
     }
 }
 

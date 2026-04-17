@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 23 | 6 | 35 |
-| Total | 98 | 57 | 6 | 35 |
+| Compiler | 64 | 24 | 9 | 31 |
+| Total | 98 | 58 | 9 | 31 |
 
 ## Runtime
 
@@ -85,12 +85,12 @@ Source area: `ink-c-sharp/compiler/`
 12. `ParsedHierarchy/Text.cs` (`deps=1`) [ported]
 13. `Plugins/Plugin.cs` (`deps=1`) [ported]
 14. `InkParser/CommentEliminator.cs` (`deps=2`) [ported]
-15. `InkParser/InkParser_AuthorWarning.cs` (`deps=2`)
+15. `InkParser/InkParser_AuthorWarning.cs` (`deps=2`) [partial: reason=the parser wrapper is real, but identifier-with-metadata parsing is still simplified; missing=IdentifierWithMetadata parity and exact TODO token handling; next=port identifier parsing into InkParser and reuse it here]
 16. `ParsedHierarchy/IncludedFile.cs` (`deps=2`) [ported]
 17. `ParsedHierarchy/Return.cs` (`deps=2`) [ported]
 18. `ParsedHierarchy/Wrap.cs` (`deps=2`) [ported]
-19. `InkParser/InkParser_Include.cs` (`deps=3`)
-20. `InkParser/InkParser_Whitespace.cs` (`deps=3`)
+19. `InkParser/InkParser_Include.cs` (`deps=3`) [partial: reason=include loading is wired, but root-parser recursion tracking and exact error recovery are simplified; missing=root-parser chained include semantics and full open-file bookkeeping parity; next=port the remaining parser hierarchy so include can match C# recursion behavior]
+20. `InkParser/InkParser_Whitespace.cs` (`deps=3`) [ported]
 21. `ParsedHierarchy/ContentList.cs` (`deps=3`)
 22. `ParsedHierarchy/FlowLevel.cs` (`deps=3`) [ported]
 23. `ParsedHierarchy/IWeavePoint.cs` (`deps=3`) [ported]
@@ -120,7 +120,7 @@ Source area: `ink-c-sharp/compiler/`
 47. `InkParser/InkParser_Sequences.cs` (`deps=8`)
 48. `ParsedHierarchy/Object.cs` (`deps=8`)
 49. `ParsedHierarchy/Path.cs` (`deps=8`) [partial: reason=path component storage and string formatting are real, but ancestry-based resolution still depends on the unported ParsedHierarchy.Object/FlowBase tree; missing=ResolveFromContext and child lookup through the parser hierarchy; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase]
-50. `InkParser/InkParser.cs` (`deps=9`)
+50. `InkParser/InkParser.cs` (`deps=9`) [partial: reason=the parser wrapper now delegates comment elimination, whitespace, include, and debug metadata, but the main Parse entry point and statement hierarchy are still unported; missing=full statement parsing and parsed-object tree construction; next=port InkParser statement/content rules and the remaining ParsedHierarchy tree]
 51. `ParsedHierarchy/FunctionCall.cs` (`deps=9`) [partial: reason=builtin name detection is now real, but proxy divert generation, native function generation, and special-case argument handling are still stubbed; missing=GenerateIntoContainer, ResolveReferences, and the runtime/linkage-backed properties; next=port the full function-call generation path]
 52. `ParsedHierarchy/VariableReference.cs` (`deps=9`) [partial: reason=constant and list-item recognition are now wired, but read-count resolution and full ancestry-based variable lookup still depend on the unported parser object tree; missing=read-count resolution, ResolveReferences parity, and runtime variable reference generation for the remaining cases; next=port ParsedHierarchy/Object and ParsedHierarchy/Path resolution]
 53. `InkParser/InkParser_Statements.cs` (`deps=10`)

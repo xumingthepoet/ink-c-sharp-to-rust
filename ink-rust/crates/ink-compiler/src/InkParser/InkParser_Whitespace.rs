@@ -1,55 +1,101 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/compiler/InkParser/InkParser_Whitespace.cs
 
-use crate::stub::*;
-
-#[derive(Clone, Debug, Default)]
-pub struct InkParser {
-    pub _port_marker: (),
-}
+use crate::CharacterSet::CharacterSet;
+use crate::InkParser::InkParser::InkParser;
 
 impl InkParser {
-    pub fn new() -> Self {
-        Self::default()
+    // Handles both newline and endOfFile
+    pub fn EndOfLine(&mut self) -> Option<()> {
+        self.Newline().or_else(|| self.EndOfFile())
     }
 
-    // C# signature: protected object EndOfLine()
-    pub fn EndOfLine(&mut self) -> crate::stub::PortStub {
-        Default::default()
+    // Allow whitespace before the actual newline
+    pub fn Newline(&mut self) -> Option<()> {
+        self.Whitespace();
+
+        if self.ParseNewline().is_some() {
+            Some(())
+        } else {
+            None
+        }
     }
 
-    // C# signature: protected object Newline()
-    pub fn Newline(&mut self) -> crate::stub::PortStub {
-        Default::default()
+    pub fn EndOfFile(&mut self) -> Option<()> {
+        self.Whitespace();
+
+        if !self.get_endOfInput() {
+            return None;
+        }
+
+        Some(())
     }
 
-    // C# signature: protected object EndOfFile()
-    pub fn EndOfFile(&mut self) -> crate::stub::PortStub {
-        Default::default()
+    // General purpose space, returns N-count newlines (fails if no newlines)
+    pub fn MultilineWhitespace(&mut self) -> Option<()> {
+        let mut seen_newline = false;
+        while self.Newline().is_some() {
+            seen_newline = true;
+        }
+
+        if seen_newline {
+            Some(())
+        } else {
+            None
+        }
     }
 
-    // C# signature: protected object MultilineWhitespace()
-    pub fn MultilineWhitespace(&mut self) -> crate::stub::PortStub {
-        Default::default()
+    pub fn Whitespace(&mut self) -> Option<()> {
+        if self
+            .ParseCharactersFromCharSet(CharacterSet::new_overload_2(" \t".to_string()), true, -1)
+            .is_some()
+        {
+            Some(())
+        } else {
+            None
+        }
     }
 
-    // C# signature: protected object Whitespace()
-    pub fn Whitespace(&mut self) -> crate::stub::PortStub {
-        Default::default()
+    pub fn Spaced<T, R>(
+        &mut self,
+        mut rule: R,
+    ) -> Box<dyn FnMut(&mut InkParser) -> Option<T> + 'static>
+    where
+        R: FnMut(&mut InkParser) -> Option<T> + 'static,
+        T: 'static,
+    {
+        Box::new(move |parser| {
+            parser.Whitespace();
+            let result = rule(parser)?;
+            parser.Whitespace();
+            Some(result)
+        })
     }
 
-    // C# signature: protected ParseRule Spaced(ParseRule rule)
-    pub fn Spaced(&mut self, _rule: crate::stub::ParseRule) -> crate::stub::ParseRule {
-        Default::default()
+    pub fn AnyWhitespace(&mut self) -> Option<()> {
+        let mut any_whitespace = false;
+        while self.Whitespace().is_some() || self.MultilineWhitespace().is_some() {
+            any_whitespace = true;
+        }
+        if any_whitespace {
+            Some(())
+        } else {
+            None
+        }
     }
 
-    // C# signature: protected object AnyWhitespace ()
-    pub fn AnyWhitespace(&mut self) -> crate::stub::PortStub {
-        Default::default()
-    }
-
-    // C# signature: protected ParseRule MultiSpaced (ParseRule rule)
-    pub fn MultiSpaced(&mut self, _rule: crate::stub::ParseRule) -> crate::stub::ParseRule {
-        Default::default()
+    pub fn MultiSpaced<T, R>(
+        &mut self,
+        mut rule: R,
+    ) -> Box<dyn FnMut(&mut InkParser) -> Option<T> + 'static>
+    where
+        R: FnMut(&mut InkParser) -> Option<T> + 'static,
+        T: 'static,
+    {
+        Box::new(move |parser| {
+            parser.AnyWhitespace();
+            let result = rule(parser)?;
+            parser.AnyWhitespace();
+            Some(result)
+        })
     }
 }
