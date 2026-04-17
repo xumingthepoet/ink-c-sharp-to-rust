@@ -1,26 +1,67 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/compiler/ParsedHierarchy/Stitch.cs
 
-use crate::stub::*;
+use crate::ParsedHierarchy::FlowBase::FlowBase;
+use crate::ParsedHierarchy::FlowLevel::FlowLevel;
+use crate::ParsedHierarchy::Identifier::Identifier;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Stitch {
-    pub _port_marker: (),
+    base: FlowBase,
 }
 
 impl Stitch {
     // C# signature: public Stitch (Identifier name, List<Parsed.Object> topLevelObjects, List<Argument> arguments, bool isFunction)
     pub fn new(
-        _name: crate::stub::Identifier,
-        _topLevelObjects: Vec<crate::stub::PortStub>,
-        _arguments: Vec<crate::stub::Argument>,
-        _isFunction: bool,
+        name: Identifier,
+        topLevelObjects: Vec<crate::ParsedHierarchy::Object::Object>,
+        arguments: Vec<crate::ParsedHierarchy::FlowBase::Argument>,
+        isFunction: bool,
     ) -> Self {
-        Default::default()
+        let mut base = FlowBase::new(name, topLevelObjects, arguments, isFunction, false);
+        base.set_flowLevel(FlowLevel::Stitch);
+        Self { base }
     }
 
-    // C# signature: FlowLevel flowLevel { get; }
-    pub fn get_flowLevel(&mut self) -> crate::stub::FlowLevel {
-        Default::default()
+    pub fn get_flowLevel(&self) -> FlowLevel {
+        FlowLevel::Stitch
+    }
+
+    pub fn get_name(&self) -> Option<&str> {
+        self.base.get_name()
+    }
+
+    pub fn get_identifier(&self) -> Option<&Identifier> {
+        self.base.get_identifier()
+    }
+
+    pub fn get_base(&self) -> &FlowBase {
+        &self.base
+    }
+
+    pub fn get_base_mut(&mut self) -> &mut FlowBase {
+        &mut self.base
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Stitch;
+    use crate::ParsedHierarchy::FlowLevel::FlowLevel;
+    use crate::ParsedHierarchy::Identifier::Identifier;
+
+    #[test]
+    fn stitch_reports_flow_level_and_name() {
+        let stitch = Stitch::new(
+            Identifier {
+                name: Some("scene".to_string()),
+                debugMetadata: None,
+            },
+            vec![],
+            vec![],
+            false,
+        );
+
+        assert_eq!(stitch.get_flowLevel(), FlowLevel::Stitch);
+        assert_eq!(stitch.get_name(), Some("scene"));
     }
 }

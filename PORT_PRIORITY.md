@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 30 | 19 | 15 |
-| Total | 98 | 64 | 19 | 15 |
+| Compiler | 64 | 30 | 21 | 13 |
+| Total | 98 | 64 | 21 | 13 |
 
 ## Runtime
 
@@ -50,10 +50,10 @@ Source area: `ink-c-sharp/compiler/`
 18. `ParsedHierarchy/Conditional.cs` (`deps=5`)
 19. `ParsedHierarchy/Gather.cs` (`deps=5`) [partial: content tree handling is still waiting on Parsed.Object/FlowBase/ContentList porting]
 20. `ParsedHierarchy/ListDefinition.cs` (`deps=5`) [ported]
-21. `ParsedHierarchy/Stitch.cs` (`deps=5`)
+21. `ParsedHierarchy/Stitch.cs` (`deps=5`) [partial: thin flow wrapper is real, but full story-owned subflow resolution and knot/stitch cross-name collision parity still depend on the remaining flow-tree structure]
 22. `ParsedHierarchy/Sequence.cs` (`deps=6`)
 23. `ParsedHierarchy/ConditionalSingleBranch.cs` (`deps=7`)
-24. `ParsedHierarchy/Knot.cs` (`deps=7`)
+24. `ParsedHierarchy/Knot.cs` (`deps=7`) [partial: thin flow wrapper is real, but knot/stitch ownership and cross-name collision behavior still depend on the remaining flow-tree hierarchy]
 25. `ParsedHierarchy/VariableAssignment.cs` (`deps=7`) [partial: list-definition backref is not yet modeled with the C# ownership cycle, and variable resolution is still using a reduced Story-side lookup until FlowBase/Object are ported]
 26. `ParsedHierarchy/Object.cs` (`deps=8`) [partial: reason=the shared parsed-object base now tracks ancestry, identifiers, and runtime storage, but it is not yet wired into the concrete parsed node types or the story-root ownership model; missing=concrete node inheritance/composition wiring and full Story-root lookup; next=port ParsedHierarchy/Story and the remaining flow-tree nodes onto this base]
 27. `ParsedHierarchy/Path.cs` (`deps=8`) [partial: reason=path component storage and string formatting are real, but ancestry-based resolution still depends on the unported ParsedHierarchy.Object/FlowBase tree; missing=ResolveFromContext and child lookup through the parser hierarchy; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase]

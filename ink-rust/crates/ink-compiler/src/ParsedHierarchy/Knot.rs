@@ -1,29 +1,77 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/compiler/ParsedHierarchy/Knot.cs
 
-use crate::stub::*;
+use crate::ParsedHierarchy::FlowBase::FlowBase;
+use crate::ParsedHierarchy::FlowLevel::FlowLevel;
+use crate::ParsedHierarchy::Identifier::Identifier;
+use crate::ParsedHierarchy::Story::Story;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Knot {
-    pub _port_marker: (),
+    base: FlowBase,
 }
 
 impl Knot {
     // C# signature: public Knot (Identifier name, List<Parsed.Object> topLevelObjects, List<Argument> arguments, bool isFunction)
     pub fn new(
-        _name: crate::stub::Identifier,
-        _topLevelObjects: Vec<crate::stub::PortStub>,
-        _arguments: Vec<crate::stub::Argument>,
-        _isFunction: bool,
+        name: Identifier,
+        topLevelObjects: Vec<crate::ParsedHierarchy::Object::Object>,
+        arguments: Vec<crate::ParsedHierarchy::FlowBase::Argument>,
+        isFunction: bool,
     ) -> Self {
-        Default::default()
+        let mut base = FlowBase::new(name, topLevelObjects, arguments, isFunction, false);
+        base.set_flowLevel(FlowLevel::Knot);
+        Self { base }
     }
 
-    // C# signature: public override void ResolveReferences (Story context)
-    pub fn ResolveReferences(&mut self, _context: crate::stub::Story) {}
+    pub fn ResolveReferences(&mut self, context: &mut Story) {
+        self.base.ResolveReferences(context);
+    }
 
-    // C# signature: FlowLevel flowLevel { get; }
-    pub fn get_flowLevel(&mut self) -> crate::stub::FlowLevel {
-        Default::default()
+    pub fn GenerateRuntimeObject(&mut self) -> ink_runtime::Container::Container {
+        self.base.GenerateRuntimeObject()
+    }
+
+    pub fn get_flowLevel(&self) -> FlowLevel {
+        FlowLevel::Knot
+    }
+
+    pub fn get_name(&self) -> Option<&str> {
+        self.base.get_name()
+    }
+
+    pub fn get_identifier(&self) -> Option<&Identifier> {
+        self.base.get_identifier()
+    }
+
+    pub fn get_base(&self) -> &FlowBase {
+        &self.base
+    }
+
+    pub fn get_base_mut(&mut self) -> &mut FlowBase {
+        &mut self.base
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Knot;
+    use crate::ParsedHierarchy::FlowBase::Argument;
+    use crate::ParsedHierarchy::FlowLevel::FlowLevel;
+    use crate::ParsedHierarchy::Identifier::Identifier;
+
+    #[test]
+    fn knot_reports_flow_level_and_name() {
+        let knot = Knot::new(
+            Identifier {
+                name: Some("intro".to_string()),
+                debugMetadata: None,
+            },
+            vec![],
+            vec![Argument::default()],
+            false,
+        );
+
+        assert_eq!(knot.get_flowLevel(), FlowLevel::Knot);
+        assert_eq!(knot.get_name(), Some("intro"));
     }
 }
