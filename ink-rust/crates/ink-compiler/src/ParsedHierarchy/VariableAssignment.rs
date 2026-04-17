@@ -68,6 +68,13 @@ impl VariableAssignment {
 
     // C# signature: public override void ResolveReferences (Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
+        if self.listDefinition.is_some() {
+            let self_clone = self.clone();
+            if let Some(list_definition) = &mut self.listDefinition {
+                list_definition.variableAssignment = Some(self_clone);
+            }
+        }
+
         if self.isDeclaration() && self.listDefinition.is_none() {
             context.CheckForNamingCollisions(
                 Default::default(),
@@ -200,10 +207,12 @@ impl VariableAssignment {
 
 #[cfg(test)]
 mod tests {
-    use super::VariableAssignment;
+    use super::{ListDefinition, VariableAssignment};
     use crate::ParsedHierarchy::Expression::{Expression, ExpressionKind};
     use crate::ParsedHierarchy::Identifier::Identifier;
+    use crate::ParsedHierarchy::ListDefinition::ListElementDefinition;
     use crate::ParsedHierarchy::Number::{Number, NumberValue};
+    use crate::ParsedHierarchy::Story::Story;
 
     #[test]
     fn declares_variable_and_reports_type_name() {
@@ -217,5 +226,50 @@ mod tests {
         let assignment = VariableAssignment::new(identifier, expression);
         assert_eq!(assignment.get_variableName(), "score");
         assert_eq!(assignment.get_typeName(), "variable assignment");
+    }
+
+    #[test]
+    fn resolve_references_threads_list_backref() {
+        let list_definition = ListDefinition::new(vec![ListElementDefinition::new(
+            Identifier {
+                name: Some("item".to_string()),
+                debugMetadata: None,
+            },
+            true,
+            None,
+        )]);
+
+        let mut assignment = VariableAssignment::new_overload_2(
+            Identifier {
+                name: Some("food".to_string()),
+                debugMetadata: None,
+            },
+            list_definition,
+        );
+
+        let mut story = Story::new(vec![], false);
+        let mut registry_list = ListDefinition::new(vec![ListElementDefinition::new(
+            Identifier {
+                name: Some("item".to_string()),
+                debugMetadata: None,
+            },
+            true,
+            None,
+        )]);
+        registry_list.identifier = Some(Identifier {
+            name: Some("food".to_string()),
+            debugMetadata: None,
+        });
+        story.register_list_definition(registry_list);
+
+        assignment.ResolveReferences(&mut story);
+
+        let backref = assignment
+            .get_listDefinition()
+            .unwrap()
+            .variableAssignment
+            .as_ref();
+        assert!(backref.is_some());
+        assert_eq!(backref.unwrap().get_variableName(), "food");
     }
 }

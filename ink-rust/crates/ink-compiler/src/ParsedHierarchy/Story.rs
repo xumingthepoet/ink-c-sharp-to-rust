@@ -311,11 +311,21 @@ impl Story {
                     || self.externals.contains_key(&name)
                     || FunctionCall::IsBuiltIn(name.clone())
                 {
-                    self.Error(
-                        format!("name '{}' has already been used", name),
-                        Default::default(),
-                        false,
-                    );
+                    let is_owning_variable_assignment = self.listDefs.values().any(|list_def| {
+                        list_def
+                            .variableAssignment
+                            .as_ref()
+                            .map(|assignment| assignment.get_variableName() == name)
+                            .unwrap_or(false)
+                    });
+
+                    if !is_owning_variable_assignment {
+                        self.Error(
+                            format!("name '{}' has already been used", name),
+                            Default::default(),
+                            false,
+                        );
+                    }
                 }
 
                 for list_def in self.listDefs.values() {
@@ -337,10 +347,19 @@ impl Story {
             | SymbolType::Knot
             | SymbolType::SubFlowAndWeave
             | SymbolType::ListItem => {
-                if self.constants.contains_key(&name)
+                let is_owning_variable_assignment = self.listDefs.values().any(|list_def| {
+                    list_def
+                        .variableAssignment
+                        .as_ref()
+                        .map(|assignment| assignment.get_variableName() == name)
+                        .unwrap_or(false)
+                });
+
+                if (self.constants.contains_key(&name)
                     || self.listDefs.contains_key(&name)
                     || self.externals.contains_key(&name)
-                    || FunctionCall::IsBuiltIn(name.clone())
+                    || FunctionCall::IsBuiltIn(name.clone()))
+                    && !is_owning_variable_assignment
                 {
                     self.Error(
                         format!("name '{}' has already been used", name),
