@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 26 | 15 | 23 |
-| Total | 98 | 60 | 15 | 23 |
+| Compiler | 64 | 26 | 16 | 22 |
+| Total | 98 | 60 | 16 | 22 |
 
 ## Runtime
 
@@ -48,7 +48,7 @@ Source area: `ink-c-sharp/compiler/`
 16. `ParsedHierarchy/StringExpression.cs` (`deps=4`) [ported]
 17. `ParsedHierarchy/TunnelOnwards.cs` (`deps=4`) [partial: tunnel target resolution still depends on Parsed.Object ancestry and FlowBase/path resolution]
 18. `ParsedHierarchy/Conditional.cs` (`deps=5`)
-19. `ParsedHierarchy/Gather.cs` (`deps=5`)
+19. `ParsedHierarchy/Gather.cs` (`deps=5`) [partial: content tree handling is still waiting on Parsed.Object/FlowBase/ContentList porting]
 20. `ParsedHierarchy/ListDefinition.cs` (`deps=5`) [ported]
 21. `ParsedHierarchy/Stitch.cs` (`deps=5`)
 22. `ParsedHierarchy/Sequence.cs` (`deps=6`)
