@@ -3,6 +3,7 @@
 use crate::ParsedHierarchy::Expression::Expression;
 use crate::ParsedHierarchy::Object::Object;
 use crate::ParsedHierarchy::Story::Story;
+use crate::ParsedHierarchy::Weave::Weave;
 use ink_runtime::Container::{Container as RuntimeContainer, ContentItem};
 use ink_runtime::ControlCommand::ControlCommand;
 use ink_runtime::Divert::Divert as RuntimeDivert;
@@ -119,13 +120,14 @@ impl ConditionalSingleBranch {
     }
 
     fn GenerateRuntimeForContent(&mut self) -> RuntimeContainer {
-        let mut content_container = RuntimeContainer::new();
-        for obj in &mut self.base.content {
-            if let Some(runtime_object) = obj.get_runtimeObject().cloned() {
-                content_container.AddContent(runtime_object);
-            }
+        if self.base.content.is_empty() {
+            return RuntimeContainer::new();
         }
-        content_container
+
+        let mut weave = Weave::new(self.base.content.clone(), -1);
+        weave
+            .get_rootContainer()
+            .unwrap_or_else(RuntimeContainer::new)
     }
 
     // C# signature: public override void ResolveReferences (Story context)

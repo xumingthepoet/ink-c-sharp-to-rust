@@ -189,9 +189,15 @@ impl Choice {
 
     // C# signature: public override void ResolveReferences(Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
-        if let Some(inner) = &self.innerContentContainer {
+        if let Some(inner) = &mut self.innerContentContainer {
             if let Some(choice) = self.runtimeChoice.as_mut() {
                 choice.set_pathStringOnChoice(inner.get_path().ToString());
+            }
+
+            if context.countAllVisits {
+                inner.set_countFlags(
+                    (CountFlags::Visits as i32) | (CountFlags::CountStartOnly as i32),
+                );
             }
         }
 
