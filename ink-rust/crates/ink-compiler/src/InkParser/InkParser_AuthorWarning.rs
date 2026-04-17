@@ -7,7 +7,7 @@ impl InkParser {
     pub fn AuthorWarning(&mut self) -> Option<AuthorWarning> {
         self.Whitespace();
 
-        let identifier = self.ParseIdentifierWithMetadata()?;
+        let identifier = self.IdentifierWithMetadata()?;
         if identifier.name.as_deref() != Some("TODO") {
             return None;
         }
@@ -21,15 +21,5 @@ impl InkParser {
             .unwrap_or_default();
 
         Some(AuthorWarning::new(message))
-    }
-
-    fn ParseIdentifierWithMetadata(
-        &mut self,
-    ) -> Option<crate::ParsedHierarchy::Identifier::Identifier> {
-        let parsed = self.ParseUntilCharactersFromString(":".to_string())?;
-        Some(crate::ParsedHierarchy::Identifier::Identifier {
-            name: Some(parsed.trim().to_string()),
-            debugMetadata: None,
-        })
     }
 }

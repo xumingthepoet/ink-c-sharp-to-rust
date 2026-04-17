@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 24 | 9 | 31 |
-| Total | 98 | 58 | 9 | 31 |
+| Compiler | 64 | 25 | 9 | 30 |
+| Total | 98 | 59 | 9 | 30 |
 
 ## Runtime
 
@@ -79,7 +79,7 @@ Source area: `ink-c-sharp/compiler/`
 6. `CharacterRange.cs` (`deps=1`) [ported]
 7. `FileHandler.cs` (`deps=1`) [ported]
 8. `InkStringConversionExtensions.cs` (`deps=1`) [ported]
-9. `ParsedHierarchy/AuthorWarning.cs` (`deps=1`) [partial: reason=Parsed.Object warning plumbing is not ported; missing=GenerateRuntimeObject must call Warning(warningMessage); next=port ParsedHierarchy/Object error-warning context]
+9. `ParsedHierarchy/AuthorWarning.cs` (`deps=1`) [ported]
 10. `ParsedHierarchy/Number.cs` (`deps=1`) [ported]
 11. `ParsedHierarchy/Tag.cs` (`deps=1`) [ported]
 12. `ParsedHierarchy/Text.cs` (`deps=1`) [ported]
@@ -121,21 +121,20 @@ Source area: `ink-c-sharp/compiler/`
 48. `ParsedHierarchy/Object.cs` (`deps=8`)
 49. `ParsedHierarchy/Path.cs` (`deps=8`) [partial: reason=path component storage and string formatting are real, but ancestry-based resolution still depends on the unported ParsedHierarchy.Object/FlowBase tree; missing=ResolveFromContext and child lookup through the parser hierarchy; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase]
 50. `InkParser/InkParser.cs` (`deps=9`) [partial: reason=the parser wrapper now delegates comment elimination, whitespace, include, and debug metadata, but the main Parse entry point and statement hierarchy are still unported; missing=full statement parsing and parsed-object tree construction; next=port InkParser statement/content rules and the remaining ParsedHierarchy tree]
-51. `ParsedHierarchy/FunctionCall.cs` (`deps=9`) [partial: reason=builtin name detection is now real, but proxy divert generation, native function generation, and special-case argument handling are still stubbed; missing=GenerateIntoContainer, ResolveReferences, and the runtime/linkage-backed properties; next=port the full function-call generation path]
-52. `ParsedHierarchy/VariableReference.cs` (`deps=9`) [partial: reason=constant and list-item recognition are now wired, but read-count resolution and full ancestry-based variable lookup still depend on the unported parser object tree; missing=read-count resolution, ResolveReferences parity, and runtime variable reference generation for the remaining cases; next=port ParsedHierarchy/Object and ParsedHierarchy/Path resolution]
-53. `InkParser/InkParser_Statements.cs` (`deps=10`)
-54. `ParsedHierarchy/Divert.cs` (`deps=10`) [partial: reason=runtime divert generation and stack/argument packaging are real, but target-content resolution, reference validation, and ancestry-based path lookup still depend on the unported parser object tree; missing=ResolveReferences parity, targetContent resolution, and argument validity checks; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase or the remaining parser ancestry helpers]
-55. `ParsedHierarchy/DivertTarget.cs` (`deps=10`)
-56. `ParsedHierarchy/Expression.cs` (`deps=10`) [partial: reason=the wrapper now covers literal generation and recursive expression evaluation for the core AST forms, but the full upstream expression hierarchy still needs the remaining node variants and parser integrations; missing=FunctionCall/DivertTarget wiring and final parity for the expression node set; next=port the remaining expression-derived parser nodes and expand the wrapper variants]
-57. `Compiler.cs` (`deps=11`)
-58. `InkParser/InkParser_Knot.cs` (`deps=11`)
-59. `ParsedHierarchy/Choice.cs` (`deps=11`)
-60. `InkParser/InkParser_Expressions.cs` (`deps=15`)
-61. `ParsedHierarchy/FlowBase.cs` (`deps=16`)
-62. `ParsedHierarchy/Story.cs` (`deps=16`) [partial: reason=the parser-side story now handles symbol registration and list/external lookup, but top-level object processing, runtime export, and the full variable-resolution / weave-processing pipeline are still skeletons; missing=top-level AST traversal, runtime export, flattening, and variable resolution; next=port ParsedHierarchy/FlowBase, ParsedHierarchy/Object, and the remaining export pipeline]
-63. `ParsedHierarchy/Weave.cs` (`deps=16`)
-64. `InkParser/InkParser_Logic.cs` (`deps=19`)
-
+51. `InkParser/InkParser_Logic.cs` (`deps=9`) [partial: reason=identifier parsing is real, but the line/variable/list/inline logic parser family is still skeletal; missing=LogicLine, VariableDeclaration, List/Const declarations, inline logic, and expression helper parity; next=port the remaining InkParser logic and expression rules]
+52. `ParsedHierarchy/FunctionCall.cs` (`deps=9`) [partial: reason=builtin name detection is now real, but proxy divert generation, native function generation, and special-case argument handling are still stubbed; missing=GenerateIntoContainer, ResolveReferences, and the runtime/linkage-backed properties; next=port the full function-call generation path]
+53. `ParsedHierarchy/VariableReference.cs` (`deps=9`) [partial: reason=constant and list-item recognition are now wired, but read-count resolution and full ancestry-based variable lookup still depend on the unported parser object tree; missing=read-count resolution, ResolveReferences parity, and runtime variable reference generation for the remaining cases; next=port ParsedHierarchy/Object and ParsedHierarchy/Path resolution]
+54. `InkParser/InkParser_Statements.cs` (`deps=10`)
+55. `ParsedHierarchy/Divert.cs` (`deps=10`) [partial: reason=runtime divert generation and stack/argument packaging are real, but target-content resolution, reference validation, and ancestry-based path lookup still depend on the unported parser object tree; missing=ResolveReferences parity, targetContent resolution, and argument validity checks; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase or the remaining parser ancestry helpers]
+56. `ParsedHierarchy/DivertTarget.cs` (`deps=10`)
+57. `ParsedHierarchy/Expression.cs` (`deps=10`) [partial: reason=the wrapper now covers literal generation and recursive expression evaluation for the core AST forms, but the full upstream expression hierarchy still needs the remaining node variants and parser integrations; missing=FunctionCall/DivertTarget wiring and final parity for the expression node set; next=port the remaining expression-derived parser nodes and expand the wrapper variants]
+58. `Compiler.cs` (`deps=11`)
+59. `InkParser/InkParser_Knot.cs` (`deps=11`)
+60. `ParsedHierarchy/Choice.cs` (`deps=11`)
+61. `InkParser/InkParser_Expressions.cs` (`deps=15`)
+62. `ParsedHierarchy/FlowBase.cs` (`deps=16`)
+63. `ParsedHierarchy/Story.cs` (`deps=16`) [partial: reason=the parser-side story now handles symbol registration and list/external lookup, but top-level object processing, runtime export, and the full variable-resolution / weave-processing pipeline are still skeletons; missing=top-level AST traversal, runtime export, flattening, and variable resolution; next=port ParsedHierarchy/FlowBase, ParsedHierarchy/Object, and the remaining export pipeline]
+64. `ParsedHierarchy/Weave.cs` (`deps=16`)
 Recommended compiler implementation phases:
 
 - Phase C1: `CharacterSet.cs` through `Plugins/Plugin.cs`

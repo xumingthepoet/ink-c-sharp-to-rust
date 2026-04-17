@@ -178,6 +178,15 @@ impl InkParser {
             .ParseUntilCharactersFromCharSet(charSet, maxCount)
     }
 
+    pub fn ExtendIdentifierCharacterRanges(&mut self, identifierCharSet: &mut CharacterSet) {
+        for mut char_range in
+            crate::InkParser::InkParser_CharacterRanges::InkParser::ListAllCharacterRanges()
+        {
+            let character_set = char_range.ToCharacterSet();
+            identifierCharSet.AddCharacters(character_set.characters.iter().copied());
+        }
+    }
+
     pub fn get_endOfInput(&self) -> bool {
         self.parser.get_endOfInput()
     }
