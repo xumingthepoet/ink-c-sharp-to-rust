@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 28 | 14 | 22 |
-| Total | 98 | 62 | 14 | 22 |
+| Compiler | 64 | 28 | 15 | 21 |
+| Total | 98 | 62 | 15 | 21 |
 
 ## Runtime
 
@@ -39,7 +39,7 @@ Source area: `ink-c-sharp/compiler/`
 7. `ParsedHierarchy/IncludedFile.cs` (`deps=2`) [ported]
 8. `ParsedHierarchy/Return.cs` (`deps=2`) [ported]
 9. `ParsedHierarchy/Wrap.cs` (`deps=2`) [ported]
-10. `ParsedHierarchy/ContentList.cs` (`deps=3`)
+10. `ParsedHierarchy/ContentList.cs` (`deps=3`) [partial: content generation and whitespace trimming are ported, but dontFlatten still cannot notify Story.DontFlattenContainer because parsed-object ownership is not wired]
 11. `ParsedHierarchy/FlowLevel.cs` (`deps=3`) [ported]
 12. `ParsedHierarchy/IWeavePoint.cs` (`deps=3`) [ported]
 13. `ParsedHierarchy/List.cs` (`deps=3`) [ported]
