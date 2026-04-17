@@ -3,6 +3,7 @@
 use crate::ParsedHierarchy::FlowBase::FlowBase;
 use crate::ParsedHierarchy::FlowLevel::FlowLevel;
 use crate::ParsedHierarchy::Identifier::Identifier;
+use crate::ParsedHierarchy::Story::Story;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Stitch {
@@ -32,6 +33,14 @@ impl Stitch {
 
     pub fn get_identifier(&self) -> Option<&Identifier> {
         self.base.get_identifier()
+    }
+
+    pub fn ResolveReferences(&mut self, context: &mut Story) {
+        self.base.ResolveReferences(context);
+    }
+
+    pub fn GenerateRuntimeObject(&mut self) -> ink_runtime::Container::Container {
+        self.base.GenerateRuntimeObject()
     }
 
     pub fn get_base(&self) -> &FlowBase {

@@ -128,6 +128,7 @@ impl Story {
         self.CollectDeclarations();
 
         let mut content = std::mem::take(&mut self.content);
+        self.content = content.clone();
         for obj in &mut content {
             obj.ResolveReferences(self);
         }
@@ -140,7 +141,9 @@ impl Story {
         let mut rootContainer = Container::new();
         for obj in &mut content {
             if let Some(runtime_object) = obj.EnsureRuntimeObject() {
-                if runtime_object.get_hasValidName() {
+                if matches!(obj.kind, ObjectKind::Knot | ObjectKind::Stitch) {
+                    rootContainer.AddToNamedContentOnly(runtime_object);
+                } else if runtime_object.get_hasValidName() {
                     rootContainer.AddContent(runtime_object);
                 } else {
                     rootContainer.AddContentsOfContainer(runtime_object);
@@ -650,6 +653,7 @@ impl Story {
         flattened.set_debugMetadata(container.get_debugMetadata().cloned());
 
         for content in container.get_content().iter().cloned() {
+            let content = Self::detach_content_parent(content);
             match content {
                 ContentItem::Container(child) => {
                     let child_container = self.flatten_container(*child);
@@ -681,12 +685,24 @@ impl Story {
     }
 
     fn flatten_content_item(&self, content: ContentItem) -> ContentItem {
-        match content {
+        match Self::detach_content_parent(content) {
             ContentItem::Container(container) => {
                 ContentItem::Container(Box::new(self.flatten_container(*container)))
             }
             other => other,
         }
+    }
+
+    fn detach_content_parent(mut content: ContentItem) -> ContentItem {
+        match &mut content {
+            ContentItem::ChoicePoint(choice_point) => choice_point.set_parent(None),
+            ContentItem::Divert(divert) => divert.set_parent(None),
+            ContentItem::VariableReference(variable_reference) => {
+                variable_reference.set_parent(None)
+            }
+            _ => {}
+        }
+        content
     }
 
     fn newline_object() -> Object {

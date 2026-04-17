@@ -10,7 +10,9 @@ use crate::ParsedHierarchy::FlowLevel::FlowLevel;
 use crate::ParsedHierarchy::Gather::Gather;
 use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::IncludedFile::IncludedFile;
+use crate::ParsedHierarchy::Knot::Knot;
 use crate::ParsedHierarchy::Return::Return;
+use crate::ParsedHierarchy::Stitch::Stitch;
 use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
 use crate::ParsedHierarchy::Weave::Weave;
 use ink_runtime::Container::Container;
@@ -48,7 +50,9 @@ pub enum ObjectPayload {
     ExternalDeclaration(Box<ExternalDeclaration>),
     Gather(Box<Gather>),
     IncludedFile(Box<IncludedFile>),
+    Knot(Box<Knot>),
     Return(Box<Return>),
+    Stitch(Box<Stitch>),
     VariableAssignment(Box<VariableAssignment>),
     Weave(Box<Weave>),
 }
@@ -131,10 +135,8 @@ impl Object {
         object
     }
 
-    pub fn from_content_list(mut content_list: ContentList) -> Self {
-        let runtimeObject = Some(content_list.GenerateRuntimeObject());
+    pub fn from_content_list(content_list: ContentList) -> Self {
         let mut object = Object::with_kind(ObjectKind::Plain);
-        object.set_runtimeObject(runtimeObject);
         object.payload = Some(ObjectPayload::ContentList(Box::new(content_list)));
         object
     }
@@ -174,11 +176,38 @@ impl Object {
         object
     }
 
+    pub fn from_knot(knot: Knot) -> Self {
+        let mut object = Object::with_kind(ObjectKind::Knot);
+        object.isFunction = knot.get_base().get_isFunction();
+        object.set_identifier(knot.get_identifier().cloned());
+        object.content = knot.get_base().base.content.clone();
+        object.set_debugMetadata(
+            knot.get_identifier()
+                .and_then(|identifier| identifier.debugMetadata.clone()),
+        );
+        object.payload = Some(ObjectPayload::Knot(Box::new(knot)));
+        object
+    }
+
     pub fn from_return(returned: Return) -> Self {
         let runtimeObject = Some(returned.GenerateRuntimeObject());
         let mut object = Object::with_kind(ObjectKind::Plain);
         object.set_runtimeObject(runtimeObject);
         object.payload = Some(ObjectPayload::Return(Box::new(returned)));
+        object
+    }
+
+    pub fn from_stitch(stitch: Stitch) -> Self {
+        let mut object = Object::with_kind(ObjectKind::Stitch);
+        object.isFunction = stitch.get_base().get_isFunction();
+        object.set_identifier(stitch.get_identifier().cloned());
+        object.content = stitch.get_base().base.content.clone();
+        object.set_debugMetadata(
+            stitch
+                .get_identifier()
+                .and_then(|identifier| identifier.debugMetadata.clone()),
+        );
+        object.payload = Some(ObjectPayload::Stitch(Box::new(stitch)));
         object
     }
 
@@ -371,7 +400,9 @@ impl Object {
                 let _ = included.GenerateRuntimeObject();
                 None
             }
+            Some(ObjectPayload::Knot(knot)) => Some(knot.GenerateRuntimeObject()),
             Some(ObjectPayload::Return(returned)) => Some(returned.GenerateRuntimeObject()),
+            Some(ObjectPayload::Stitch(stitch)) => Some(stitch.GenerateRuntimeObject()),
             Some(ObjectPayload::VariableAssignment(assignment)) => assignment
                 .GenerateRuntimeObject()
                 .and_then(Self::container_from_content_item),
@@ -416,7 +447,15 @@ impl Object {
                 true
             }
             Some(ObjectPayload::IncludedFile(_)) => true,
+            Some(ObjectPayload::Knot(knot)) => {
+                knot.ResolveReferences(context);
+                true
+            }
             Some(ObjectPayload::Return(_)) => true,
+            Some(ObjectPayload::Stitch(stitch)) => {
+                stitch.ResolveReferences(context);
+                true
+            }
             Some(ObjectPayload::VariableAssignment(assignment)) => {
                 assignment.ResolveReferences(context);
                 true
@@ -669,8 +708,9 @@ mod tests {
     fn from_content_list_and_weave_preserves_runtime_object() {
         let content_list =
             ContentList::new(vec![ContentListItem::from(Text::new("x".to_string()))]);
-        let content_object = Object::from(content_list);
-        assert!(content_object.get_runtimeObject().is_some());
+        let mut content_object = Object::from(content_list);
+        assert!(content_object.get_runtimeObject().is_none());
+        assert!(content_object.EnsureRuntimeObject().is_some());
         assert_eq!(content_object.get_typeName(), "Object");
 
         let weave = Weave::new(vec![], -1);

@@ -19,6 +19,8 @@ pub struct Divert {
     pub isEmpty: bool,
     pub isTunnel: bool,
     pub isThread: bool,
+    resolvedTargetPathString: Option<String>,
+    resolvedVariableDivertName: Option<String>,
 }
 
 impl Divert {
@@ -49,13 +51,23 @@ impl Divert {
             return ContentItem::ControlCommand(ControlCommand::Done());
         }
 
-        self.runtimeDivert = Some(if self.isFunctionCall {
+        let mut runtime_divert = if self.isFunctionCall {
             RuntimeDivert::new_overload_2(PushPopType::Function)
         } else if self.isTunnel {
             RuntimeDivert::new_overload_2(PushPopType::Tunnel)
         } else {
             RuntimeDivert::new()
-        });
+        };
+
+        if let Some(target_path_string) = &self.resolvedTargetPathString {
+            runtime_divert.set_targetPathString(Some(target_path_string.clone()));
+        }
+
+        if let Some(variable_name) = &self.resolvedVariableDivertName {
+            runtime_divert.set_variableDivertName(Some(variable_name.clone()));
+        }
+
+        self.runtimeDivert = Some(runtime_divert);
 
         let mut container = RuntimeContainer::new();
         let needs_arg_codegen = !self.arguments.is_empty();
@@ -104,9 +116,15 @@ impl Divert {
         }
 
         if let Some(target_content) = &self.targetContent {
-            self.runtimeDivert
-                .get_or_insert_with(RuntimeDivert::new)
-                .set_targetPathString(Some(target_content.get_runtimePath().ToString()));
+            let runtime_path = target_content.get_runtimePath().ToString();
+            self.resolvedTargetPathString = if runtime_path.is_empty() {
+                target_content
+                    .identifier
+                    .as_ref()
+                    .and_then(|identifier| identifier.name.clone())
+            } else {
+                Some(runtime_path)
+            };
         }
 
         for argument in &mut self.arguments {
@@ -154,12 +172,20 @@ impl Divert {
             }
         }
 
-        if self
-            .runtimeDivert
-            .as_ref()
-            .and_then(|divert| divert.get_variableDivertName())
-            .is_some()
-        {
+        if self.resolvedVariableDivertName.is_some() {
+            return;
+        }
+
+        if !target_was_found {
+            if let Some(target_content) =
+                context.ContentWithNameAtLevel(target_name.clone(), None, true)
+            {
+                self.targetContent = Some(target_content);
+            }
+        }
+
+        if self.targetContent.is_some() {
+            self.resolvedTargetPathString = Some(target_path_string);
             return;
         }
 

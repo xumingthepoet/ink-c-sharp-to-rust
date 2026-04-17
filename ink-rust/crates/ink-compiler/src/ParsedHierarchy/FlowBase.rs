@@ -3,7 +3,7 @@
 use crate::ParsedHierarchy::FlowLevel::FlowLevel;
 use crate::ParsedHierarchy::Gather::Gather;
 use crate::ParsedHierarchy::Identifier::Identifier;
-use crate::ParsedHierarchy::Object::{Object, ObjectKind};
+use crate::ParsedHierarchy::Object::{Object, ObjectKind, ObjectPayload};
 use crate::ParsedHierarchy::Story::Story;
 use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
 use ink_runtime::Container::{Container, ContentItem};
@@ -170,6 +170,12 @@ impl FlowBase {
     }
 
     fn from_object(object: &Object) -> Self {
+        match object.payload.as_ref() {
+            Some(ObjectPayload::Knot(knot)) => return knot.get_base().clone(),
+            Some(ObjectPayload::Stitch(stitch)) => return stitch.get_base().clone(),
+            _ => {}
+        }
+
         let mut base = Object::with_kind(object.kind.clone());
         base.identifier = object.identifier.clone();
         base.indentationDepth = object.indentationDepth;
@@ -337,7 +343,7 @@ impl FlowBase {
         let has_parameters = self.get_hasParameters();
         for obj in &mut self.base.content {
             if matches!(obj.kind, ObjectKind::Knot | ObjectKind::Stitch) {
-                if let Some(runtime_object) = obj.get_runtimeObject().cloned() {
+                if let Some(runtime_object) = obj.EnsureRuntimeObject() {
                     if contentIdx == 0 && !has_parameters && self.flow_level == FlowLevel::Knot {
                         self.startingSubFlowDivert = Some(RuntimeDivert::new());
                         if let Some(divert) = self.startingSubFlowDivert.as_ref() {
@@ -534,10 +540,14 @@ impl FlowBase {
                 .map(|name| !name.is_empty())
                 .unwrap_or(false)
             {
+                let symbol_type = match self.flow_level {
+                    FlowLevel::Knot => crate::ParsedHierarchy::Story::SymbolType::Knot,
+                    _ => crate::ParsedHierarchy::Story::SymbolType::SubFlowAndWeave,
+                };
                 context.CheckForNamingCollisions(
                     Default::default(),
                     identifier.clone(),
-                    crate::ParsedHierarchy::Story::SymbolType::SubFlowAndWeave,
+                    symbol_type,
                     String::new(),
                 );
             }

@@ -28,4 +28,38 @@ mod tests {
         assert_eq!(output, "Hello world\n");
         assert!(!story.get_canContinue());
     }
+
+    #[test]
+    fn compiles_top_level_knot_as_named_content_without_auto_entering() {
+        let mut compiler = Compiler::new(
+            "== intro ==\nHello from knot\n".to_string(),
+            Options::default(),
+        );
+        let mut story = compiler
+            .Compile()
+            .expect("source compilation should succeed");
+
+        let output = story.Continue();
+        let root = story.get_mainContentContainer();
+
+        assert_eq!(output, "");
+        assert!(root.get_namedContent().contains_key("intro"));
+    }
+
+    #[test]
+    fn compiles_divert_to_top_level_knot_runtime_json() {
+        let mut compiler = Compiler::new(
+            "-> intro\n== intro ==\nHello from knot\n-> DONE\n".to_string(),
+            Options::default(),
+        );
+        let mut story = compiler
+            .Compile()
+            .expect("source compilation should succeed");
+
+        let json = story.ToJson();
+
+        assert!(json.contains(r#""->":"intro""#));
+        assert!(json.contains(r#""intro""#));
+        assert!(json.contains("Hello from knot"));
+    }
 }

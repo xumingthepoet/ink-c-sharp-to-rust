@@ -233,6 +233,8 @@ impl ContentList {
         for content in &mut self.content {
             match content {
                 ContentListItem::Expression(expression) => expression.ResolveReferences(context),
+                ContentListItem::Divert(divert) => divert.ResolveReferences(context),
+                ContentListItem::TunnelOnwards(tunnel) => tunnel.ResolveReferences(context),
                 ContentListItem::List(list) => list.ResolveReferences(context),
                 ContentListItem::VariableAssignment(variable_assignment) => {
                     variable_assignment.ResolveReferences(context)

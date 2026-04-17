@@ -8,8 +8,6 @@ use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::Knot::Knot;
 use crate::ParsedHierarchy::Object::{Object, ObjectKind};
 use crate::ParsedHierarchy::Stitch::Stitch;
-use ink_runtime::Container::Container;
-use ink_runtime::Container::ContentItem;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FlowDecl {
@@ -32,20 +30,13 @@ impl InkParser {
             .or_else(|| self.KnotStitchNoContentRecoveryRule())
             .unwrap_or_default();
 
-        let mut knot = Knot::new(
+        let knot = Knot::new(
             knotDecl.name.clone(),
-            content.clone(),
+            content,
             knotDecl.arguments.clone(),
             knotDecl.isFunction,
         );
-        let runtime_container = knot.GenerateRuntimeObject();
-        Some(Self::wrap_flow_object(
-            ObjectKind::Knot,
-            knot.get_name().map(|name| name.to_string()),
-            knot.get_base().base.content.clone(),
-            runtime_container,
-            knot.get_base().get_isFunction(),
-        ))
+        Some(Object::from_knot(knot))
     }
 
     // C# signature: protected FlowDecl KnotDeclaration()
@@ -117,20 +108,13 @@ impl InkParser {
             .or_else(|| self.KnotStitchNoContentRecoveryRule())
             .unwrap_or_default();
 
-        let mut stitch = Stitch::new(
+        let stitch = Stitch::new(
             decl.name.clone(),
-            content.clone(),
+            content,
             decl.arguments.clone(),
             decl.isFunction,
         );
-        let runtime_container = stitch.get_base_mut().GenerateRuntimeObject();
-        Some(Self::wrap_flow_object(
-            ObjectKind::Stitch,
-            stitch.get_name().map(|name| name.to_string()),
-            stitch.get_base().base.content.clone(),
-            runtime_container,
-            stitch.get_base().get_isFunction(),
-        ))
+        Some(Object::from_stitch(stitch))
     }
 
     // C# signature: protected FlowDecl StitchDeclaration()
@@ -296,22 +280,56 @@ impl InkParser {
             ),
         )
     }
+}
 
-    fn wrap_flow_object(
-        kind: ObjectKind,
-        name: Option<String>,
-        content: Vec<Object>,
-        runtime_container: Container,
-        isFunction: bool,
-    ) -> Object {
-        let mut obj = Object::with_kind(kind);
-        obj.isFunction = isFunction;
-        obj.set_identifier(name.map(|name| Identifier {
-            name: Some(name),
-            debugMetadata: None,
-        }));
-        obj.content = content;
-        obj.set_runtimeObject(Some(runtime_container));
-        obj
+#[cfg(test)]
+mod tests {
+    use super::InkParser;
+    use crate::ParsedHierarchy::Object::ObjectPayload;
+
+    #[test]
+    fn knot_and_stitch_definitions_remain_typed_payloads() {
+        let mut knot_parser = InkParser::new(
+            "== intro ==\nHello\n= scene\nWorld\n".to_string(),
+            None,
+            None,
+            None,
+        );
+
+        let knot = knot_parser.KnotDefinition().expect("knot");
+        assert!(matches!(
+            knot.payload.as_ref(),
+            Some(ObjectPayload::Knot(_))
+        ));
+
+        let knot_payload = match knot.payload.as_ref() {
+            Some(ObjectPayload::Knot(knot)) => knot,
+            _ => unreachable!("checked above"),
+        };
+        assert_eq!(knot_payload.get_name(), Some("intro"));
+        assert!(knot_payload
+            .get_base()
+            .base
+            .content
+            .iter()
+            .any(|obj| matches!(obj.payload.as_ref(), Some(ObjectPayload::Stitch(_)))));
+    }
+
+    #[test]
+    fn top_level_statements_keep_divert_and_following_knot() {
+        let mut parser = InkParser::new(
+            "-> intro\n== intro ==\nHello\n".to_string(),
+            None,
+            None,
+            None,
+        );
+
+        let story = parser.Parse();
+
+        assert_eq!(story.content.len(), 2);
+        assert!(matches!(
+            story.content[1].payload.as_ref(),
+            Some(ObjectPayload::Knot(_))
+        ));
     }
 }

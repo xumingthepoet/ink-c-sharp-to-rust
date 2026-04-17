@@ -51,7 +51,14 @@ impl InkParser {
     // C# signature: protected object StatementAtLevel(StatementLevel level)
     pub fn StatementAtLevel(&mut self, level: StatementLevel) -> Option<Object> {
         let statement = self
-            .ParseObject(|parser| parser.MultiDivert())
+            .ParseObject(|parser| {
+                let pieces = parser.MultiDivert()?;
+                if parser.EndOfLine().is_none() {
+                    parser.Error("Expected end of line".to_string());
+                    let _ = parser.SkipToNextLine();
+                }
+                Some(pieces)
+            })
             .map(|pieces| Self::wrap_divert_line(pieces))
             .or_else(|| {
                 if level >= StatementLevel::Top {
