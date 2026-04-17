@@ -92,6 +92,10 @@ impl VariableReference {
     pub fn set_parent(&mut self, parent: Option<Box<crate::Container::Container>>) {
         self.parent = parent;
     }
+
+    pub fn get_parent(&self) -> Option<&crate::Container::Container> {
+        self.parent.as_deref()
+    }
 }
 
 #[cfg(test)]

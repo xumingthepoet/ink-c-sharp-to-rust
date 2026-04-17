@@ -146,13 +146,9 @@ pub struct Container {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CountFlags {
-    PortPlaceholder,
-}
-
-impl Default for CountFlags {
-    fn default() -> Self {
-        Self::PortPlaceholder
-    }
+    Visits = 1,
+    Turns = 2,
+    CountStartOnly = 4,
 }
 
 impl Container {
@@ -172,6 +168,9 @@ impl Container {
     // C# signature: public void AddContent(Runtime.Object contentObj)
     pub fn AddContent<T: Into<ContentItem>>(&mut self, contentObj: T) {
         let mut content = contentObj.into();
+        if Self::content_item_has_parent(&content) {
+            panic!("content is already in a container");
+        }
         if let ContentItem::Container(ref mut container) = content {
             container.parent = Some(Box::new(self.clone()));
             let index = self.content.len() as i32;
@@ -211,6 +210,9 @@ impl Container {
     pub fn InsertContent<T: Into<ContentItem>>(&mut self, contentObj: T, index: i32) {
         let index = index.max(0) as usize;
         let mut content = contentObj.into();
+        if Self::content_item_has_parent(&content) {
+            panic!("content is already in a container");
+        }
         if let ContentItem::Container(ref mut container) = content {
             container.parent = Some(Box::new(self.clone()));
             let child_path = if container.get_hasValidName() {
@@ -270,7 +272,39 @@ impl Container {
     // C# signature: public void AddContentsOfContainer(Container otherContainer)
     pub fn AddContentsOfContainer(&mut self, otherContainer: Container) {
         for content in otherContainer.content {
+            let mut content = content;
+            Self::detach_parent(&mut content);
             self.AddContent(content);
+        }
+    }
+
+    fn detach_parent(content: &mut ContentItem) {
+        match content {
+            ContentItem::Container(container) => {
+                container.parent = None;
+            }
+            ContentItem::ChoicePoint(choice_point) => {
+                choice_point.set_parent(None);
+            }
+            ContentItem::Divert(divert) => {
+                divert.set_parent(None);
+            }
+            ContentItem::VariableReference(variable_reference) => {
+                variable_reference.set_parent(None);
+            }
+            _ => {}
+        }
+    }
+
+    fn content_item_has_parent(content: &ContentItem) -> bool {
+        match content {
+            ContentItem::Container(container) => container.parent.is_some(),
+            ContentItem::ChoicePoint(choice_point) => choice_point.get_parent().is_some(),
+            ContentItem::Divert(divert) => divert.get_parent().is_some(),
+            ContentItem::VariableReference(variable_reference) => {
+                variable_reference.get_parent().is_some()
+            }
+            _ => false,
         }
     }
 
@@ -356,7 +390,7 @@ impl Container {
         &mut self,
         mut sb: crate::stub::StringBuilder,
         indentation: i32,
-        _pointedObj: crate::stub::PortStub,
+        pointedPath: Option<Path>,
     ) {
         fn append_indentation(sb: &mut crate::stub::StringBuilder, indentation: i32) {
             for _ in 0..(indentation.max(0) as usize * 4) {
@@ -368,15 +402,12 @@ impl Container {
             sb: &mut crate::stub::StringBuilder,
             indentation: i32,
             content: &ContentItem,
+            pointedPath: &Option<Path>,
         ) {
             match content {
                 ContentItem::Container(container) => {
                     let mut child = container.as_ref().clone();
-                    child.BuildStringOfHierarchy(
-                        sb.clone(),
-                        indentation,
-                        crate::stub::PortStub::default(),
-                    );
+                    child.BuildStringOfHierarchy(sb.clone(), indentation, pointedPath.clone());
                 }
                 ContentItem::Value(value) => {
                     append_indentation(sb, indentation);
@@ -440,10 +471,24 @@ impl Container {
             sb.Append(")");
         }
 
+        if pointedPath.as_ref() == Some(self.get_path()) {
+            sb.Append("  <---");
+        }
+
         sb.AppendLine("");
 
         for (index, content) in self.content.iter().enumerate() {
-            append_content(&mut sb, indentation + 1, content);
+            let item_path = match content {
+                ContentItem::Container(container) => container.get_path().clone(),
+                _ => self
+                    .get_path()
+                    .PathByAppendingComponent(Component::new(index as i32)),
+            };
+            append_content(&mut sb, indentation + 1, content, &pointedPath);
+
+            if Some(&item_path) == pointedPath.as_ref() {
+                sb.Append("  <---");
+            }
 
             if index != self.content.len() - 1 {
                 sb.Append(",");
@@ -466,11 +511,7 @@ impl Container {
             for (_, content) in only_named {
                 if let ContentItem::Container(container) = content {
                     let mut child = container.as_ref().clone();
-                    child.BuildStringOfHierarchy(
-                        sb.clone(),
-                        indentation + 1,
-                        crate::stub::PortStub::default(),
-                    );
+                    child.BuildStringOfHierarchy(sb.clone(), indentation + 1, pointedPath.clone());
                     sb.AppendLine("");
                 }
             }
@@ -483,7 +524,7 @@ impl Container {
     // C# signature: public virtual string BuildStringOfHierarchy()
     pub fn BuildStringOfHierarchy_overload_2(&mut self) -> String {
         let sb = crate::stub::StringBuilder::new();
-        self.BuildStringOfHierarchy(sb.clone(), 0, crate::stub::PortStub::default());
+        self.BuildStringOfHierarchy(sb.clone(), 0, None);
         sb.ToString()
     }
 
@@ -599,9 +640,10 @@ impl Container {
     }
 
     pub fn set_countFlags(&mut self, countFlags: i32) {
-        self.visitsShouldBeCounted = (countFlags & 1) != 0;
-        self.turnIndexShouldBeCounted = (countFlags & 2) != 0;
-        self.countingAtStartOnly = (countFlags & 4) != 0;
+        let flag = countFlags;
+        self.visitsShouldBeCounted = (flag & CountFlags::Visits as i32) != 0;
+        self.turnIndexShouldBeCounted = (flag & CountFlags::Turns as i32) != 0;
+        self.countingAtStartOnly = (flag & CountFlags::CountStartOnly as i32) != 0;
     }
 
     // C# signature: Path pathToFirstLeafContent { get; }
@@ -642,5 +684,43 @@ mod tests {
             Some(ContentItem::Container(_))
         ));
         assert_eq!(root.get_pathToFirstLeafContent().ToString(), "0");
+    }
+
+    #[test]
+    fn count_flags_round_trip_matches_csharp_bits() {
+        let mut container = Container::new();
+
+        container.set_countFlags(1 | 2 | 4);
+        assert!(container.get_visitsShouldBeCounted());
+        assert!(container.get_turnIndexShouldBeCounted());
+        assert!(container.get_countingAtStartOnly());
+        assert_eq!(container.get_countFlags(), 7);
+
+        container.set_countFlags(4);
+        assert!(!container.get_visitsShouldBeCounted());
+        assert!(!container.get_turnIndexShouldBeCounted());
+        assert!(container.get_countingAtStartOnly());
+        assert_eq!(container.get_countFlags(), 0);
+    }
+
+    #[test]
+    fn add_contents_of_container_reparents_children() {
+        let mut inner = Container::new();
+        inner.set_name(Some("inner".to_string()));
+        inner.AddContent(ControlCommand::BeginString());
+
+        let mut source = Container::new();
+        source.AddContent(inner.clone());
+
+        let mut root = Container::new();
+        root.AddContentsOfContainer(source);
+
+        assert_eq!(root.get_content().len(), 1);
+        assert!(root.get_namedContent().contains_key("inner"));
+        let inserted = match root.get_content().first() {
+            Some(ContentItem::Container(container)) => container.as_ref().clone(),
+            _ => panic!("child container missing"),
+        };
+        assert!(inserted.get_parent().is_some());
     }
 }

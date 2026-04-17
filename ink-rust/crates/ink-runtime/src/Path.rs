@@ -1,4 +1,3 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/Path.cs
 
 use std::collections::hash_map::DefaultHasher;

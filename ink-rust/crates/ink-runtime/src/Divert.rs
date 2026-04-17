@@ -335,6 +335,10 @@ impl Divert {
         self.parent = parent;
     }
 
+    pub fn get_parent(&self) -> Option<&crate::Container::Container> {
+        self.parent.as_deref()
+    }
+
     pub fn set_path(&mut self, path: Path) {
         self.path = Some(path);
     }

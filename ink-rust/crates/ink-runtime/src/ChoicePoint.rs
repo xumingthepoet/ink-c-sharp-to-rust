@@ -1,4 +1,3 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/ChoicePoint.cs
 
 use crate::Container::Container;
@@ -79,6 +78,10 @@ impl ChoicePoint {
 
     pub fn set_parent(&mut self, parent: Option<Box<Container>>) {
         self.parent = parent;
+    }
+
+    pub fn get_parent(&self) -> Option<&Container> {
+        self.parent.as_deref()
     }
 
     fn debug_line_number_of_path(&self, path: &Path) -> Option<i32> {

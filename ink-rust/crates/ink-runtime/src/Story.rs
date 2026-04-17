@@ -1,4 +1,3 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/ink-engine-runtime/Story.cs
 
 use crate::stub::*;
@@ -864,7 +863,13 @@ impl Story {
     // C# signature: public virtual string BuildStringOfHierarchy()
     pub fn BuildStringOfHierarchy(&mut self) -> String {
         let mut container = self.main_content_container_ref().clone();
-        container.BuildStringOfHierarchy_overload_2()
+        let sb = crate::stub::StringBuilder::new();
+        container.BuildStringOfHierarchy(
+            sb.clone(),
+            0,
+            self.story_state_ref().get_currentPointer().get_path(),
+        );
+        sb.ToString()
     }
 
     // C# signature: private void NextContent()
