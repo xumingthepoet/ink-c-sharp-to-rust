@@ -139,6 +139,7 @@ impl ListDefinition {
             let parent_name = identifier.name.clone();
             for element in &mut self.itemDefinitions {
                 element.set_parent_list_name(parent_name.clone());
+                element.ResolveReferences(context);
             }
             context.CheckForNamingCollisions(
                 Default::default(),
@@ -189,7 +190,16 @@ impl ListElementDefinition {
     }
 
     // C# signature: public override void ResolveReferences (Story context)
-    pub fn ResolveReferences(&mut self, _context: Story) {}
+    pub fn ResolveReferences(&mut self, context: &mut Story) {
+        if let Some(identifier) = self.identifier.clone() {
+            context.CheckForNamingCollisions(
+                Default::default(),
+                identifier,
+                crate::ParsedHierarchy::Story::SymbolType::ListItem,
+                String::new(),
+            );
+        }
+    }
 
     // C# signature: string typeName { get; }
     pub fn get_typeName(&self) -> String {
