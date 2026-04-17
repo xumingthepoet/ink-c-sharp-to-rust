@@ -56,6 +56,7 @@ impl FlowBase {
     ) -> Self {
         let mut base = Object::with_kind(ObjectKind::FlowBase);
         base.set_identifier(Some(name.clone()));
+        base.set_debugMetadata(name.debugMetadata.clone());
         base.content = topLevelObjects;
 
         let mut flow = Self {
@@ -318,6 +319,7 @@ impl FlowBase {
                 .as_ref()
                 .and_then(|identifier| identifier.name.clone()),
         );
+        container.set_debugMetadata(self.base.get_debugMetadata().cloned());
 
         if self.flow_level == FlowLevel::Story || self.isIncludedStory {
             container.set_countFlags(1);
@@ -622,5 +624,36 @@ mod tests {
             flow.ResolveVariableWithName("temp".to_string(), &Object::with_kind(ObjectKind::Plain));
         assert!(temp.found);
         assert!(temp.isTemporary);
+    }
+
+    #[test]
+    fn generated_runtime_container_keeps_debug_metadata() {
+        let mut flow = FlowBase::new(
+            Identifier {
+                name: Some("story".to_string()),
+                debugMetadata: Some(ink_runtime::DebugMetadata::DebugMetadata {
+                    startLineNumber: 12,
+                    endLineNumber: 12,
+                    startCharacterNumber: 0,
+                    endCharacterNumber: 5,
+                    fileName: Some("story.ink".to_string()),
+                    sourceName: None,
+                }),
+            },
+            vec![],
+            vec![],
+            false,
+            false,
+        );
+        flow.set_flowLevel(FlowLevel::Story);
+
+        let runtime = flow.GenerateRuntimeObject();
+
+        assert_eq!(
+            runtime
+                .get_debugMetadata()
+                .map(|debug| debug.startLineNumber),
+            Some(12)
+        );
     }
 }

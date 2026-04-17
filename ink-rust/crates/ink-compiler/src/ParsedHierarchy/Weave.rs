@@ -143,6 +143,7 @@ impl Weave {
     // C# signature: public override Runtime.Object GenerateRuntimeObject ()
     pub fn GenerateRuntimeObject(&mut self) -> ContentItem {
         let mut root_container = Container::new();
+        root_container.set_debugMetadata(self.base.get_debugMetadata().cloned());
         self.rootContainer = Some(root_container.clone());
         self.currentContainer = Some(root_container.clone());
         self.looseEnds.clear();
