@@ -1,79 +1,203 @@
-// Auto-generated structural port skeleton. Fill behavior from the matching C# source.
 // Source: ink-c-sharp/compiler/InkParser/InkParser.cs
 
-use crate::stub::*;
+use crate::FileHandler::{DefaultFileHandler, IFileHandler};
+use crate::StringParser::StringParser::{ErrorHandler, StringParser};
+use ink_runtime::DebugMetadata::DebugMetadata;
+use std::collections::HashSet;
+use std::sync::Arc;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone)]
 pub struct InkParser {
-    pub _port_marker: (),
+    parser: StringParser,
+    filename: Option<String>,
+    externalErrorHandler: Option<ErrorHandler>,
+    fileHandler: Arc<dyn IFileHandler + Send + Sync>,
+    openFilenames: HashSet<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CustomFlags {
-    PortPlaceholder,
-}
-
-impl Default for CustomFlags {
-    fn default() -> Self {
-        Self::PortPlaceholder
-    }
+    ParsingString = 0x1,
+    TagActive = 0x2,
 }
 
 impl InkParser {
     // C# signature: public InkParser(string str, string filenameForMetadata = null, Ink.ErrorHandler externalErrorHandler = null, IFileHandler fileHandler = null)
     pub fn new(
-        _str: String,
-        _filenameForMetadata: String,
-        _externalErrorHandler: crate::stub::ErrorHandler,
-        _fileHandler: crate::stub::IFileHandler,
+        str: String,
+        filenameForMetadata: Option<String>,
+        externalErrorHandler: Option<ErrorHandler>,
+        fileHandler: Option<Arc<dyn IFileHandler + Send + Sync>>,
     ) -> Self {
-        Default::default()
+        let processed = crate::InkParser::CommentEliminator::CommentEliminator::new(str)
+            .Process()
+            .unwrap_or_default();
+        let parser = StringParser::new(processed);
+        let fileHandler = fileHandler.unwrap_or_else(|| Arc::new(DefaultFileHandler));
+        let mut openFilenames = HashSet::new();
+
+        if let Some(filename) = filenameForMetadata.as_ref() {
+            if let Ok(full_root_ink_path) = fileHandler.ResolveInkFilename(filename) {
+                openFilenames.insert(full_root_ink_path);
+            }
+        }
+
+        Self {
+            parser,
+            filename: filenameForMetadata,
+            externalErrorHandler,
+            fileHandler,
+            openFilenames,
+        }
     }
 
     // C# signature: public Parsed.Story Parse()
-    pub fn Parse(&mut self) -> crate::stub::Story {
-        Default::default()
+    pub fn Parse(&mut self) -> crate::ParsedHierarchy::Story::Story {
+        todo!("InkParser.Parse still depends on the unported statement and hierarchy parser tree");
     }
 
     // C# signature: protected List<T> SeparatedList<T> (SpecificParseRule<T> mainRule, ParseRule separatorRule)
-    pub fn SeparatedList(
+    pub fn SeparatedList<T, MainRule, SeparatorRule>(
         &mut self,
-        _mainRule: crate::stub::PortStub,
-        _separatorRule: crate::stub::ParseRule,
-    ) -> Vec<crate::stub::PortStub> {
-        Default::default()
+        mut mainRule: MainRule,
+        mut separatorRule: SeparatorRule,
+    ) -> Option<Vec<T>>
+    where
+        MainRule: FnMut(&mut StringParser) -> Option<T>,
+        SeparatorRule: FnMut(&mut StringParser) -> Option<()>,
+        T: 'static,
+    {
+        let firstElement = self.parser.ParseObject(&mut mainRule)?;
+        let mut allElements = vec![firstElement];
+
+        loop {
+            let nextElementRuleId = self.parser.BeginRule();
+
+            if separatorRule(&mut self.parser).is_none() {
+                self.parser.CancelRule(nextElementRuleId);
+                break;
+            }
+
+            match self.parser.ParseObject(&mut mainRule) {
+                Some(nextElement) => {
+                    self.parser.SucceedRule(nextElementRuleId, ());
+                    allElements.push(nextElement);
+                }
+                None => {
+                    self.parser.CancelRule(nextElementRuleId);
+                    break;
+                }
+            }
+        }
+
+        Some(allElements)
     }
 
     // C# signature: protected override string PreProcessInputString(string str)
-    pub fn PreProcessInputString(&mut self, _str: String) -> String {
-        Default::default()
+    pub fn PreProcessInputString(&mut self, str: String) -> String {
+        crate::InkParser::CommentEliminator::CommentEliminator::new(str)
+            .Process()
+            .unwrap_or_default()
     }
 
     // C# signature: protected Runtime.DebugMetadata CreateDebugMetadata(StringParserState.Element stateAtStart, StringParserState.Element stateAtEnd)
     pub fn CreateDebugMetadata(
         &mut self,
-        _stateAtStart: crate::stub::Element,
-        _stateAtEnd: crate::stub::Element,
-    ) -> crate::stub::DebugMetadata {
-        Default::default()
+        stateAtStart: crate::StringParser::StringParserState::Element,
+        stateAtEnd: crate::StringParser::StringParserState::Element,
+    ) -> DebugMetadata {
+        let mut md = DebugMetadata::new();
+        md.startLineNumber = stateAtStart.lineIndex + 1;
+        md.endLineNumber = stateAtEnd.lineIndex + 1;
+        md.startCharacterNumber = stateAtStart.characterInLineIndex + 1;
+        md.endCharacterNumber = stateAtEnd.characterInLineIndex + 1;
+        md.fileName = self.filename.clone();
+        md
     }
 
     // C# signature: protected override void RuleDidSucceed(object result, StringParserState.Element stateAtStart, StringParserState.Element stateAtEnd)
     pub fn RuleDidSucceed(
         &mut self,
         _result: crate::stub::PortStub,
-        _stateAtStart: crate::stub::Element,
-        _stateAtEnd: crate::stub::Element,
+        _stateAtStart: crate::StringParser::StringParserState::Element,
+        _stateAtEnd: crate::StringParser::StringParserState::Element,
     ) {
     }
 
     // C# signature: bool parsingStringExpression { get; }
     pub fn get_parsingStringExpression(&mut self) -> bool {
-        Default::default()
+        self.parser.GetFlag(CustomFlags::ParsingString as u32)
     }
 
     // C# signature: bool tagActive { get; }
     pub fn get_tagActive(&mut self) -> bool {
-        Default::default()
+        self.parser.GetFlag(CustomFlags::TagActive as u32)
+    }
+
+    pub fn get_fileHandler(&self) -> &dyn IFileHandler {
+        self.fileHandler.as_ref()
+    }
+
+    pub fn get_externalErrorHandler(&self) -> Option<ErrorHandler> {
+        self.externalErrorHandler.clone()
+    }
+
+    pub fn get_openFilenames(&self) -> &HashSet<String> {
+        &self.openFilenames
+    }
+
+    pub fn set_flag(&mut self, flag: CustomFlags, value: bool) {
+        self.parser.SetFlag(flag as u32, value);
+    }
+
+    pub fn get_flag(&mut self, flag: CustomFlags) -> bool {
+        self.parser.GetFlag(flag as u32)
+    }
+
+    pub fn parser_mut(&mut self) -> &mut StringParser {
+        &mut self.parser
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::InkParser;
+    use crate::StringParser::StringParserState::Element;
+
+    #[test]
+    fn preprocesses_comments_and_builds_debug_metadata() {
+        let mut parser = InkParser::new(
+            "one // comment\n two".to_string(),
+            Some("story.ink".to_string()),
+            None,
+            None,
+        );
+
+        assert_eq!(
+            parser.PreProcessInputString("a/*x\n*/b".to_string()),
+            "a\nb"
+        );
+
+        let md = parser.CreateDebugMetadata(
+            Element {
+                lineIndex: 1,
+                characterInLineIndex: 2,
+                ..Default::default()
+            },
+            Element {
+                lineIndex: 3,
+                characterInLineIndex: 4,
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(md.startLineNumber, 2);
+        assert_eq!(md.endLineNumber, 4);
+        assert_eq!(md.startCharacterNumber, 3);
+        assert_eq!(md.endCharacterNumber, 5);
+        assert_eq!(md.fileName.as_deref(), Some("story.ink"));
+
+        // Keep the constructed parser live to ensure the constructor path stays valid.
+        assert!(parser.get_openFilenames().len() <= 1);
     }
 }
