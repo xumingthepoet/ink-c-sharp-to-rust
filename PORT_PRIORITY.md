@@ -20,6 +20,45 @@ These totals are derived from the annotations below and replace the deleted symb
 | Compiler | 64 | 41 | 20 | 3 |
 | Total | 98 | 75 | 20 | 3 |
 
+## Continuation Plan For Future Agents
+
+The remaining work should converge on integration tests, not on isolated compile-only stubs. Use the current annotations as a dependency map, but follow the order below when choosing work.
+
+Non-negotiable rules for lower-capability agents:
+
+1. Read the matching C# file before editing Rust. If behavior is unclear, inspect nearby C# callers and tests before touching `ink-rust/`.
+2. Keep all edits in `ink-rust/` or this tracking file unless the user explicitly says otherwise. `ink-c-sharp/` and `blade-ink-rs/` remain read-only references.
+3. Do not mark a file `[ported]` unless the entire C# file is faithfully represented and `make -C ink-rust gate` passes. Partial compile success is not enough.
+4. Prefer visible unfinished markers over plausible wrong behavior. If a dependency is still missing, keep the file `[partial: ...]` and state the missing C# behavior.
+5. Add or upgrade tests through `ink-rust/crates/ink-tests` or `ink-rust/crates/ink-testbed` when a behavior reaches compiler-to-runtime execution.
+
+Recommended implementation order from the current state:
+
+1. Finish the ParsedHierarchy flow-tree spine first: `ParsedHierarchy/Object.cs`, `ParsedHierarchy/FlowBase.cs`, `ParsedHierarchy/Story.cs`, then `ParsedHierarchy/Weave.cs`.
+   The goal is one coherent ownership and resolution path for parent chains, root story lookup, subflow lookup, root weave export, named-only knots/stitches, and loose-end validation. Do not spend another pass polishing parser edge cases until this spine can generate runtime containers through the same path that C# uses.
+
+2. Finish weave-backed content nodes next: `ParsedHierarchy/Choice.cs`, `ParsedHierarchy/ConditionalSingleBranch.cs`, `ParsedHierarchy/Conditional.cs`, and `ParsedHierarchy/Sequence.cs`.
+   These should be completed against the official C# control flow rules for choice/gather mutation, branch rejoin routing, sequence branch ownership, and loose-end propagation. Use small compiler-to-runtime stories as acceptance tests, not only object-level unit tests.
+
+3. Finish reference and expression behavior after the flow tree is stable: `ParsedHierarchy/Divert.cs`, `ParsedHierarchy/DivertTarget.cs`, `ParsedHierarchy/VariableReference.cs`, `ParsedHierarchy/VariableAssignment.cs`, `ParsedHierarchy/FunctionCall.cs`, and `ParsedHierarchy/Expression.cs`.
+   The important acceptance surface is ancestry-sensitive target resolution, variable divert targets, `TURNS_SINCE`, `READ_COUNT`, function calls, temp/global variable lookup, list-backed declarations, and exact error timing.
+
+4. Wire the parser onto the completed hierarchy: `InkParser/InkParser_Divert.cs`, `InkParser/InkParser_Choices.cs`, `InkParser/InkParser_Conditional.cs`, `InkParser/InkParser_Content.cs`, `InkParser/InkParser_Sequences.cs`, `InkParser/InkParser_Statements.cs`, `InkParser/InkParser_Knot.cs`, and `InkParser/InkParser.cs`.
+   Parser work should preserve typed parsed payloads and avoid eager runtime generation. The parser should hand a faithful parsed tree to ParsedHierarchy; it should not compensate for missing ParsedHierarchy behavior with ad hoc runtime objects.
+
+5. Complete outer integration only after the compiler path is real: `Compiler.cs` and `Plugins/PluginManager.cs`.
+   Compiler completion includes parse error plumbing, debug source/range bookkeeping, include behavior, plugin hooks or an explicit compatible substitute, and command-line/immediate-mode surfaces that are used by official tests.
+
+6. Expand integration coverage continuously.
+   Use `ink-rust/crates/ink-tests` for concise regression cases and `ink-rust/crates/ink-testbed` when a case needs realistic story driving, choices, tags, or multi-step interaction. Good milestone tests are: linear text, top-level knot divert, choice selection, gather fallthrough, conditional branch, sequence branch, global/temp variable assignment, function call/return, list operations, tunnel return, include handling, and save/load runtime JSON parity.
+
+Suggested work packages for sub-agents:
+
+1. Assign only one ownership slice at a time. Example: one agent owns `ParsedHierarchy/FlowBase.rs` plus tests; another owns `ParsedHierarchy/Weave.rs` plus tests. Do not let two agents edit the same Rust file concurrently.
+2. Ask each agent to report changed paths, C# symbols covered, tests added, remaining gaps, and whether `make -C ink-rust gate` passed.
+3. For large partial files, require the agent to update the matching `[partial: ...]` annotation in this file in the same change. The annotation must say what is still missing and what dependency blocks completion.
+4. Keep commits small: one large file, two or three medium files, or a tightly related test upgrade. Run `make -C ink-rust gate` before committing.
+
 ## Runtime
 
 Runtime is fully ported. The summary table above is the only runtime status needed.
