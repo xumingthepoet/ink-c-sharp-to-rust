@@ -266,8 +266,8 @@ impl InkParser {
         );
 
         let content = self
-            .ParseUntilCharactersFromString("\"".to_string())
-            .unwrap_or_default();
+            .MixedTextAndLogic()
+            .unwrap_or_else(|| vec![ContentListItem::from(Text::new(String::new()))]);
 
         if self.ParseString("\"".to_string()).is_none() {
             self.Error("close quote for string expression".to_string());
@@ -283,9 +283,16 @@ impl InkParser {
             was_parsing_string,
         );
 
-        Some(Expression::from_kind(ExpressionKind::Text(Text::new(
-            content,
-        ))))
+        if content
+            .iter()
+            .any(|item| matches!(item, ContentListItem::Divert(_)))
+        {
+            self.Error("String expressions cannot contain diverts (->)".to_string());
+        }
+
+        Some(Expression::from(
+            crate::ParsedHierarchy::StringExpression::StringExpression::new(content),
+        ))
     }
 
     pub fn ExpressionBool(&mut self) -> Option<Expression> {
@@ -549,5 +556,12 @@ mod tests {
         assert!(statement.is::<Expression>());
         let expr = statement.as_ref().downcast_ref::<Expression>().unwrap();
         assert!(matches!(expr.kind, ExpressionKind::Binary(_)));
+    }
+
+    #[test]
+    fn parses_string_expression_into_string_expression_variant() {
+        let mut parser = InkParser::new("\"hello\"".to_string(), None, None, None);
+        let expr = parser.Expression().expect("string expression");
+        assert!(matches!(expr.kind, ExpressionKind::StringExpression(_)));
     }
 }

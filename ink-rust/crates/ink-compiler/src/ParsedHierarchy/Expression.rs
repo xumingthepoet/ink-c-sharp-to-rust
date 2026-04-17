@@ -5,6 +5,7 @@ use crate::ParsedHierarchy::FunctionCall::FunctionCall;
 use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::List::List;
 use crate::ParsedHierarchy::Number::{Number, NumberValue};
+use crate::ParsedHierarchy::StringExpression::StringExpression;
 use crate::ParsedHierarchy::Text::Text;
 use crate::ParsedHierarchy::VariableReference::VariableReference;
 use ink_runtime::Container::{Container as RuntimeContainer, ContentItem};
@@ -33,6 +34,7 @@ pub enum ExpressionKind {
     DivertTarget(Box<DivertTarget>),
     VariableReference(Box<VariableReference>),
     List(List),
+    StringExpression(Box<StringExpression>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -124,6 +126,9 @@ impl Expression {
                 variable_reference.GenerateIntoContainer(container)
             }
             ExpressionKind::List(list) => list.GenerateIntoContainer(container),
+            ExpressionKind::StringExpression(string_expression) => {
+                string_expression.GenerateIntoContainer(container)
+            }
         }
     }
 
@@ -146,6 +151,9 @@ impl Expression {
                 variable_reference.ResolveReferences(_context)
             }
             ExpressionKind::List(list) => list.ResolveReferences(_context),
+            ExpressionKind::StringExpression(string_expression) => {
+                string_expression.ResolveReferences(_context)
+            }
         }
     }
 
@@ -163,6 +171,7 @@ impl Expression {
             ExpressionKind::DivertTarget(divert_target) => divert_target.ToString(),
             ExpressionKind::VariableReference(variable_reference) => variable_reference.ToString(),
             ExpressionKind::List(list) => list.ToString(),
+            ExpressionKind::StringExpression(string_expression) => string_expression.ToString(),
         }
     }
 
@@ -233,6 +242,7 @@ impl Expression {
             ExpressionKind::DivertTarget(_) => Vec::new(),
             ExpressionKind::VariableReference(_) => Vec::new(),
             ExpressionKind::List(_) => Vec::new(),
+            ExpressionKind::StringExpression(_) => Vec::new(),
             _ => Vec::new(),
         }
     }
@@ -462,6 +472,12 @@ impl From<VariableReference> for Expression {
 impl From<List> for Expression {
     fn from(value: List) -> Self {
         Expression::from_kind(ExpressionKind::List(value))
+    }
+}
+
+impl From<StringExpression> for Expression {
+    fn from(value: StringExpression) -> Self {
+        Expression::from_kind(ExpressionKind::StringExpression(Box::new(value)))
     }
 }
 

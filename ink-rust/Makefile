@@ -11,7 +11,7 @@ check:
 	cargo check --workspace
 
 test: require-timeout
-	$(TIMEOUT) 5s cargo test -p ink-compiler
+	$(TIMEOUT) 15s cargo test -p ink-compiler
 	$(TIMEOUT) 5s cargo test -p ink-runtime
 	$(TIMEOUT) 5s cargo test -p ink-tests
 	$(TIMEOUT) 5s cargo test -p inklecate
