@@ -47,6 +47,7 @@ impl Weave {
         };
 
         weave.ResolveWeavePointNaming();
+        weave.ConstructWeaveHierarchyFromIndentation();
         weave
     }
 
@@ -56,10 +57,9 @@ impl Weave {
 
         let weave_points: Vec<Object> = self
             .base
-            .content
-            .iter()
+            .FindAll(None)
+            .into_iter()
             .filter(|obj| obj.kind == ObjectKind::WeavePoint)
-            .cloned()
             .collect();
 
         for obj in weave_points {
@@ -86,6 +86,46 @@ impl Weave {
         }
     }
 
+    // C# signature: void ConstructWeaveHierarchyFromIndentation()
+    fn ConstructWeaveHierarchyFromIndentation(&mut self) {
+        let mut contentIdx = 0;
+        while contentIdx < self.base.content.len() {
+            let obj = self.base.content[contentIdx].clone();
+            if obj.kind == ObjectKind::WeavePoint {
+                let weaveIndentIdx = obj.indentationDepth.saturating_sub(1);
+
+                if weaveIndentIdx > self.baseIndentIndex {
+                    let innerWeaveStartIdx = contentIdx;
+                    while contentIdx < self.base.content.len() {
+                        let innerWeaveObj = self.base.content[contentIdx].clone();
+                        if innerWeaveObj.kind == ObjectKind::WeavePoint {
+                            let innerIndentIdx = innerWeaveObj.indentationDepth.saturating_sub(1);
+                            if innerIndentIdx <= self.baseIndentIndex {
+                                break;
+                            }
+                        }
+
+                        contentIdx += 1;
+                    }
+
+                    let weaveContent: Vec<Object> = self
+                        .base
+                        .content
+                        .drain(innerWeaveStartIdx..contentIdx)
+                        .collect();
+                    let nestedWeave = Weave::new(weaveContent, weaveIndentIdx);
+                    let mut nestedWeaveObj = Object::with_kind(ObjectKind::Weave);
+                    nestedWeaveObj.content = nestedWeave.base.content.clone();
+                    self.base
+                        .InsertContent(innerWeaveStartIdx as i32, nestedWeaveObj);
+                    contentIdx = innerWeaveStartIdx;
+                }
+            }
+
+            contentIdx += 1;
+        }
+    }
+
     // C# signature: public int DetermineBaseIndentationFromContent(List<Parsed.Object> contentList)
     pub fn DetermineBaseIndentationFromContent(&mut self, contentList: Vec<Object>) -> i32 {
         Self::determine_base_indentation_from_content(&contentList)
@@ -109,7 +149,12 @@ impl Weave {
         self.gatherPointsToResolve.clear();
 
         for obj in &mut self.base.content {
-            if let Some(runtime_object) = obj.get_runtimeObject().cloned() {
+            if obj.kind == ObjectKind::Weave {
+                let mut nested = Weave::new(obj.content.clone(), -1);
+                if let ContentItem::Container(nested_root) = nested.GenerateRuntimeObject() {
+                    root_container.AddContent(*nested_root);
+                }
+            } else if let Some(runtime_object) = obj.get_runtimeObject().cloned() {
                 root_container.AddContent(runtime_object);
             }
         }
@@ -130,7 +175,12 @@ impl Weave {
         self.base.ResolveReferences(context);
 
         for obj in &mut self.base.content {
-            obj.ResolveReferences(context);
+            if obj.kind == ObjectKind::Weave {
+                let mut nested = Weave::new(obj.content.clone(), -1);
+                nested.ResolveReferences(context);
+            } else {
+                obj.ResolveReferences(context);
+            }
         }
 
         for gatherPoint in &mut self.gatherPointsToResolve {
@@ -207,5 +257,20 @@ mod tests {
             2
         );
         assert!(weave.get_lastParsedSignificantObject().is_some());
+    }
+
+    #[test]
+    fn nested_indentation_wraps_inner_weave() {
+        let mut outer_choice = Object::with_kind(ObjectKind::WeavePoint);
+        outer_choice.indentationDepth = 1;
+        let mut inner_choice = Object::with_kind(ObjectKind::WeavePoint);
+        inner_choice.indentationDepth = 3;
+
+        let weave = Weave::new(vec![outer_choice, inner_choice], -1);
+        assert!(weave
+            .base
+            .content
+            .iter()
+            .any(|obj| obj.kind == ObjectKind::Weave));
     }
 }
