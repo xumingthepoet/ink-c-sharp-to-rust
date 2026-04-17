@@ -3,6 +3,7 @@
 use crate::Choice::Choice;
 use crate::ChoicePoint::ChoicePoint;
 use crate::ControlCommand::ControlCommand;
+use crate::DebugMetadata::DebugMetadata;
 use crate::Divert::Divert;
 use crate::Glue::Glue;
 use crate::NativeFunctionCall::NativeFunctionCall;
@@ -135,6 +136,7 @@ pub struct Container {
     named_content: HashMap<String, ContentItem>,
     name: Option<String>,
     path: Path,
+    debug_metadata: Option<DebugMetadata>,
     visitsShouldBeCounted: bool,
     turnIndexShouldBeCounted: bool,
     countingAtStartOnly: bool,
@@ -455,6 +457,14 @@ impl Container {
 
     pub fn set_path(&mut self, path: Path) {
         self.path = path;
+    }
+
+    pub fn get_debugMetadata(&self) -> Option<&DebugMetadata> {
+        self.debug_metadata.as_ref()
+    }
+
+    pub fn set_debugMetadata(&mut self, debug_metadata: Option<DebugMetadata>) {
+        self.debug_metadata = debug_metadata;
     }
 
     // C# signature: List<Runtime.Object> content { get; }

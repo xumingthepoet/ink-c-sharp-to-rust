@@ -19,10 +19,13 @@ use crate::Story::Story;
 use crate::Value::{ListValue, StringValue, Value, ValueType, VariablePointerValue};
 use crate::VariablesState::VariablesState;
 use std::collections::HashMap;
+use std::fmt;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct StoryState {
+    pub onDidLoadState: Option<Arc<dyn Fn() + Send + Sync>>,
     story: Story,
     currentFlow: Flow,
     namedFlows: Option<HashMap<String, Flow>>,
@@ -52,6 +55,38 @@ impl Default for StoryState {
     }
 }
 
+impl fmt::Debug for StoryState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StoryState")
+            .field(
+                "onDidLoadState",
+                &self.onDidLoadState.as_ref().map(|_| "<callback>"),
+            )
+            .field("story", &self.story)
+            .field("currentFlow", &self.currentFlow)
+            .field("namedFlows", &self.namedFlows)
+            .field("patch", &self.patch)
+            .field("visitCounts", &self.visitCounts)
+            .field("turnIndices", &self.turnIndices)
+            .field("currentErrors", &self.currentErrors)
+            .field("currentWarnings", &self.currentWarnings)
+            .field("variablesState", &self.variablesState)
+            .field("evaluationStack", &self.evaluationStack)
+            .field("divertedPointer", &self.divertedPointer)
+            .field("currentTurnIndex", &self.currentTurnIndex)
+            .field("storySeed", &self.storySeed)
+            .field("previousRandom", &self.previousRandom)
+            .field("didSafeExit", &self.didSafeExit)
+            .field("currentTextCache", &self.currentTextCache)
+            .field("currentTagsCache", &self.currentTagsCache)
+            .field("aliveFlowNamesCache", &self.aliveFlowNamesCache)
+            .field("outputStreamTextDirty", &self.outputStreamTextDirty)
+            .field("outputStreamTagsDirty", &self.outputStreamTagsDirty)
+            .field("aliveFlowNamesDirty", &self.aliveFlowNamesDirty)
+            .finish()
+    }
+}
+
 impl StoryState {
     pub const kInkSaveStateVersion: i32 = 10;
     const kMinCompatibleLoadVersion: i32 = 8;
@@ -64,6 +99,7 @@ impl StoryState {
         let variablesState = VariablesState::new(currentFlow.callStack.clone(), listDefinitions);
 
         let mut state = Self {
+            onDidLoadState: None,
             story,
             currentFlow,
             namedFlows: None,
@@ -114,6 +150,9 @@ impl StoryState {
         let jObject = SimpleJson::TextToDictionary(json)
             .unwrap_or_else(|err| panic!("Failed to parse story state JSON: {}", err));
         self.LoadJsonObj(jObject);
+        if let Some(callback) = &self.onDidLoadState {
+            callback();
+        }
     }
 
     // C# signature: public int VisitCountAtPathString(string pathString)
@@ -893,18 +932,22 @@ impl StoryState {
         self.story.clone()
     }
 
-    pub fn get_currentPathString(&self) -> String {
-        self.currentPointer()
-            .get_path()
-            .map(|path| path.ToString())
-            .unwrap_or_default()
+    pub fn get_currentPathString(&self) -> Option<String> {
+        let pointer = self.currentPointer();
+        if pointer.get_isNull() {
+            None
+        } else {
+            pointer.get_path().map(|path| path.ToString())
+        }
     }
 
-    pub fn get_previousPathString(&self) -> String {
-        self.previousPointer()
-            .get_path()
-            .map(|path| path.ToString())
-            .unwrap_or_default()
+    pub fn get_previousPathString(&self) -> Option<String> {
+        let pointer = self.previousPointer();
+        if pointer.get_isNull() {
+            None
+        } else {
+            pointer.get_path().map(|path| path.ToString())
+        }
     }
 
     pub fn get_currentPointer(&self) -> Pointer {
@@ -1304,5 +1347,30 @@ impl StoryState {
 
     fn outputStreamContainsContent(&self) -> bool {
         self.get_outputStreamContainsContent()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StoryState;
+    use crate::Story::Story;
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
+    #[test]
+    fn invokes_load_callback_after_json_roundtrip() {
+        let mut state = StoryState::new(Story::default());
+        let json = state.ToJson();
+        let called = Arc::new(AtomicBool::new(false));
+        let callback_called = called.clone();
+
+        state.onDidLoadState = Some(Arc::new(move || {
+            callback_called.store(true, Ordering::SeqCst);
+        }));
+
+        state.LoadJson(json);
+        assert!(called.load(Ordering::SeqCst));
     }
 }

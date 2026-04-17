@@ -20,6 +20,10 @@ impl Object {
 
     // C# signature: public int? DebugLineNumberOfPath(Path path)
     pub fn DebugLineNumberOfPath(&self, path: Path) -> Option<i32> {
+        if path.get_length() == 0 {
+            return None;
+        }
+
         let root = self.get_rootContentContainer();
         let Some(mut root) = root else {
             return None;
@@ -27,10 +31,9 @@ impl Object {
 
         let target_content = root.ContentAtPath(path, 0, -1).obj?;
         match target_content {
-            crate::Container::ContentItem::Container(container) => {
-                let _ = container;
-                None
-            }
+            crate::Container::ContentItem::Container(container) => container
+                .get_debugMetadata()
+                .map(|debug_metadata| debug_metadata.startLineNumber),
             _ => None,
         }
     }
@@ -126,7 +129,7 @@ impl Object {
 
     // C# signature: public virtual Object Copy()
     pub fn Copy(&self) -> Self {
-        self.clone()
+        panic!("{} doesn't support copying", std::any::type_name::<Self>())
     }
 
     // C# signature: public void SetChild<T>(ref T obj, T value)
@@ -141,7 +144,11 @@ impl Object {
 
     // C# signature: Runtime.DebugMetadata debugMetadata { get; }
     pub fn get_debugMetadata(&self) -> Option<&DebugMetadata> {
-        self.debug_metadata.as_ref()
+        self.debug_metadata.as_ref().or_else(|| {
+            self.parent
+                .as_deref()
+                .and_then(|parent| parent.get_debugMetadata())
+        })
     }
 
     // C# signature: Runtime.DebugMetadata ownDebugMetadata { get; }
@@ -168,6 +175,7 @@ impl Object {
 mod tests {
     use super::Object;
     use crate::Container::Container;
+    use crate::DebugMetadata::DebugMetadata;
     use crate::Path::{Component, Path};
 
     #[test]
@@ -208,5 +216,25 @@ mod tests {
 
         let root_container = obj.get_rootContentContainer().expect("root container");
         assert_eq!(root_container.get_name(), "root");
+    }
+
+    #[test]
+    fn reads_debug_line_number_from_container_metadata() {
+        let mut root = Container::new();
+
+        let mut child = Container::new();
+        let mut debug = DebugMetadata::new();
+        debug.startLineNumber = 42;
+        child.set_debugMetadata(Some(debug));
+
+        root.AddContent(child);
+
+        let mut obj = Object::new();
+        obj.parent = Some(Box::new(root));
+
+        assert_eq!(
+            obj.DebugLineNumberOfPath(Path::new_overload_3(vec![Component::new(0)], false)),
+            Some(42)
+        );
     }
 }
