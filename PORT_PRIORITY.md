@@ -17,7 +17,7 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 28 | 15 | 21 |
+| Compiler | 64 | 29 | 15 | 20 |
 | Total | 98 | 62 | 15 | 21 |
 
 ## Runtime
@@ -84,8 +84,9 @@ Source area: `ink-c-sharp/compiler/`
 13. `InkParser/InkParser_Logic.cs` (`deps=9`) [partial: reason=identifier parsing is real, but the line/variable/list/inline logic parser family is still skeletal; missing=LogicLine, VariableDeclaration, List/Const declarations, inline logic, and expression helper parity; next=port the remaining InkParser logic and expression rules]
 14. `InkParser/InkParser.cs` (`deps=9`) [partial: reason=the parser wrapper now delegates comment elimination, whitespace, include, and debug metadata, but the main Parse entry point and statement hierarchy are still unported; missing=full statement parsing and parsed-object tree construction; next=port InkParser statement/content rules and the remaining ParsedHierarchy tree]
 15. `InkParser/InkParser_Statements.cs` (`deps=10`) [partial: reason=the parser helper now defines statement levels and line/skip helpers, but the real statement dispatcher still depends on the unported parsed hierarchy tree; missing=StatementsAtLevel/StatementAtLevel rule tables and end-to-end statement parsing; next=port the remaining parsed hierarchy nodes that feed statement dispatch]
-16. `InkParser/InkParser_Knot.cs` (`deps=11`)
-17. `InkParser/InkParser_Expressions.cs` (`deps=15`) [partial: reason=the parser now handles temp keywords, return, infix precedence, function calls, lists, variables, parens, divert targets, and temp declaration/assignment, but string parsing still depends on unported MixedTextAndLogic and remaining parser rules; missing=MixedTextAndLogic string parsing; next=port the remaining parser content rules]
+16. `InkParser/InkParser_Tags.cs` (`deps=10`) [ported]
+17. `InkParser/InkParser_Knot.cs` (`deps=11`)
+18. `InkParser/InkParser_Expressions.cs` (`deps=15`) [partial: reason=the parser now handles temp keywords, return, infix precedence, function calls, lists, variables, parens, divert targets, and temp declaration/assignment, but string parsing still depends on unported MixedTextAndLogic and remaining parser rules; missing=MixedTextAndLogic string parsing; next=port the remaining parser content rules]
 
 ### Outer Files
 
