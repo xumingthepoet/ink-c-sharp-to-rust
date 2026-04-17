@@ -195,7 +195,7 @@ impl FunctionCall {
     // C# signature: public override void ResolveReferences (Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
         let function_name = self.name_str();
-        self.proxyDivert.ResolveReferences(Default::default());
+        self.proxyDivert.ResolveReferences(context);
 
         self.resolvedList = context.ResolveList(function_name.clone());
 

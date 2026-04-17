@@ -1,6 +1,7 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/Divert.cs
 
 use crate::ParsedHierarchy::Expression::Expression;
+use crate::ParsedHierarchy::Object::{Object, ObjectKind};
 use crate::ParsedHierarchy::Path::Path;
 use ink_runtime::Container::{Container as RuntimeContainer, ContentItem};
 use ink_runtime::ControlCommand::ControlCommand;
@@ -11,7 +12,7 @@ use ink_runtime::Value::VariablePointerValue;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Divert {
     pub target: Option<Path>,
-    pub targetContent: Option<crate::stub::PortStub>,
+    pub targetContent: Option<Object>,
     pub arguments: Vec<Expression>,
     pub runtimeDivert: Option<RuntimeDivert>,
     pub isFunctionCall: bool,
@@ -31,7 +32,7 @@ impl Divert {
     }
 
     // C# signature: public Divert (Parsed.Object targetContent)
-    pub fn new_overload_2(targetContent: crate::stub::PortStub) -> Self {
+    pub fn new_overload_2(targetContent: Object) -> Self {
         Self {
             targetContent: Some(targetContent),
             ..Default::default()
@@ -97,16 +98,111 @@ impl Divert {
     }
 
     // C# signature: public override void ResolveReferences(Story context)
-    pub fn ResolveReferences(&mut self, _context: crate::stub::Story) {
+    pub fn ResolveReferences(&mut self, context: &mut crate::ParsedHierarchy::Story::Story) {
         if self.get_isEmpty() || self.get_isEnd() || self.get_isDone() {
             return;
         }
 
-        // Full ancestry/path resolution is still waiting on the parser object tree.
+        if let Some(target_content) = &self.targetContent {
+            self.runtimeDivert
+                .get_or_insert_with(RuntimeDivert::new)
+                .set_targetPathString(Some(target_content.get_runtimePath().ToString()));
+        }
+
+        for argument in &mut self.arguments {
+            argument.ResolveReferences(context);
+        }
+
+        let Some(target) = self.target.as_ref() else {
+            return;
+        };
+
+        let target_was_found = self.targetContent.is_some();
+        let mut is_built_in = false;
+        let mut is_external = false;
+        let target_name = target.get_firstComponent().unwrap_or_default().to_string();
+        let target_path_string = target.get_dotSeparatedComponents();
+
+        if target.get_numberOfComponents() == 1 {
+            is_built_in =
+                crate::ParsedHierarchy::FunctionCall::FunctionCall::IsBuiltIn(target_name.clone());
+            is_external = context.IsExternal(target_name.clone());
+
+            if is_built_in || is_external {
+                if !self.isFunctionCall {
+                    self.Error(
+                        format!(
+                            "{} must be called as a function: ~ {}()",
+                            target_name, target_name
+                        ),
+                        Default::default(),
+                        false,
+                    );
+                }
+
+                if is_external {
+                    if let Some(runtime_divert) = &mut self.runtimeDivert {
+                        runtime_divert.set_isExternal(true);
+                        runtime_divert.set_externalArgs(self.arguments.len() as i32);
+                        runtime_divert.set_pushesToStack(false);
+                        runtime_divert.set_targetPathString(Some(target_path_string.clone()));
+                    }
+                    self.CheckExternalArgumentValidity(context);
+                }
+
+                return;
+            }
+        }
+
+        if self
+            .runtimeDivert
+            .as_ref()
+            .and_then(|divert| divert.get_variableDivertName())
+            .is_some()
+        {
+            return;
+        }
+
+        if !target_was_found && !is_built_in && !is_external {
+            self.Error(
+                format!("target not found: '{}'", target.ToString()),
+                Default::default(),
+                false,
+            );
+        }
     }
 
     // C# signature: public override void Error (string message, Object source = null, bool isWarning = false)
-    pub fn Error(&mut self, _message: String, _source: crate::stub::PortStub, _isWarning: bool) {}
+    pub fn Error(
+        &mut self,
+        _message: String,
+        _source: crate::ParsedHierarchy::Object::Object,
+        _isWarning: bool,
+    ) {
+    }
+
+    fn CheckExternalArgumentValidity(
+        &mut self,
+        context: &mut crate::ParsedHierarchy::Story::Story,
+    ) {
+        if let Some(target) = &self.target {
+            let externalName = target.get_firstComponent().unwrap_or_default().to_string();
+            if let Some(external) = context.externals.get(&externalName) {
+                let expected = external.argumentNames.len();
+                let actual = self.arguments.len();
+                if actual != expected {
+                    self.Error(
+                        format!(
+                            "incorrect number of arguments sent to external function '{}'. Expected {} but got {}",
+                            externalName, expected, actual
+                        ),
+                        Default::default(),
+                        false,
+                    );
+                }
+            }
+        }
+    }
 
     // C# signature: public override string ToString ()
     pub fn ToString(&self) -> String {
@@ -123,7 +219,7 @@ impl Divert {
     }
 
     // C# signature: Parsed.Object targetContent { get; }
-    pub fn get_targetContent(&self) -> Option<&crate::stub::PortStub> {
+    pub fn get_targetContent(&self) -> Option<&Object> {
         self.targetContent.as_ref()
     }
 

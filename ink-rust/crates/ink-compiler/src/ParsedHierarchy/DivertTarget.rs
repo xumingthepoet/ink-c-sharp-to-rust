@@ -46,7 +46,7 @@ impl DivertTarget {
 
     // C# signature: public override void ResolveReferences (Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
-        self.divert.ResolveReferences(Default::default());
+        self.divert.ResolveReferences(context);
         let mut divert = self.divert.clone();
         divert.GenerateRuntimeObject();
         self.runtimeDivert = divert.get_runtimeDivert().cloned();
