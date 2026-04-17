@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 34 | 26 | 4 |
-| Total | 98 | 68 | 26 | 4 |
+| Compiler | 64 | 35 | 25 | 4 |
+| Total | 98 | 69 | 25 | 4 |
 
 ## Runtime
 
@@ -71,7 +71,7 @@ Source area: `ink-c-sharp/compiler/`
 
 1. `InkParser/CommentEliminator.cs` (`deps=2`) [ported]
 2. `InkParser/InkParser_AuthorWarning.cs` (`deps=2`) [ported]
-3. `InkParser/InkParser_Include.cs` (`deps=3`) [partial: reason=include loading is wired, but root-parser recursion tracking and exact error recovery are simplified; missing=root-parser chained include semantics and full open-file bookkeeping parity; next=port the remaining parser hierarchy so include can match C# recursion behavior]
+3. `InkParser/InkParser_Include.cs` (`deps=3`) [ported]
 4. `InkParser/InkParser_Whitespace.cs` (`deps=3`) [ported]
 5. `InkParser/InkParser_CharacterRanges.cs` (`deps=4`) [ported]
 6. `InkParser/InkParser_CommandLineInput.cs` (`deps=4`) [ported]

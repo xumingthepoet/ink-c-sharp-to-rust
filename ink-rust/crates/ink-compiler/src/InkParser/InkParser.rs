@@ -4,7 +4,9 @@ use crate::CharacterSet::CharacterSet;
 use crate::FileHandler::{DefaultFileHandler, IFileHandler};
 use crate::StringParser::StringParser::{ErrorHandler, StringParser};
 use ink_runtime::DebugMetadata::DebugMetadata;
+use std::cell::RefCell;
 use std::collections::HashSet;
+use std::rc::Rc;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -13,7 +15,7 @@ pub struct InkParser {
     filename: Option<String>,
     externalErrorHandler: Option<ErrorHandler>,
     fileHandler: Arc<dyn IFileHandler + Send + Sync>,
-    openFilenames: HashSet<String>,
+    openFilenames: Rc<RefCell<HashSet<String>>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -35,11 +37,11 @@ impl InkParser {
             .unwrap_or_default();
         let parser = StringParser::new(processed);
         let fileHandler = fileHandler.unwrap_or_else(|| Arc::new(DefaultFileHandler));
-        let mut openFilenames = HashSet::new();
+        let openFilenames = Rc::new(RefCell::new(HashSet::new()));
 
         if let Some(filename) = filenameForMetadata.as_ref() {
             if let Ok(full_root_ink_path) = fileHandler.ResolveInkFilename(filename) {
-                openFilenames.insert(full_root_ink_path);
+                openFilenames.borrow_mut().insert(full_root_ink_path);
             }
         }
 
@@ -383,8 +385,16 @@ impl InkParser {
         }
     }
 
-    pub fn get_openFilenames(&self) -> &HashSet<String> {
-        &self.openFilenames
+    pub fn get_openFilenames(&self) -> HashSet<String> {
+        self.openFilenames.borrow().clone()
+    }
+
+    pub fn clone_openFilenames(&self) -> Rc<RefCell<HashSet<String>>> {
+        Rc::clone(&self.openFilenames)
+    }
+
+    pub fn set_openFilenames_shared(&mut self, openFilenames: Rc<RefCell<HashSet<String>>>) {
+        self.openFilenames = openFilenames;
     }
 
     pub fn set_flag(&mut self, flag: CustomFlags, value: bool) {
@@ -400,11 +410,11 @@ impl InkParser {
     }
 
     pub fn AddOpenFilenameShared(&mut self, fullFilename: String) {
-        self.openFilenames.insert(fullFilename);
+        self.openFilenames.borrow_mut().insert(fullFilename);
     }
 
     pub fn RemoveOpenFilenameShared(&mut self, fullFilename: String) {
-        self.openFilenames.remove(&fullFilename);
+        self.openFilenames.borrow_mut().remove(&fullFilename);
     }
 }
 

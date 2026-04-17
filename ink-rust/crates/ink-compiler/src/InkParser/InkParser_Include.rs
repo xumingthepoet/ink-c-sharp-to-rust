@@ -45,6 +45,8 @@ impl InkParser {
                 self.get_externalErrorHandler(),
                 Some(self.clone_fileHandler()),
             );
+            parser.set_openFilenames_shared(self.clone_openFilenames());
+            parser.AddOpenFilenameShared(fullFilename.clone());
             parser.Parse()
         });
 
