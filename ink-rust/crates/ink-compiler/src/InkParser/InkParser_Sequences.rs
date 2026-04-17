@@ -4,6 +4,7 @@ use crate::CharacterSet::CharacterSet;
 use crate::InkParser::InkParser::InkParser;
 use crate::ParsedHierarchy::ContentList::{ContentList, ContentListItem};
 use crate::ParsedHierarchy::Sequence::{Sequence, SequenceType};
+use crate::ParsedHierarchy::Text::Text;
 
 impl InkParser {
     // C# signature: protected Sequence InnerSequence()
@@ -176,9 +177,23 @@ impl InkParser {
     pub fn InnerMultilineSequenceObjects(&mut self) -> Option<Vec<ContentList>> {
         let _ = self.MultilineWhitespace();
 
-        todo!(
-            "sequence multiline parsing needs ContentList conversion from parsed statement objects"
-        )
+        let mut result = Vec::<ContentList>::new();
+
+        loop {
+            let rule_id = self.parser_mut().BeginRule();
+            let Some(content_list) = self.SingleMultilineSequenceElement() else {
+                self.parser_mut().CancelRule(rule_id);
+                break;
+            };
+            self.parser_mut().SucceedRule(rule_id, ());
+            result.push(content_list);
+        }
+
+        if result.is_empty() {
+            None
+        } else {
+            Some(result)
+        }
     }
 
     // C# signature: protected ContentList SingleMultilineSequenceElement()
@@ -195,8 +210,22 @@ impl InkParser {
 
         let _ = self.Whitespace();
 
-        todo!(
-            "sequence multiline parsing needs ContentList conversion from parsed statement objects"
-        )
+        let content = self
+            .StatementsAtLevel(crate::InkParser::InkParser_Statements::StatementLevel::InnerBlock)
+            .unwrap_or_default();
+
+        let mut content_list_items = Vec::<ContentListItem>::new();
+
+        if content.is_empty() {
+            let _ = self.MultilineWhitespace();
+        } else {
+            content_list_items.push(ContentListItem::from(Text::new("\n".to_string())));
+        }
+
+        for item in content {
+            content_list_items.push(ContentListItem::from(item));
+        }
+
+        Some(ContentList::new(content_list_items))
     }
 }

@@ -7,6 +7,7 @@ use crate::ParsedHierarchy::Expression::Expression;
 use crate::ParsedHierarchy::Gather::Gather;
 use crate::ParsedHierarchy::IncludedFile::IncludedFile;
 use crate::ParsedHierarchy::List::List;
+use crate::ParsedHierarchy::Object::Object;
 use crate::ParsedHierarchy::Return::Return;
 use crate::ParsedHierarchy::Story::Story;
 use crate::ParsedHierarchy::Tag::Tag;
@@ -33,6 +34,7 @@ pub enum ContentListItem {
     AuthorWarning(AuthorWarning),
     ConstantDeclaration(ConstantDeclaration),
     IncludedFile(IncludedFile),
+    Object(Object),
 }
 
 impl From<Text> for ContentListItem {
@@ -125,6 +127,12 @@ impl From<IncludedFile> for ContentListItem {
     }
 }
 
+impl From<Object> for ContentListItem {
+    fn from(value: Object) -> Self {
+        Self::Object(value)
+    }
+}
+
 impl std::fmt::Display for ContentListItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -143,6 +151,7 @@ impl std::fmt::Display for ContentListItem {
             ContentListItem::AuthorWarning(_) => f.write_str("AuthorWarning"),
             ContentListItem::ConstantDeclaration(_) => f.write_str("ConstantDeclaration"),
             ContentListItem::IncludedFile(_) => f.write_str("IncludedFile"),
+            ContentListItem::Object(object) => write!(f, "{}", object.get_typeName()),
         }
     }
 }
@@ -156,9 +165,12 @@ pub struct ContentList {
 
 impl ContentList {
     // C# signature: public ContentList (List<Parsed.Object> objects)
-    pub fn new(objects: Vec<ContentListItem>) -> Self {
+    pub fn new<T>(objects: Vec<T>) -> Self
+    where
+        T: Into<ContentListItem> + Clone,
+    {
         Self {
-            content: objects,
+            content: objects.into_iter().map(Into::into).collect(),
             ..Default::default()
         }
     }
@@ -178,9 +190,12 @@ impl ContentList {
     }
 
     // C# signature: public void AddContent<T>(List<T> listContent)
-    pub fn AddContent_overload_2(&mut self, listContent: Vec<ContentListItem>) {
+    pub fn AddContent_overload_2<T>(&mut self, listContent: Vec<T>)
+    where
+        T: Into<ContentListItem> + Clone,
+    {
         for obj in listContent {
-            self.content.push(obj);
+            self.content.push(obj.into());
         }
     }
 
@@ -237,6 +252,7 @@ impl ContentList {
                 ContentListItem::ConstantDeclaration(declaration) => {
                     declaration.ResolveReferences(context)
                 }
+                ContentListItem::Object(object) => object.ResolveReferences(context),
                 _ => {}
             }
         }
@@ -294,6 +310,11 @@ impl ContentList {
             ContentListItem::IncludedFile(included) => {
                 let _ = included.GenerateRuntimeObject();
             }
+            ContentListItem::Object(object) => {
+                if let Some(runtime_object) = object.get_runtimeObject().cloned() {
+                    container.AddContent(runtime_object);
+                }
+            }
         }
     }
 
@@ -330,9 +351,10 @@ impl ContentList {
 #[cfg(test)]
 mod tests {
     use super::{ContentList, ContentListItem};
+    use crate::ParsedHierarchy::Object::{Object, ObjectKind};
     use crate::ParsedHierarchy::Tag::Tag;
     use crate::ParsedHierarchy::Text::Text;
-    use ink_runtime::Container::ContentItem;
+    use ink_runtime::Container::{Container, ContentItem};
     use ink_runtime::ControlCommand::CommandType;
     use ink_runtime::Value::{StringValue, Value};
 
@@ -370,6 +392,24 @@ mod tests {
             runtime.get_content()[1],
             ContentItem::ControlCommand(ref command)
                 if command.get_commandType() == CommandType::BeginTag
+        ));
+    }
+
+    #[test]
+    fn passes_through_runtime_objects_from_parsed_objects() {
+        let mut object = Object::with_kind(ObjectKind::Plain);
+        let mut nested = Container::new();
+        nested.AddContent(Value::new_int(7));
+        object.set_runtimeObject(Some(nested.clone()));
+
+        let mut list = ContentList::new(vec![object]);
+
+        let runtime = list.GenerateRuntimeObject();
+
+        assert_eq!(runtime.get_content().len(), 1);
+        assert!(matches!(
+            runtime.get_content()[0],
+            ContentItem::Container(ref container) if container.get_content().len() == 1
         ));
     }
 }
