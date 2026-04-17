@@ -1473,7 +1473,7 @@ Hello world 2!
 
         story.ObserveVariable(
             "testVar".to_string(),
-            Arc::new(move |_name: String, new_value: ink_runtime::Value| {
+            Arc::new(move |_name: String, new_value: Value| {
                 if let Value::Int(iv) = new_value {
                     *current_var_clone.lock().unwrap() = iv.value;
                 }
@@ -1789,7 +1789,7 @@ After thread 2 choice ({name})
         assert_eq!("Hello I'm blue\n", continue_once(&mut story));
 
         story.SwitchFlow("Red Flow".to_string());
-        story.ChoosePathString("red".to_string());
+        story.ChoosePathString("red".to_string(), true, vec![]);
         assert_eq!("Hello I'm red\n", continue_once(&mut story));
 
         // Test existing state remains after switch (blue)
@@ -1807,7 +1807,7 @@ After thread 2 choice ({name})
         story.ResetState();
 
         // Load to pre-choice: still blue, choose second choice
-        story.get_state().LoadJson(saved);
+        story.get_state().LoadJson(saved.clone());
         story.ChooseChoiceIndex(1);
         assert_eq!(
             "Thread 2 blue choice\nAfter thread 2 choice (blue)\n",
@@ -1815,7 +1815,7 @@ After thread 2 choice ({name})
         );
 
         // Load: switch to red, choose 1
-        story.get_state().LoadJson(saved);
+        story.get_state().LoadJson(saved.clone());
         story.SwitchFlow("Red Flow".to_string());
         story.ChooseChoiceIndex(0);
         assert_eq!(
@@ -1835,7 +1835,7 @@ After thread 2 choice ({name})
 VAR x = ""world""
 Hello {x}.
 "#;
-        let story = compile_string(story_src);
+        let mut story = compile_string(story_src);
         assert_eq!("Hello world.\n", continue_once(&mut story.clone()));
         // Setting non-existent variable - in Rust this may panic or be silently ignored
         // We test that the story runs correctly with existing variables
