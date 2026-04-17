@@ -4,8 +4,9 @@
 use crate::Container::Container;
 use crate::Path::Path;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ChoicePoint {
+    parent: Option<Box<Container>>,
     pathOnChoice: Option<Path>,
     pub hasCondition: bool,
     pub hasStartContent: bool,
@@ -18,6 +19,7 @@ impl ChoicePoint {
     // C# signature: public ChoicePoint (bool onceOnly)
     pub fn new(onceOnly: bool) -> Self {
         Self {
+            parent: None,
             pathOnChoice: None,
             hasCondition: false,
             hasStartContent: false,
@@ -47,9 +49,21 @@ impl ChoicePoint {
 
     // C# signature: Container choiceTarget { get; }
     pub fn get_choiceTarget(&mut self) -> Option<Container> {
-        todo!(
-            "port runtime ChoicePoint.choiceTarget after Runtime.Object.ResolvePath is translated"
-        );
+        let path = self.pathOnChoice.clone()?;
+        let container = self.parent.as_ref()?;
+        let root = container
+            .get_rootContentContainer()
+            .unwrap_or_else(|| container.as_ref().clone());
+        let mut search_root = if path.get_isRelative() {
+            container.as_ref().clone()
+        } else {
+            root
+        };
+
+        search_root
+            .ContentAtPath(path, 0, -1)
+            .get_container()
+            .cloned()
     }
 
     // C# signature: string pathStringOnChoice { get; }
@@ -62,6 +76,10 @@ impl ChoicePoint {
 
     pub fn set_pathStringOnChoice(&mut self, value: String) {
         self.pathOnChoice = Some(Path::new_overload_4(value));
+    }
+
+    pub fn set_parent(&mut self, parent: Option<Box<Container>>) {
+        self.parent = parent;
     }
 
     // C# signature: bool hasCondition { get; }
@@ -142,6 +160,7 @@ impl ChoicePoint {
 #[cfg(test)]
 mod tests {
     use super::ChoicePoint;
+    use crate::Container::{Container, ContentItem};
 
     #[test]
     fn tracks_choice_flags_and_path_strings() {
@@ -154,5 +173,25 @@ mod tests {
         assert_eq!(choice.get_pathStringOnChoice(), "knot.stitch");
         assert_eq!(choice.get_flags(), 1 | 4);
         assert_eq!(choice.ToString(), "Choice: -> knot.stitch");
+    }
+
+    #[test]
+    fn resolves_choice_target_from_parent_container() {
+        let mut target = Container::new();
+        target.set_name(Some("target".to_string()));
+
+        let mut root = Container::new();
+        root.AddToNamedContentOnly(target.clone());
+
+        let mut choice = ChoicePoint::new(true);
+        choice.set_parent(Some(Box::new(root.clone())));
+        choice.set_pathStringOnChoice("target".to_string());
+
+        let resolved = choice.get_choiceTarget().expect("choice target");
+        assert_eq!(resolved.get_name(), "target");
+        assert!(matches!(
+            root.get_namedContent().get("target"),
+            Some(ContentItem::Container(_))
+        ));
     }
 }

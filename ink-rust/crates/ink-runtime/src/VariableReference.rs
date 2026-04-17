@@ -2,8 +2,9 @@
 
 use crate::Path::Path;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct VariableReference {
+    parent: Option<Box<crate::Container::Container>>,
     name: Option<String>,
     pathForCount: Option<Path>,
 }
@@ -12,6 +13,7 @@ impl VariableReference {
     // C# signature: public VariableReference (string name)
     pub fn new(name: String) -> Self {
         Self {
+            parent: None,
             name: Some(name),
             pathForCount: None,
         }
@@ -43,7 +45,28 @@ impl VariableReference {
 
     // C# signature: Container containerForCount { get; }
     pub fn get_containerForCount(&self) -> crate::Container::Container {
-        todo!("port runtime VariableReference.containerForCount after Runtime.Object path resolution is translated");
+        let path = self
+            .pathForCount
+            .clone()
+            .unwrap_or_else(crate::Path::Path::new);
+        let parent = self
+            .parent
+            .as_ref()
+            .expect("variable reference must be parented");
+        let root = parent
+            .get_rootContentContainer()
+            .unwrap_or_else(|| parent.as_ref().clone());
+        let mut search_root = if path.get_isRelative() {
+            parent.as_ref().clone()
+        } else {
+            root
+        };
+
+        search_root
+            .ContentAtPath(path, 0, -1)
+            .get_container()
+            .cloned()
+            .expect("variable reference container not found")
     }
 
     // C# signature: string pathStringForCount { get; }
@@ -57,11 +80,16 @@ impl VariableReference {
     pub fn set_pathStringForCount(&mut self, value: Option<String>) {
         self.pathForCount = value.map(Path::new_overload_4);
     }
+
+    pub fn set_parent(&mut self, parent: Option<Box<crate::Container::Container>>) {
+        self.parent = parent;
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::VariableReference;
+    use crate::Container::Container;
 
     #[test]
     fn stringifies_named_and_count_references() {
@@ -72,5 +100,21 @@ mod tests {
         assert_eq!(named.ToString(), "var(score)");
         assert_eq!(count.ToString(), "read_count(knot.stitch)");
         assert_eq!(count.get_pathStringForCount(), "knot.stitch");
+    }
+
+    #[test]
+    fn resolves_count_container_from_parent_chain() {
+        let mut target = Container::new();
+        target.set_name(Some("target".to_string()));
+
+        let mut root = Container::new();
+        root.AddToNamedContentOnly(target.clone());
+
+        let mut reference = VariableReference::new_overload_2();
+        reference.set_parent(Some(Box::new(root.clone())));
+        reference.set_pathStringForCount(Some("target".to_string()));
+
+        let resolved = reference.get_containerForCount();
+        assert_eq!(resolved.get_name(), "target");
     }
 }

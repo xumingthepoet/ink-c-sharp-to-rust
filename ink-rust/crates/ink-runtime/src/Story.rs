@@ -10,6 +10,7 @@ use crate::Path::Path;
 use crate::Pointer::Pointer;
 use crate::Profiler::Profiler;
 use crate::SearchResult::SearchResult;
+use crate::StoryException::StoryException;
 use crate::StoryState::StoryState;
 use crate::Value::Value;
 use crate::VariablesState::VariablesState;
@@ -606,10 +607,18 @@ impl Story {
     pub fn NextContent(&mut self) {}
 
     // C# signature: public void Error(string message, bool useEndLineNumber = false)
-    pub fn Error(&mut self, _message: String, _useEndLineNumber: bool) {}
+    pub fn Error(&mut self, message: String, useEndLineNumber: bool) {
+        let mut err = StoryException::new_overload_2(message);
+        err.useEndLineNumber = useEndLineNumber;
+        panic!("{}", err);
+    }
 
     // C# signature: public void Warning (string message)
-    pub fn Warning(&mut self, _message: String) {}
+    pub fn Warning(&mut self, message: String) {
+        if let Some(state) = self.state.as_mut() {
+            state.AddError(message, true);
+        }
+    }
 
     // C# signature: List<Choice> currentChoices { get; }
     pub fn get_currentChoices(&mut self) -> Vec<Choice> {

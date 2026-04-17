@@ -180,6 +180,10 @@ impl Container {
                 self.path.PathByAppendingComponent(Component::new(index))
             };
             container.set_path(child_path);
+        } else if let ContentItem::ChoicePoint(ref mut choice_point) = content {
+            choice_point.set_parent(Some(Box::new(self.clone())));
+        } else if let ContentItem::VariableReference(ref mut variable_reference) = content {
+            variable_reference.set_parent(Some(Box::new(self.clone())));
         }
         self.content.push(content.clone());
         if let Some(name) = content_item_name(&content) {
@@ -210,6 +214,10 @@ impl Container {
                     .PathByAppendingComponent(Component::new(index as i32))
             };
             container.set_path(child_path);
+        } else if let ContentItem::ChoicePoint(ref mut choice_point) = content {
+            choice_point.set_parent(Some(Box::new(self.clone())));
+        } else if let ContentItem::VariableReference(ref mut variable_reference) = content {
+            variable_reference.set_parent(Some(Box::new(self.clone())));
         }
         if index >= self.content.len() {
             self.content.push(content.clone());
@@ -231,6 +239,10 @@ impl Container {
         let mut content = namedContentObj.into();
         if let ContentItem::Container(ref mut container) = content {
             container.parent = Some(Box::new(self.clone()));
+        } else if let ContentItem::ChoicePoint(ref mut choice_point) = content {
+            choice_point.set_parent(Some(Box::new(self.clone())));
+        } else if let ContentItem::VariableReference(ref mut variable_reference) = content {
+            variable_reference.set_parent(Some(Box::new(self.clone())));
         }
         if let Some(name) = content_item_name(&content) {
             self.named_content.insert(name, content);
@@ -463,6 +475,14 @@ impl Container {
 
     pub fn get_parent(&self) -> Option<&Container> {
         self.parent.as_deref()
+    }
+
+    pub fn get_rootContentContainer(&self) -> Option<Container> {
+        let mut ancestor = self.clone();
+        while let Some(parent) = ancestor.get_parent() {
+            ancestor = parent.clone();
+        }
+        Some(ancestor)
     }
 
     // C# signature: int countFlags { get; }
