@@ -6,13 +6,13 @@ use ink_runtime::Container::{Container, ContentItem};
 use ink_runtime::Divert::Divert as RuntimeDivert;
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct GatherPointToResolve {
     pub divert: RuntimeDivert,
     pub targetRuntimeObj: Container,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Weave {
     pub base: Object,
     looseEnds: Vec<Object>,
@@ -141,7 +141,7 @@ impl Weave {
     }
 
     // C# signature: public IWeavePoint WeavePointNamed(string name)
-    pub fn WeavePointNamed(&mut self, name: String) -> Option<Object> {
+    pub fn WeavePointNamed(&self, name: String) -> Option<Object> {
         self.namedWeavePoints.get(&name).cloned()
     }
 

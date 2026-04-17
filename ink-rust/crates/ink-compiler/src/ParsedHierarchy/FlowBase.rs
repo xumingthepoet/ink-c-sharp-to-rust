@@ -1,11 +1,13 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/FlowBase.cs
 
 use crate::ParsedHierarchy::FlowLevel::FlowLevel;
+use crate::ParsedHierarchy::Gather::Gather;
 use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::Object::{Object, ObjectKind};
 use crate::ParsedHierarchy::Story::Story;
 use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
 use ink_runtime::Container::{Container, ContentItem};
+use ink_runtime::ControlCommand::ControlCommand;
 use ink_runtime::Divert::Divert as RuntimeDivert;
 use ink_runtime::VariableAssignment::VariableAssignment as RuntimeVariableAssignment;
 use std::collections::HashMap;
@@ -37,6 +39,10 @@ pub struct FlowBase {
     pub isIncludedStory: bool,
     parent_flow: Option<Box<FlowBase>>,
     startingSubFlowDivert: Option<RuntimeDivert>,
+    startingSubFlowRuntime: Option<Container>,
+    rootWeave: Option<Box<crate::ParsedHierarchy::Weave::Weave>>,
+    subFlowsByName: HashMap<String, Box<FlowBase>>,
+    firstChildFlow: Option<Object>,
 }
 
 impl FlowBase {
@@ -52,7 +58,7 @@ impl FlowBase {
         base.set_identifier(Some(name.clone()));
         base.content = topLevelObjects;
 
-        Self {
+        let mut flow = Self {
             base,
             identifier: Some(name),
             arguments,
@@ -62,7 +68,16 @@ impl FlowBase {
             isIncludedStory,
             parent_flow: None,
             startingSubFlowDivert: None,
-        }
+            startingSubFlowRuntime: None,
+            rootWeave: None,
+            subFlowsByName: HashMap::new(),
+            firstChildFlow: None,
+        };
+
+        flow.PreProcessTopLevelObjects(flow.base.content.clone());
+        let split_content = flow.SplitWeaveAndSubFlowContent(flow.base.content.clone(), false);
+        flow.base.content = split_content;
+        flow
     }
 
     pub fn set_flowLevel(&mut self, flow_level: FlowLevel) {
@@ -85,6 +100,104 @@ impl FlowBase {
 
     // C# signature: protected virtual void PreProcessTopLevelObjects(List<Parsed.Object> topLevelObjects)
     pub fn PreProcessTopLevelObjects(&mut self, _topLevelObjects: Vec<Object>) {}
+
+    fn SplitWeaveAndSubFlowContent(
+        &mut self,
+        contentObjs: Vec<Object>,
+        isRootStory: bool,
+    ) -> Vec<Object> {
+        let mut weaveObjs = Vec::new();
+        let mut subFlowObjs = Vec::new();
+
+        self.subFlowsByName.clear();
+        self.firstChildFlow = None;
+
+        for obj in contentObjs {
+            let is_sub_flow = matches!(obj.kind, ObjectKind::Knot | ObjectKind::Stitch);
+            if is_sub_flow {
+                if self.firstChildFlow.is_none() {
+                    self.firstChildFlow = Some(obj.clone());
+                }
+
+                if let Some(name) = obj
+                    .identifier
+                    .as_ref()
+                    .and_then(|identifier| identifier.name.clone())
+                {
+                    self.subFlowsByName
+                        .insert(name, Box::new(FlowBase::from_object(&obj)));
+                }
+                subFlowObjs.push(obj);
+            } else {
+                weaveObjs.push(obj);
+            }
+        }
+
+        if isRootStory {
+            let mut gather = Gather::new(
+                Identifier {
+                    name: None,
+                    debugMetadata: None,
+                },
+                1,
+            );
+            let mut gather_obj = Object::with_kind(ObjectKind::WeavePoint);
+            gather_obj.set_indentationDepth(gather.get_indentationDepth());
+            gather_obj.set_identifier(gather.get_identifier().cloned());
+            if let ContentItem::Container(container) = gather.GenerateRuntimeObject() {
+                gather_obj.set_runtimeObject(Some(*container));
+            }
+            weaveObjs.push(gather_obj);
+
+            let mut done_obj = Object::with_kind(ObjectKind::Plain);
+            let mut done_container = Container::new();
+            done_container.AddContent(ControlCommand::Done());
+            done_obj.set_runtimeObject(Some(done_container));
+            weaveObjs.push(done_obj);
+        }
+
+        if !weaveObjs.is_empty() {
+            self.rootWeave = Some(Box::new(crate::ParsedHierarchy::Weave::Weave::new(
+                weaveObjs.clone(),
+                0,
+            )));
+        }
+
+        let mut final_content = weaveObjs;
+        final_content.extend(subFlowObjs);
+        final_content
+    }
+
+    fn from_object(object: &Object) -> Self {
+        let mut base = Object::with_kind(object.kind.clone());
+        base.identifier = object.identifier.clone();
+        base.indentationDepth = object.indentationDepth;
+        base.isFunction = object.isFunction;
+        base.content = object.content.clone();
+        base.set_runtimeObject(object.get_runtimeObject().cloned());
+        base.set_debugMetadata(object.get_debugMetadata().cloned());
+
+        Self {
+            base,
+            identifier: object.identifier.clone(),
+            arguments: Vec::new(),
+            variableDeclarations: HashMap::new(),
+            flow_level: match object.kind {
+                ObjectKind::Story => FlowLevel::Story,
+                ObjectKind::Knot => FlowLevel::Knot,
+                ObjectKind::Stitch => FlowLevel::Stitch,
+                _ => FlowLevel::WeavePoint,
+            },
+            isFunction: object.isFunction,
+            isIncludedStory: false,
+            parent_flow: None,
+            startingSubFlowDivert: None,
+            startingSubFlowRuntime: None,
+            rootWeave: None,
+            subFlowsByName: HashMap::new(),
+            firstChildFlow: None,
+        }
+    }
 
     // C# signature: public VariableResolveResult ResolveVariableWithName(string varName, Parsed.Object fromNode)
     pub fn ResolveVariableWithName(
@@ -158,30 +271,38 @@ impl FlowBase {
 
     // C# signature: public void ResolveWeavePointNaming ()
     pub fn ResolveWeavePointNaming(&mut self) {
-        let mut named = HashMap::<String, usize>::new();
-        let mut duplicate: Option<(String, usize, usize)> = None;
-        for (idx, obj) in self.base.content.iter().enumerate() {
-            if obj.kind == ObjectKind::WeavePoint {
-                if let Some(identifier) = &obj.identifier {
-                    if let Some(name) = &identifier.name {
-                        if let Some(existing_idx) = named.insert(name.clone(), idx) {
-                            duplicate = Some((name.clone(), existing_idx, idx));
+        if let Some(root_weave) = self.rootWeave.as_mut() {
+            root_weave.ResolveWeavePointNaming();
+        } else {
+            let mut named = HashMap::<String, usize>::new();
+            let mut duplicate: Option<(String, usize, usize)> = None;
+            for (idx, obj) in self.base.content.iter().enumerate() {
+                if obj.kind == ObjectKind::WeavePoint {
+                    if let Some(identifier) = &obj.identifier {
+                        if let Some(name) = &identifier.name {
+                            if let Some(existing_idx) = named.insert(name.clone(), idx) {
+                                duplicate = Some((name.clone(), existing_idx, idx));
+                            }
                         }
                     }
                 }
             }
+
+            if let Some((name, existing_idx, _idx)) = duplicate {
+                let existing = self.base.content[existing_idx].clone();
+                self.base.Error(
+                    format!(
+                        "A weave point with the same label name '{}' already exists in this context",
+                        name
+                    ),
+                    Some(existing),
+                    false,
+                );
+            }
         }
 
-        if let Some((name, existing_idx, _idx)) = duplicate {
-            let existing = self.base.content[existing_idx].clone();
-            self.base.Error(
-                format!(
-                    "A weave point with the same label name '{}' already exists in this context",
-                    name
-                ),
-                Some(existing),
-                false,
-            );
+        for sub_flow in self.subFlowsByName.values_mut() {
+            sub_flow.ResolveWeavePointNaming();
         }
     }
 
@@ -198,23 +319,35 @@ impl FlowBase {
                 .and_then(|identifier| identifier.name.clone()),
         );
 
-        if self
-            .parent_flow
-            .as_ref()
-            .map(|parent| parent.flow_level == FlowLevel::Story)
-            .unwrap_or(self.flow_level == FlowLevel::Story)
-        {
-            if self.base.get_ancestry().is_empty() {
-                container.set_countFlags(1);
-            }
+        if self.flow_level == FlowLevel::Story || self.isIncludedStory {
+            container.set_countFlags(1);
         }
 
         self.GenerateArgumentVariableAssignments(&mut container);
 
-        for obj in &mut self.base.content {
-            if let Some(runtime_object) = obj.get_runtimeObject().cloned() {
-                container.AddContent(runtime_object);
+        if let Some(root_weave) = self.rootWeave.as_mut() {
+            if let ContentItem::Container(root_container) = root_weave.GenerateRuntimeObject() {
+                container.AddContent(*root_container);
             }
+        }
+
+        let mut contentIdx = 0;
+        let has_parameters = self.get_hasParameters();
+        for obj in &mut self.base.content {
+            if matches!(obj.kind, ObjectKind::Knot | ObjectKind::Stitch) {
+                if let Some(runtime_object) = obj.get_runtimeObject().cloned() {
+                    if contentIdx == 0 && !has_parameters && self.flow_level == FlowLevel::Knot {
+                        self.startingSubFlowDivert = Some(RuntimeDivert::new());
+                        if let Some(divert) = self.startingSubFlowDivert.as_ref() {
+                            container.AddContent(divert.clone());
+                        }
+                        self.startingSubFlowRuntime = Some(runtime_object.clone());
+                    }
+
+                    container.AddToNamedContentOnly(runtime_object);
+                }
+            }
+            contentIdx += 1;
         }
 
         container
@@ -254,15 +387,21 @@ impl FlowBase {
         }
 
         if level == Some(FlowLevel::WeavePoint) || level.is_none() {
-            for obj in &self.base.content {
-                if obj.kind == ObjectKind::WeavePoint
-                    && obj
-                        .identifier
-                        .as_ref()
-                        .and_then(|identifier| identifier.name.as_deref())
-                        == Some(name.as_str())
-                {
-                    return Some(obj.clone());
+            if let Some(root_weave) = &self.rootWeave {
+                if let Some(weave_point) = root_weave.WeavePointNamed(name.clone()) {
+                    return Some(weave_point);
+                }
+            } else {
+                for obj in &self.base.content {
+                    if obj.kind == ObjectKind::WeavePoint
+                        && obj
+                            .identifier
+                            .as_ref()
+                            .and_then(|identifier| identifier.name.as_deref())
+                            == Some(name.as_str())
+                    {
+                        return Some(obj.clone());
+                    }
                 }
             }
 
@@ -272,6 +411,12 @@ impl FlowBase {
                 } else {
                     None
                 };
+            }
+        }
+
+        if let Some(sub_flow) = self.subFlowsByName.get(&name) {
+            if level.is_none() || level == Some(sub_flow.flow_level) {
+                return Some(sub_flow.base.clone());
             }
         }
 
@@ -297,17 +442,18 @@ impl FlowBase {
             return Some(weaveResultSelf);
         }
 
-        for obj in &self.base.content {
-            if obj
+        for sub_flow in self.subFlowsByName.values() {
+            if sub_flow
+                .base
                 .identifier
                 .as_ref()
                 .and_then(|identifier| identifier.name.as_deref())
                 == Some(name.as_str())
             {
-                return Some(obj.clone());
+                return Some(sub_flow.base.clone());
             }
 
-            if let Some(found) = obj.FindAll(None).into_iter().find(|candidate| {
+            if let Some(found) = sub_flow.base.FindAll(None).into_iter().find(|candidate| {
                 candidate
                     .identifier
                     .as_ref()
@@ -324,20 +470,35 @@ impl FlowBase {
     // C# signature: public override void ResolveReferences (Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
         if let Some(divert) = self.startingSubFlowDivert.as_mut() {
-            if let Some(first_child) = self.base.content.first() {
-                divert.set_targetPathString(Some(first_child.get_runtimePath().ToString()));
+            if let Some(starting_runtime) = self.startingSubFlowRuntime.as_ref() {
+                divert.set_targetPathString(Some(starting_runtime.get_path().ToString()));
             }
+        }
+
+        if let Some(root_weave) = self.rootWeave.as_mut() {
+            root_weave.ResolveReferences(context);
         }
 
         self.base.ResolveReferences(context);
 
-        if let Some(root_identifier) = &self.identifier {
-            let _ = root_identifier;
-            let _ = context;
+        for sub_flow in self.subFlowsByName.values_mut() {
+            sub_flow.ResolveReferences(context);
         }
 
-        for _arg in &self.arguments {
-            let _ = _arg;
+        if let Some(identifier) = &self.identifier {
+            if identifier
+                .name
+                .as_ref()
+                .map(|name| !name.is_empty())
+                .unwrap_or(false)
+            {
+                context.CheckForNamingCollisions(
+                    Default::default(),
+                    identifier.clone(),
+                    crate::ParsedHierarchy::Story::SymbolType::SubFlowAndWeave,
+                    String::new(),
+                );
+            }
         }
     }
 
