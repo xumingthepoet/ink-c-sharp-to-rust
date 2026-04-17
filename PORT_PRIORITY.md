@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 25 | 9 | 30 |
-| Total | 98 | 59 | 9 | 30 |
+| Compiler | 64 | 25 | 10 | 29 |
+| Total | 98 | 59 | 10 | 29 |
 
 ## Runtime
 
@@ -96,7 +96,7 @@ Source area: `ink-c-sharp/compiler/`
 23. `ParsedHierarchy/IWeavePoint.cs` (`deps=3`) [ported]
 24. `ParsedHierarchy/List.cs` (`deps=3`)
 25. `InkParser/InkParser_CharacterRanges.cs` (`deps=4`) [ported]
-26. `InkParser/InkParser_CommandLineInput.cs` (`deps=4`)
+26. `InkParser/InkParser_CommandLineInput.cs` (`deps=4`) [partial: reason=the parser helper now handles help, exit, DebugSource, DebugPath, and choice-number inputs, but immediate-mode statement parsing is still omitted; missing=UserImmediateModeStatement and the statement/expression tree it depends on; next=port the statement hierarchy and expression parser enough to support immediate-mode input]
 27. `ParsedHierarchy/ConstantDeclaration.cs` (`deps=4`) [ported]
 28. `ParsedHierarchy/ExternalDeclaration.cs` (`deps=4`) [ported]
 29. `ParsedHierarchy/StringExpression.cs` (`deps=4`) [ported]
