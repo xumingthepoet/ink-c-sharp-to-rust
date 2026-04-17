@@ -413,6 +413,21 @@ impl StoryState {
         self.currentWarnings = None;
     }
 
+    // C# signature: internal void StartVariableObservation()
+    pub fn StartVariableObservation(&mut self) {
+        self.variablesState.StartVariableObservation();
+    }
+
+    // C# signature: internal HashMap<string, Runtime.Object> CompleteVariableObservation()
+    pub fn CompleteVariableObservation(&mut self) -> HashMap<String, Value> {
+        self.variablesState.CompleteVariableObservation()
+    }
+
+    // C# signature: internal void NotifyObservers(Dictionary<string, Runtime.Object> changedVars)
+    pub fn NotifyObservers(&mut self, changedVars: HashMap<String, Value>) {
+        self.variablesState.NotifyObservers(changedVars);
+    }
+
     // C# signature: public void ResetOutput(List<Runtime.Object> objs = null)
     pub fn ResetOutput(&mut self, objs: Vec<ContentItem>) {
         self.currentFlow.outputStream.clear();
@@ -930,6 +945,11 @@ impl StoryState {
         self.divertedPointer.clone()
     }
 
+    // C# signature: internal void set_divertedPointer(Pointer value)
+    pub fn set_divertedPointer(&mut self, value: Pointer) {
+        self.divertedPointer = value;
+    }
+
     pub fn get_currentTurnIndex(&self) -> i32 {
         self.currentTurnIndex
     }
@@ -944,6 +964,11 @@ impl StoryState {
 
     pub fn get_didSafeExit(&self) -> bool {
         self.didSafeExit
+    }
+
+    // C# signature: internal void set_didSafeExit(bool value)
+    pub fn set_didSafeExit(&mut self, value: bool) {
+        self.didSafeExit = value;
     }
 
     pub fn get_story(&self) -> Story {
@@ -972,8 +997,18 @@ impl StoryState {
         self.currentPointer()
     }
 
+    // C# signature: internal void set_currentPointer(Pointer value)
+    pub fn set_currentPointer(&mut self, value: Pointer) {
+        self.currentPointer_set(value);
+    }
+
     pub fn get_previousPointer(&self) -> Pointer {
         self.previousPointer()
+    }
+
+    // C# signature: internal void set_previousPointer(Pointer value)
+    pub fn set_previousPointer(&mut self, value: Pointer) {
+        self.previousPointer_set(value);
     }
 
     pub fn get_canContinue(&self) -> bool {

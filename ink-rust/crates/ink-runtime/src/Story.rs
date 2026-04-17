@@ -3,26 +3,40 @@
 
 use crate::stub::*;
 use crate::Choice::Choice;
+use crate::ChoicePoint::ChoicePoint;
 use crate::Container::Container;
+use crate::ControlCommand::{CommandType, ControlCommand};
+use crate::Divert::Divert;
+use crate::Glue::Glue;
 use crate::ListDefinition::ListDefinition;
 use crate::ListDefinitionsOrigin::ListDefinitionsOrigin;
+use crate::NativeFunctionCall::NativeFunctionCall;
 use crate::Path::Path;
 use crate::Pointer::Pointer;
 use crate::Profiler::Profiler;
 use crate::SearchResult::SearchResult;
 use crate::StoryException::StoryException;
 use crate::StoryState::StoryState;
-use crate::Value::Value;
+use crate::Tag::Tag;
+use crate::Value::{StringValue, Value};
 use crate::VariablesState::VariableObserver;
 use crate::VariablesState::VariablesState;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::rc::Rc;
 
 #[derive(Default)]
 pub struct Story {
     main_content_container: Container,
     listDefinitions: ListDefinitionsOrigin,
     state: Option<Box<StoryState>>,
+    state_snapshot_at_last_new_line: Option<Box<StoryState>>,
+    temporary_evaluation_container: Option<Container>,
     _externals: HashMap<String, ExternalFunctionDef>,
+    _profiler: Option<Profiler>,
+    recursive_continue_count: i32,
+    async_continue_active: bool,
+    saw_lookahead_unsafe_function_after_newline: bool,
+    _has_validated_externals: bool,
     async_saving: bool,
     allowExternalFunctionFallbacks: bool,
     pub _port_marker: (),
@@ -34,6 +48,27 @@ impl std::fmt::Debug for Story {
             .field("main_content_container", &self.main_content_container)
             .field("listDefinitions", &self.listDefinitions)
             .field("state", &self.state.as_ref().map(|_| "<state>"))
+            .field(
+                "state_snapshot_at_last_new_line",
+                &self
+                    .state_snapshot_at_last_new_line
+                    .as_ref()
+                    .map(|_| "<snapshot>"),
+            )
+            .field(
+                "temporary_evaluation_container",
+                &self
+                    .temporary_evaluation_container
+                    .as_ref()
+                    .map(|_| "<temporary>"),
+            )
+            .field("recursive_continue_count", &self.recursive_continue_count)
+            .field("async_continue_active", &self.async_continue_active)
+            .field(
+                "saw_lookahead_unsafe_function_after_newline",
+                &self.saw_lookahead_unsafe_function_after_newline,
+            )
+            .field("_has_validated_externals", &self._has_validated_externals)
             .field("async_saving", &self.async_saving)
             .field(
                 "allowExternalFunctionFallbacks",
@@ -49,7 +84,14 @@ impl Clone for Story {
             main_content_container: self.main_content_container.clone(),
             listDefinitions: self.listDefinitions.clone(),
             state: None,
+            state_snapshot_at_last_new_line: None,
+            temporary_evaluation_container: None,
             _externals: self._externals.clone(),
+            _profiler: None,
+            recursive_continue_count: 0,
+            async_continue_active: false,
+            saw_lookahead_unsafe_function_after_newline: false,
+            _has_validated_externals: false,
             async_saving: self.async_saving,
             allowExternalFunctionFallbacks: self.allowExternalFunctionFallbacks,
             _port_marker: (),
@@ -59,12 +101,14 @@ impl Clone for Story {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OutputStateChange {
-    PortPlaceholder,
+    NoChange,
+    NewlineRemoved,
+    ExtendedBeyondNewline,
 }
 
 impl Default for OutputStateChange {
     fn default() -> Self {
-        Self::PortPlaceholder
+        Self::NoChange
     }
 }
 
@@ -84,7 +128,14 @@ impl Story {
             main_content_container: _contentContainer,
             listDefinitions: ListDefinitionsOrigin::new(lists),
             state: None,
+            state_snapshot_at_last_new_line: None,
+            temporary_evaluation_container: None,
             _externals: HashMap::new(),
+            _profiler: None,
+            recursive_continue_count: 0,
+            async_continue_active: false,
+            saw_lookahead_unsafe_function_after_newline: false,
+            _has_validated_externals: false,
             async_saving: false,
             allowExternalFunctionFallbacks: false,
             _port_marker: (),
@@ -132,7 +183,14 @@ impl Story {
             main_content_container,
             listDefinitions: list_definitions,
             state: None,
+            state_snapshot_at_last_new_line: None,
+            temporary_evaluation_container: None,
             _externals: HashMap::new(),
+            _profiler: None,
+            recursive_continue_count: 0,
+            async_continue_active: false,
+            saw_lookahead_unsafe_function_after_newline: false,
+            _has_validated_externals: false,
             async_saving: false,
             allowExternalFunctionFallbacks: false,
             _port_marker: (),
@@ -143,11 +201,16 @@ impl Story {
 
     // C# signature: public Profiler StartProfiling()
     pub fn StartProfiling(&mut self) -> Profiler {
-        Profiler::new()
+        self.IfAsyncWeCant("start profiling");
+        let profiler = Profiler::new();
+        self._profiler = Some(profiler.clone());
+        profiler
     }
 
     // C# signature: public void EndProfiling()
-    pub fn EndProfiling(&mut self) {}
+    pub fn EndProfiling(&mut self) {
+        self._profiler = None;
+    }
 
     // C# signature: public string ToJson()
     pub fn ToJson(&mut self) -> String {
@@ -204,6 +267,36 @@ impl Story {
     pub fn ResetState(&mut self) {
         let story_snapshot = self.clone();
         self.state = Some(Box::new(StoryState::new(story_snapshot)));
+        self.state_snapshot_at_last_new_line = None;
+        self.temporary_evaluation_container = None;
+        self._profiler = None;
+        self.recursive_continue_count = 0;
+        self.async_continue_active = false;
+        self.saw_lookahead_unsafe_function_after_newline = false;
+        self._has_validated_externals = false;
+    }
+
+    fn story_state_ref(&self) -> &StoryState {
+        self.state.as_ref().expect("story state not initialized")
+    }
+
+    fn story_state_mut(&mut self) -> &mut StoryState {
+        self.state.as_mut().expect("story state not initialized")
+    }
+
+    fn IfAsyncWeCant(&self, activity_str: &str) {
+        if self.async_continue_active {
+            panic!(
+                "Can't {}. Story is in the middle of a ContinueAsync(). Make more ContinueAsync() calls or a single Continue() call beforehand.",
+                activity_str
+            );
+        }
+    }
+
+    fn main_content_container_ref(&self) -> &Container {
+        self.temporary_evaluation_container
+            .as_ref()
+            .unwrap_or(&self.main_content_container)
     }
 
     // C# signature: public void ResetCallstack()
@@ -251,12 +344,13 @@ impl Story {
 
     // C# signature: public SearchResult ContentAtPath(Path path)
     pub fn ContentAtPath(&mut self, _path: Path) -> SearchResult {
-        self.main_content_container.ContentAtPath(_path, 0, -1)
+        let mut container = self.main_content_container_ref().clone();
+        container.ContentAtPath(_path, 0, -1)
     }
 
     // C# signature: public Runtime.Container KnotContainerWithName (string name)
     pub fn KnotContainerWithName(&mut self, _name: String) -> Option<Container> {
-        self.main_content_container
+        self.main_content_container_ref()
             .get_namedContent()
             .get(&_name)
             .and_then(|content| match content {
@@ -280,11 +374,11 @@ impl Story {
             .unwrap_or(false)
         {
             path_length_to_use -= 1;
-            self.main_content_container
-                .ContentAtPath(_path.clone(), 0, path_length_to_use)
+            let mut container = self.main_content_container_ref().clone();
+            container.ContentAtPath(_path.clone(), 0, path_length_to_use)
         } else {
-            self.main_content_container
-                .ContentAtPath(_path.clone(), 0, -1)
+            let mut container = self.main_content_container_ref().clone();
+            container.ContentAtPath(_path.clone(), 0, -1)
         };
 
         let mut pointer = if let Some(container) = result.get_container() {
@@ -338,6 +432,7 @@ impl Story {
         arguments: Vec<crate::stub::PortStub>,
     ) {
         let _ = arguments;
+        self.IfAsyncWeCant("call ChoosePathString right now");
         if let Some(state) = self.state.as_mut() {
             if resetCallstack {
                 state.ForceEnd();
@@ -378,16 +473,17 @@ impl Story {
     // C# signature: public object EvaluateFunction (string functionName, out string textOutput, params object [] arguments)
     pub fn EvaluateFunction_overload_2(
         &mut self,
-        _functionName: String,
-        _textOutput: &mut String,
-        _arguments: Vec<crate::stub::PortStub>,
+        functionName: String,
+        textOutput: &mut String,
+        arguments: Vec<crate::stub::PortStub>,
     ) -> crate::stub::PortStub {
-        let _ = (_functionName, _textOutput, _arguments);
+        let _ = (functionName, textOutput, arguments);
         Default::default()
     }
 
     // C# signature: public Runtime.Object EvaluateExpression(Runtime.Container exprContainer)
     pub fn EvaluateExpression(&mut self, _exprContainer: Container) -> crate::stub::PortStub {
+        let _ = _exprContainer;
         Default::default()
     }
 
@@ -607,8 +703,8 @@ impl Story {
 
     // C# signature: public virtual string BuildStringOfHierarchy()
     pub fn BuildStringOfHierarchy(&mut self) -> String {
-        self.main_content_container
-            .BuildStringOfHierarchy_overload_2()
+        let mut container = self.main_content_container_ref().clone();
+        container.BuildStringOfHierarchy_overload_2()
     }
 
     // C# signature: private void NextContent()
@@ -747,6 +843,11 @@ impl Story {
     // C# signature: bool allowExternalFunctionFallbacks { get; }
     pub fn get_allowExternalFunctionFallbacks(&mut self) -> bool {
         self.allowExternalFunctionFallbacks
+    }
+
+    // C# signature: bool allowExternalFunctionFallbacks { get; set; }
+    pub fn set_allowExternalFunctionFallbacks(&mut self, value: bool) {
+        self.allowExternalFunctionFallbacks = value;
     }
 
     // C# signature: List<string> globalTags { get; }
