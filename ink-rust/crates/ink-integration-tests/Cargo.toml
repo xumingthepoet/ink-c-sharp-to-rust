@@ -1,0 +1,12 @@
+[package]
+name = "ink-integration-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+ink-runtime = { path = "../ink-runtime" }
+ink-compiler = { path = "../ink-compiler" }

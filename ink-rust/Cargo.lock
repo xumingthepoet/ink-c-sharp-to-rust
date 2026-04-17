@@ -10,6 +10,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ink-integration-tests"
+version = "0.1.0"
+dependencies = [
+ "ink-compiler",
+ "ink-runtime",
+]
+
+[[package]]
 name = "ink-runtime"
 version = "0.1.0"
 
