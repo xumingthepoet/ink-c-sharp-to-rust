@@ -19,7 +19,7 @@ impl ExternalDeclaration {
     }
 
     // C# signature: public override Ink.Runtime.Object GenerateRuntimeObject ()
-    pub fn GenerateRuntimeObject(&mut self) -> Option<()> {
+    pub fn GenerateRuntimeObject(&self) -> Option<()> {
         None
     }
 
@@ -67,5 +67,6 @@ mod tests {
         assert!(story.IsExternal("my_external".to_string()));
         assert_eq!(decl.get_name(), Some("my_external"));
         assert_eq!(decl.get_argumentNames(), &["arg".to_string()]);
+        assert!(decl.GenerateRuntimeObject().is_none());
     }
 }

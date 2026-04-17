@@ -5,8 +5,8 @@ Generated with Roslyn from non-generated source files only. `obj/` and `bin/` ar
 Source files: 98
 Public types: 133
 Public members: 1081
-Rust implemented: 47
-Rust skeleton: 48
+Rust implemented: 48
+Rust skeleton: 47
 Rust partial: 3
 Rust missing: 0
 
@@ -44,7 +44,7 @@ Rust missing: 0
 | `ink-c-sharp/compiler/ParsedHierarchy/Divert.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Divert.rs` | 1 | 17 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/DivertTarget.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/DivertTarget.rs` | 1 | 6 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/Expression.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/Expression.rs` | 5 | 28 | partial |
-| `ink-c-sharp/compiler/ParsedHierarchy/ExternalDeclaration.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/ExternalDeclaration.rs` | 1 | 5 | skeleton |
+| `ink-c-sharp/compiler/ParsedHierarchy/ExternalDeclaration.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/ExternalDeclaration.rs` | 1 | 5 | implemented |
 | `ink-c-sharp/compiler/ParsedHierarchy/FlowBase.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/FlowBase.rs` | 3 | 26 | skeleton |
 | `ink-c-sharp/compiler/ParsedHierarchy/FlowLevel.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/FlowLevel.rs` | 1 | 0 | implemented |
 | `ink-c-sharp/compiler/ParsedHierarchy/FunctionCall.cs` | `ink-rust/crates/ink-compiler/src/ParsedHierarchy/FunctionCall.rs` | 1 | 18 | skeleton |

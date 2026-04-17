@@ -88,7 +88,7 @@ Source area: `ink-c-sharp/compiler/`
 25. `InkParser/InkParser_CharacterRanges.cs` (`deps=4`) [ported]
 26. `InkParser/InkParser_CommandLineInput.cs` (`deps=4`)
 27. `ParsedHierarchy/ConstantDeclaration.cs` (`deps=4`) [ported]
-28. `ParsedHierarchy/ExternalDeclaration.cs` (`deps=4`) [partial: reason=external registration now happens during ResolveReferences, but the parser-side story ancestry chain is still incomplete and the call-order parity with upstream has not been audited end-to-end; missing=full AST parent/story wiring and a final timing audit against upstream GenerateRuntimeObject registration; next=port ParsedHierarchy/Object parent links and verify the registration timing against the C# pipeline]
+28. `ParsedHierarchy/ExternalDeclaration.cs` (`deps=4`) [ported]
 29. `ParsedHierarchy/StringExpression.cs` (`deps=4`) [ported]
 30. `ParsedHierarchy/TunnelOnwards.cs` (`deps=4`)
 31. `Plugins/PluginManager.cs` (`deps=4`)
