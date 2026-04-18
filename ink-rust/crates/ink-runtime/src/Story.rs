@@ -1496,12 +1496,16 @@ impl Story {
 
         Self::debug_choice_log("process_choice shown");
         start_text.push_str(&choice_only_text);
+        let thread_at_generation = self.story_state_mut().ForkThread();
         let choice = Choice {
             text: start_text.trim().to_string(),
-            sourcePath: String::new(),
+            sourcePath: choice_point
+                .get_pathOnChoice()
+                .map(|p| p.ToString())
+                .unwrap_or_default(),
             index: 0,
             targetPath: choice_point.get_pathOnChoice(),
-            threadAtGeneration: Some(self.story_state_mut().ForkThread()),
+            threadAtGeneration: Some(thread_at_generation),
             originalThreadIndex: 0,
             isInvisibleDefault: choice_point.get_isInvisibleDefault(),
             tags,
