@@ -175,6 +175,17 @@ impl NativeFunctionCall {
             panic!("Unexpected number of parameters");
         }
 
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!(
+                "native call {} params={:?}",
+                self.name,
+                parameters
+                    .iter()
+                    .map(|p| p.value_type())
+                    .collect::<Vec<_>>()
+            );
+        }
+
         if parameters.iter().any(|p| matches!(p, Value::String(_))) {
             return self.call_for_string(parameters);
         }
@@ -207,6 +218,7 @@ impl NativeFunctionCall {
         let b = if unary { 0 } else { to_int(&params[1]) };
         match self.name.as_str() {
             "+" => Value::new_int(a + b),
+            "_" if unary => Value::new_int(-a),
             "-" if unary => Value::new_int(-a),
             "-" => Value::new_int(a - b),
             "*" => Value::new_int(a * b),
@@ -238,6 +250,7 @@ impl NativeFunctionCall {
         let b = if unary { 0.0 } else { to_float(&params[1]) };
         match self.name.as_str() {
             "+" => Value::new_float(a + b),
+            "_" if unary => Value::new_float(-a),
             "-" if unary => Value::new_float(-a),
             "-" => Value::new_float(a - b),
             "*" => Value::new_float(a * b),

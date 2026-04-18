@@ -9,6 +9,7 @@ use ink_runtime::NativeFunctionCall::NativeFunctionCall;
 use ink_runtime::Path::{Component, Path};
 use ink_runtime::Value::Value;
 use std::ops::{BitAnd, BitOr, BitOrAssign};
+use std::rc::Rc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SequenceType(i32);
@@ -225,7 +226,7 @@ impl Sequence {
 
         container.AddToNamedContentOnly(postSequenceNoOp);
 
-        ContentItem::Container(Box::new(container))
+        ContentItem::Container(Rc::new(container))
     }
 
     // C# signature: public override void ResolveReferences(Story context)

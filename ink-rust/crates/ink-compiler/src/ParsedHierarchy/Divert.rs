@@ -8,6 +8,7 @@ use ink_runtime::ControlCommand::ControlCommand;
 use ink_runtime::Divert::Divert as RuntimeDivert;
 use ink_runtime::PushPop::PushPopType;
 use ink_runtime::Value::VariablePointerValue;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Divert {
@@ -93,11 +94,11 @@ impl Divert {
                 }
             }
 
-            ContentItem::Container(Box::new(container))
+            ContentItem::Container(Rc::new(container))
         } else if let Some(runtime_divert) = &self.runtimeDivert {
             ContentItem::Divert(runtime_divert.clone())
         } else {
-            ContentItem::Container(Box::new(RuntimeContainer::new()))
+            ContentItem::Container(Rc::new(RuntimeContainer::new()))
         }
     }
 

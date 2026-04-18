@@ -6,6 +6,7 @@ use crate::ParsedHierarchy::Story::Story;
 use crate::ParsedHierarchy::VariableReference::VariableReference;
 use ink_runtime::Container::{Container, ContentItem};
 use ink_runtime::VariableAssignment::VariableAssignment as RuntimeVariableAssignment;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct VariableAssignment {
@@ -63,7 +64,7 @@ impl VariableAssignment {
         container.AddContent(runtime_assignment.clone());
         self.runtimeAssignment = Some(runtime_assignment);
 
-        Some(ContentItem::Container(Box::new(container)))
+        Some(ContentItem::Container(Rc::new(container)))
     }
 
     // C# signature: public override void ResolveReferences (Story context)

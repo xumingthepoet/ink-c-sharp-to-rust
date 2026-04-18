@@ -20,10 +20,10 @@ use crate::Value::{ListValue, StringValue, Value, ValueType, VariablePointerValu
 use crate::VariablesState::{VariableObserver, VariablesState};
 use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Clone)]
 pub struct StoryState {
     pub onDidLoadState: Option<Arc<dyn Fn() + Send + Sync>>,
     story: Story,
@@ -47,6 +47,35 @@ pub struct StoryState {
     outputStreamTextDirty: bool,
     outputStreamTagsDirty: bool,
     aliveFlowNamesDirty: bool,
+}
+
+impl Clone for StoryState {
+    fn clone(&self) -> Self {
+        Self {
+            onDidLoadState: self.onDidLoadState.clone(),
+            story: self.story.clone_without_state(),
+            currentFlow: self.currentFlow.clone(),
+            namedFlows: self.namedFlows.clone(),
+            patch: self.patch.clone(),
+            visitCounts: self.visitCounts.clone(),
+            turnIndices: self.turnIndices.clone(),
+            currentErrors: self.currentErrors.clone(),
+            currentWarnings: self.currentWarnings.clone(),
+            variablesState: self.variablesState.clone(),
+            evaluationStack: self.evaluationStack.clone(),
+            divertedPointer: self.divertedPointer.clone(),
+            currentTurnIndex: self.currentTurnIndex,
+            storySeed: self.storySeed,
+            previousRandom: self.previousRandom,
+            didSafeExit: self.didSafeExit,
+            currentTextCache: self.currentTextCache.clone(),
+            currentTagsCache: self.currentTagsCache.clone(),
+            aliveFlowNamesCache: self.aliveFlowNamesCache.clone(),
+            outputStreamTextDirty: self.outputStreamTextDirty,
+            outputStreamTagsDirty: self.outputStreamTagsDirty,
+            aliveFlowNamesDirty: self.aliveFlowNamesDirty,
+        }
+    }
 }
 
 impl Default for StoryState {
@@ -127,9 +156,24 @@ impl StoryState {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.subsec_millis() as i32)
             .unwrap_or(0);
-        state.storySeed = (time_seed % 100).abs();
+        let mut random = crate::Story::SimpleRandom::new(time_seed);
+        state.storySeed = random.next() % 100;
         state.GoToStart();
         state
+    }
+
+    pub fn sync_variables_callstack(&mut self) {
+        let old_callstack = self.variablesState.get_callStack();
+        let mut new_callstack = self.currentFlow.callStack.clone();
+
+        for (new_thread, old_thread) in new_callstack.threads.iter_mut().zip(old_callstack.threads)
+        {
+            for (new_el, old_el) in new_thread.callstack.iter_mut().zip(old_thread.callstack) {
+                new_el.temporaryVariables = old_el.temporaryVariables;
+            }
+        }
+
+        self.variablesState.set_callStack(new_callstack);
     }
 
     // C# signature: public string ToJson()
@@ -175,11 +219,15 @@ impl StoryState {
     // C# signature: public int VisitCountForContainer(Container container)
     pub fn VisitCountForContainer(&mut self, container: Container) -> i32 {
         if !container.get_visitsShouldBeCounted() {
+            let debug_metadata = container
+                .get_debugMetadata()
+                .map(|metadata| metadata.to_string())
+                .unwrap_or_default();
             self.story.Error(
                 format!(
-                    "Read count for target ({} - on {:?}) unknown.",
+                    "Read count for target ({} - on {}) unknown.",
                     container.get_name(),
-                    container
+                    debug_metadata
                 ),
                 false,
             );
@@ -226,11 +274,15 @@ impl StoryState {
     // C# signature: public int TurnsSinceForContainer(Container container)
     pub fn TurnsSinceForContainer(&mut self, container: Container) -> i32 {
         if !container.get_turnIndexShouldBeCounted() {
+            let debug_metadata = container
+                .get_debugMetadata()
+                .map(|metadata| metadata.to_string())
+                .unwrap_or_default();
             self.story.Error(
                 format!(
-                    "TURNS_SINCE() for target ({} - on {:?}) unknown.",
+                    "TURNS_SINCE() for target ({} - on {}) unknown.",
                     container.get_name(),
-                    container
+                    debug_metadata
                 ),
                 false,
             );
@@ -285,13 +337,43 @@ impl StoryState {
     // C# signature: public void GoToStart()
     pub fn GoToStart(&mut self) {
         self.currentFlow.callStack.currentThread_mut().callstack[0].currentPointer =
-            Pointer::StartOf(self.story.get_mainContentContainer());
+            Pointer::StartOf(Rc::new(self.story.get_mainContentContainer()));
     }
 
     // C# signature: internal void SwitchFlow_Internal(string flowName)
     pub fn SwitchFlow_Internal(&mut self, flowName: String) {
         if flowName.is_empty() {
             panic!("Must pass a non-null string to Story.SwitchFlow");
+        }
+
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!(
+                "switch_flow start from={} to={} current_choices={} current_ptr={:?}",
+                self.currentFlow.name,
+                flowName,
+                self.currentFlow.currentChoices.len(),
+                self.currentFlow
+                    .callStack
+                    .currentElement()
+                    .currentPointer
+                    .get_path()
+                    .map(|p| p.ToString())
+            );
+        }
+        if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
+            eprintln!(
+                "switch_flow choice state from={} choices={} ptr={} canContinue={}",
+                self.currentFlow.name,
+                self.currentFlow.currentChoices.len(),
+                self.currentFlow
+                    .callStack
+                    .currentElement()
+                    .currentPointer
+                    .get_path()
+                    .map(|p| p.ToString())
+                    .unwrap_or_else(|| "<null>".to_string()),
+                self.get_canContinue()
+            );
         }
 
         if self.namedFlows.is_none() {
@@ -302,6 +384,10 @@ impl StoryState {
 
         if flowName == self.currentFlow.name {
             return;
+        }
+
+        if let Some(named) = self.namedFlows.as_mut() {
+            named.insert(self.currentFlow.name.clone(), self.currentFlow.clone());
         }
 
         let flow = if let Some(named) = self.namedFlows.as_mut() {
@@ -318,6 +404,35 @@ impl StoryState {
         self.variablesState
             .set_callStack(self.currentFlow.callStack.clone());
         self.OutputStreamDirty();
+
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!(
+                "switch_flow end current={} choices={} ptr={:?}",
+                self.currentFlow.name,
+                self.currentFlow.currentChoices.len(),
+                self.currentFlow
+                    .callStack
+                    .currentElement()
+                    .currentPointer
+                    .get_path()
+                    .map(|p| p.ToString())
+            );
+        }
+        if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
+            eprintln!(
+                "switch_flow done current={} choices={} ptr={} canContinue={}",
+                self.currentFlow.name,
+                self.currentFlow.currentChoices.len(),
+                self.currentFlow
+                    .callStack
+                    .currentElement()
+                    .currentPointer
+                    .get_path()
+                    .map(|p| p.ToString())
+                    .unwrap_or_else(|| "<null>".to_string()),
+                self.get_canContinue()
+            );
+        }
     }
 
     // C# signature: internal void SwitchToDefaultFlow_Internal()
@@ -361,8 +476,15 @@ impl StoryState {
             .map(|choice| choice.Clone())
             .collect();
         copy.variablesState = self.variablesState.clone();
-        copy.variablesState
-            .set_callStack(copy.currentFlow.callStack.clone());
+        let old_callstack = copy.variablesState.get_callStack();
+        let mut new_callstack = copy.currentFlow.callStack.clone();
+        for (new_thread, old_thread) in new_callstack.threads.iter_mut().zip(old_callstack.threads)
+        {
+            for (new_el, old_el) in new_thread.callstack.iter_mut().zip(old_thread.callstack) {
+                new_el.temporaryVariables = old_el.temporaryVariables;
+            }
+        }
+        copy.variablesState.set_callStack(new_callstack);
         copy.variablesState.patch = copy.patch.clone();
         copy.evaluationStack = self.evaluationStack.clone();
         copy.divertedPointer = self.divertedPointer.clone();
@@ -373,7 +495,9 @@ impl StoryState {
         copy.visitCounts = self.visitCounts.clone();
         copy.turnIndices = self.turnIndices.clone();
         if let Some(named) = &self.namedFlows {
-            copy.namedFlows = Some(named.clone());
+            let mut named_flows = named.clone();
+            named_flows.insert(self.currentFlow.name.clone(), copy.currentFlow.clone());
+            copy.namedFlows = Some(named_flows);
         }
         copy.currentErrors = self.currentErrors.clone();
         copy.currentWarnings = self.currentWarnings.clone();
@@ -383,8 +507,33 @@ impl StoryState {
 
     // C# signature: public void RestoreAfterPatch()
     pub fn RestoreAfterPatch(&mut self) {
-        self.variablesState.set_callStack(self.get_callStack());
+        let old_callstack = self.variablesState.get_callStack();
+        let mut new_callstack = self.get_callStack();
+        for (new_thread, old_thread) in new_callstack.threads.iter_mut().zip(old_callstack.threads)
+        {
+            for (new_el, old_el) in new_thread.callstack.iter_mut().zip(old_thread.callstack) {
+                new_el.temporaryVariables = old_el.temporaryVariables;
+            }
+        }
+        self.variablesState.set_callStack(new_callstack);
         self.variablesState.patch = self.patch.clone();
+    }
+
+    pub(crate) fn merge_live_flow_state_from(&mut self, live_state: &StoryState) {
+        self.currentFlow.currentChoices = live_state.currentFlow.currentChoices.clone();
+        if !self.currentFlow.currentChoices.is_empty() {
+            self.currentPointer_set(Pointer::Null());
+        }
+
+        if let Some(named_flows) = &mut self.namedFlows {
+            if let Some(flow) = named_flows.get_mut(&self.currentFlow.name) {
+                flow.currentChoices = self.currentFlow.currentChoices.clone();
+                if !flow.currentChoices.is_empty() {
+                    flow.callStack.currentThread_mut().callstack[0].currentPointer =
+                        Pointer::Null();
+                }
+            }
+        }
     }
 
     // C# signature: public void ApplyAnyPatch()
@@ -662,6 +811,9 @@ impl StoryState {
     // C# signature: public void PushEvaluationStack(Runtime.Object obj)
     pub fn PushEvaluationStack(&mut self, obj: ContentItem) {
         let mut obj = obj;
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!("push eval {:?}", obj);
+        }
         if let ContentItem::Value(Value::List(listValue)) = &mut obj {
             if let Some(origin_names) = listValue.originNames.clone() {
                 let list_definitions = self.story.get_listDefinitions();
@@ -682,6 +834,25 @@ impl StoryState {
 
     // C# signature: public Runtime.Object PopEvaluationStack()
     pub fn PopEvaluationStack(&mut self) -> ContentItem {
+        if self.evaluationStack.is_empty() && std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!(
+                "pop eval empty currentElementIndex={} inExpr={} out={} temps={:?}",
+                self.currentFlow.callStack.currentElementIndex(),
+                self.currentFlow
+                    .callStack
+                    .currentElement()
+                    .inExpressionEvaluation,
+                self.currentFlow.outputStream.len(),
+                self.currentFlow
+                    .callStack
+                    .currentElement()
+                    .temporaryVariables
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>()
+            );
+            eprintln!("{:?}", std::backtrace::Backtrace::force_capture());
+        }
         self.evaluationStack
             .pop()
             .expect("evaluation stack underflow")
@@ -708,6 +879,7 @@ impl StoryState {
     // C# signature: public void ForceEnd()
     pub fn ForceEnd(&mut self) {
         self.currentFlow.callStack.Reset();
+        self.sync_variables_callstack();
         self.currentFlow.currentChoices.clear();
         self.currentPointer_set(Pointer::Null());
         self.previousPointer_set(Pointer::Null());
@@ -750,6 +922,7 @@ impl StoryState {
             self.TrimWhitespaceFromFunctionEnd();
         }
         self.currentFlow.callStack.Pop(popType);
+        self.sync_variables_callstack();
     }
 
     // C# signature: public void SetChosenPath(Path path, bool incrementingTurnIndex)
@@ -760,6 +933,16 @@ impl StoryState {
             newPointer.index = 0;
         }
         self.currentPointer_set(newPointer);
+        if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
+            eprintln!(
+                "set_chosen_path current_ptr={}",
+                self.currentPointer()
+                    .get_path()
+                    .map(|p| p.ToString())
+                    .unwrap_or_else(|| "<null>".to_string())
+            );
+        }
+        self.sync_variables_callstack();
         if incrementingTurnIndex {
             self.currentTurnIndex += 1;
         }
@@ -789,6 +972,40 @@ impl StoryState {
             self.currentFlow
                 .callStack
                 .set_currentThread(thread_at_generation);
+            if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+                eprintln!(
+                    "choose_choice_index set thread temps={:?}",
+                    self.currentFlow
+                        .callStack
+                        .currentThread()
+                        .callstack
+                        .last()
+                        .map(|el| el.temporaryVariables.keys().cloned().collect::<Vec<_>>())
+                );
+            }
+            if let Some(current_element) = self
+                .currentFlow
+                .callStack
+                .currentThread_mut()
+                .callstack
+                .last_mut()
+            {
+                current_element.inExpressionEvaluation = false;
+            }
+            self.variablesState
+                .set_callStack(self.currentFlow.callStack.clone());
+            if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+                eprintln!(
+                    "choose_choice_index synced vars temps={:?}",
+                    self.variablesState
+                        .get_callStack()
+                        .currentElement()
+                        .temporaryVariables
+                        .keys()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                );
+            }
         }
 
         let target_path = choice_to_choose.targetPath.unwrap_or_else(|| Path::new());
@@ -812,8 +1029,9 @@ impl StoryState {
             .callstack
             .last_mut()
             .unwrap()
-            .currentPointer = Pointer::StartOf(funcContainer);
+            .currentPointer = Pointer::StartOf(Rc::new(funcContainer));
         self.PassArgumentsToEvaluationStack(arguments);
+        self.sync_variables_callstack();
     }
 
     pub fn PassArgumentsToEvaluationStack(&mut self, arguments: Vec<ContentItem>) {
@@ -943,26 +1161,41 @@ impl StoryState {
             externalEvaluationStackHeight,
             outputStreamLengthWithPushed,
         );
+        self.sync_variables_callstack();
     }
 
     // C# signature: internal void SetCurrentThread(CallStack.Thread thread)
     pub fn SetCurrentThread(&mut self, thread: crate::CallStack::Thread) {
         self.currentFlow.callStack.set_currentThread(thread);
+        if let Some(current_element) = self
+            .currentFlow
+            .callStack
+            .currentThread_mut()
+            .callstack
+            .last_mut()
+        {
+            current_element.inExpressionEvaluation = false;
+        }
+        self.variablesState
+            .set_callStack(self.currentFlow.callStack.clone());
     }
 
     // C# signature: internal CallStack.Thread ForkThread()
     pub fn ForkThread(&mut self) -> crate::CallStack::Thread {
-        self.currentFlow.callStack.ForkThread()
+        let mut callstack = self.variablesState.get_callStack();
+        callstack.ForkThread()
     }
 
     // C# signature: internal void PushThread()
     pub fn PushThread(&mut self) {
         self.currentFlow.callStack.PushThread();
+        self.sync_variables_callstack();
     }
 
     // C# signature: internal void PopThread()
     pub fn PopThread(&mut self) {
         self.currentFlow.callStack.PopThread();
+        self.sync_variables_callstack();
     }
 
     pub fn get_currentErrors(&self) -> Vec<String> {
@@ -975,6 +1208,14 @@ impl StoryState {
 
     pub fn get_variablesState(&self) -> VariablesState {
         self.variablesState.clone()
+    }
+
+    pub fn get_variablesState_mut(&mut self) -> &mut VariablesState {
+        &mut self.variablesState
+    }
+
+    pub fn set_variablesState(&mut self, variablesState: VariablesState) {
+        self.variablesState = variablesState;
     }
 
     pub fn get_callStack(&self) -> CallStack {
@@ -1002,8 +1243,16 @@ impl StoryState {
         self.storySeed
     }
 
+    pub fn set_storySeed(&mut self, value: i32) {
+        self.storySeed = value;
+    }
+
     pub fn get_previousRandom(&self) -> i32 {
         self.previousRandom
+    }
+
+    pub fn set_previousRandom(&mut self, value: i32) {
+        self.previousRandom = value;
     }
 
     pub fn get_didSafeExit(&self) -> bool {
@@ -1218,7 +1467,9 @@ impl StoryState {
                 writer.WritePropertyStart("flows".to_string())?;
                 writer.WriteObjectStart()?;
                 if let Some(namedFlows) = &self.namedFlows {
-                    for (name, flow) in namedFlows {
+                    let mut flows_to_write = namedFlows.clone();
+                    flows_to_write.insert(self.currentFlow.name.clone(), self.currentFlow.clone());
+                    for (name, flow) in &flows_to_write {
                         writer.WriteProperty(name.clone(), |writer| {
                             let mut flow = flow.clone();
                             flow.WriteJson(writer);

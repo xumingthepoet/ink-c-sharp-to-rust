@@ -571,17 +571,25 @@ impl std::fmt::Display for ListValue {
         let mut ordered = self
             .value
             .iter()
-            .map(|(item, value)| (item.to_string(), *value))
+            .map(|(item, value)| (item.clone(), *value))
             .collect::<Vec<_>>();
-        ordered.sort_by(|left, right| left.0.cmp(&right.0));
+        ordered.sort_by(|left, right| match left.1.cmp(&right.1) {
+            std::cmp::Ordering::Equal => left
+                .0
+                .originName
+                .as_deref()
+                .unwrap_or("")
+                .cmp(right.0.originName.as_deref().unwrap_or("")),
+            other => other,
+        });
 
         let rendered = ordered
             .into_iter()
-            .map(|(name, value)| format!("{name}={value}"))
+            .map(|(item, _)| item.itemName.unwrap_or_default())
             .collect::<Vec<_>>()
             .join(", ");
 
-        write!(f, "{{{rendered}}}")
+        write!(f, "{rendered}")
     }
 }
 

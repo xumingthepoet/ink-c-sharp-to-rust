@@ -678,7 +678,7 @@ impl Story {
             let content = Self::detach_content_parent(content);
             match content {
                 ContentItem::Container(child) => {
-                    let child_container = self.flatten_container(*child);
+                    let child_container = self.flatten_container(child.as_ref().clone());
                     let should_flatten = !child_container.get_hasValidName()
                         && child_container.get_namedContent().is_empty()
                         && !self
@@ -688,7 +688,7 @@ impl Story {
                     if should_flatten {
                         flattened.AddContentsOfContainer(child_container);
                     } else {
-                        flattened.AddContent(ContentItem::Container(Box::new(child_container)));
+                        flattened.AddContent(ContentItem::Container(Rc::new(child_container)));
                     }
                 }
                 other => flattened.AddContent(other),
@@ -709,7 +709,7 @@ impl Story {
     fn flatten_content_item(&self, content: ContentItem) -> ContentItem {
         match Self::detach_content_parent(content) {
             ContentItem::Container(container) => {
-                ContentItem::Container(Box::new(self.flatten_container(*container)))
+                ContentItem::Container(Rc::new(self.flatten_container(container.as_ref().clone())))
             }
             other => other,
         }

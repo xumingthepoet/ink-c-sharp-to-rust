@@ -4,10 +4,12 @@ use crate::Container::Container;
 use crate::Container::ContentItem;
 use crate::DebugMetadata::DebugMetadata;
 use crate::Path::Path;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChoicePoint {
-    parent: Option<Box<Container>>,
+    parent: RefCell<Option<Rc<Container>>>,
     pathOnChoice: Option<Path>,
     pub hasCondition: bool,
     pub hasStartContent: bool,
@@ -20,7 +22,7 @@ impl ChoicePoint {
     // C# signature: public ChoicePoint (bool onceOnly)
     pub fn new(onceOnly: bool) -> Self {
         Self {
-            parent: None,
+            parent: RefCell::new(None),
             pathOnChoice: None,
             hasCondition: false,
             hasStartContent: false,
@@ -76,12 +78,12 @@ impl ChoicePoint {
         self.pathOnChoice = Some(Path::new_overload_4(value));
     }
 
-    pub fn set_parent(&mut self, parent: Option<Box<Container>>) {
-        self.parent = parent;
+    pub fn set_parent(&self, parent: Option<Rc<Container>>) {
+        self.parent.replace(parent);
     }
 
-    pub fn get_parent(&self) -> Option<&Container> {
-        self.parent.as_deref()
+    pub fn get_parent(&self) -> Option<Rc<Container>> {
+        self.parent.borrow().clone()
     }
 
     fn debug_line_number_of_path(&self, path: &Path) -> Option<i32> {
@@ -91,12 +93,14 @@ impl ChoicePoint {
 
         let mut root = self
             .parent
+            .borrow()
             .as_ref()
             .and_then(|container| container.get_rootContentContainer())
             .or_else(|| {
                 self.parent
+                    .borrow()
                     .as_ref()
-                    .map(|container| container.as_ref().clone())
+                    .map(|container| (*container.clone()).clone())
             })?;
 
         let target_content = root.ContentAtPath(path.clone(), 0, -1).obj?;
@@ -109,29 +113,41 @@ impl ChoicePoint {
     }
 
     fn choice_target_for_path(&self, path: &Path) -> Option<Container> {
-        let container = self.parent.as_ref()?;
+        let container = self.parent.borrow().as_ref()?.clone();
         let mut search_root = if path.get_isRelative() {
-            container.as_ref().clone()
+            (*container.clone()).clone()
         } else {
             container
                 .get_rootContentContainer()
-                .unwrap_or_else(|| container.as_ref().clone())
+                .unwrap_or_else(|| (*container.clone()).clone())
+        };
+
+        let resolved_path = if path.get_isRelative()
+            && path.get_length() > 0
+            && path
+                .GetComponent(0)
+                .map(|component| component.get_isParent())
+                .unwrap_or(false)
+        {
+            path.get_tail()
+        } else {
+            path.clone()
         };
 
         search_root
-            .ContentAtPath(path.clone(), 0, -1)
+            .ContentAtPath(resolved_path, 0, -1)
             .get_container()
             .cloned()
     }
 
     fn root_content_container(&self) -> Option<Container> {
-        let parent = self.parent.as_ref()?;
-        parent.get_rootContentContainer()
+        self.parent.borrow().as_ref()?.get_rootContentContainer()
     }
 
     fn convert_path_to_relative(&self, global_path: Path) -> Path {
         let own_path = self
             .parent
+            .borrow()
             .as_ref()
             .map(|container| container.get_path().clone())
             .unwrap_or_default();
@@ -178,6 +194,7 @@ impl ChoicePoint {
             (
                 other_path.get_componentsString(),
                 self.parent
+                    .borrow()
                     .as_ref()
                     .map(|container| container.get_path().PathByAppendingPath(&other_path))
                     .unwrap_or_else(|| other_path.clone())
@@ -277,6 +294,7 @@ impl ChoicePoint {
 mod tests {
     use super::ChoicePoint;
     use crate::Container::{Container, ContentItem};
+    use std::rc::Rc;
 
     #[test]
     fn tracks_choice_flags_and_path_strings() {
@@ -303,7 +321,7 @@ mod tests {
         root.AddToNamedContentOnly(target.clone());
 
         let mut choice = ChoicePoint::new(true);
-        choice.set_parent(Some(Box::new(root.clone())));
+        choice.set_parent(Some(Rc::new(root.clone())));
         choice.set_pathStringOnChoice("target".to_string());
 
         let resolved = choice.get_choiceTarget().expect("choice target");

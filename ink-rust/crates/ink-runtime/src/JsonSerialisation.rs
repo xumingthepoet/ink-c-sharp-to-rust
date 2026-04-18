@@ -18,6 +18,8 @@ use crate::VariableAssignment::VariableAssignment;
 use crate::VariableReference::VariableReference;
 use crate::Void::Void;
 use std::collections::HashMap;
+use std::io::Write;
+use std::rc::Rc;
 
 fn must<T>(result: Result<T, String>) -> T {
     result.unwrap_or_else(|err| panic!("{}", err))
@@ -370,7 +372,7 @@ impl Json {
 
                 None
             }
-            JsonValue::Array(list) => Some(ContentItem::Container(Box::new(
+            JsonValue::Array(list) => Some(ContentItem::Container(Rc::new(
                 Self::JArrayToContainer(list),
             ))),
             JsonValue::Null => None,
@@ -445,6 +447,14 @@ impl Json {
                     "#f" => {
                         if let JsonValue::Int(count_flags) = value {
                             container.set_countFlags(count_flags);
+                            if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
+                                let _ = writeln!(
+                                    std::io::stderr(),
+                                    "json_load count_flags path={} flags={}",
+                                    container.get_path().ToString(),
+                                    count_flags
+                                );
+                            }
                         }
                     }
                     "#n" => {
@@ -457,7 +467,7 @@ impl Json {
                             if let ContentItem::Container(named_sub_container) =
                                 &mut named_content_item
                             {
-                                named_sub_container.set_name(Some(key.clone()));
+                                Rc::make_mut(named_sub_container).set_name(Some(key.clone()));
                             }
                             named_only_content.insert(key, named_content_item);
                         }
@@ -467,6 +477,8 @@ impl Json {
 
             container.set_namedOnlyContent(Some(named_only_content));
         }
+
+        container.refresh_child_parents();
 
         container
     }
@@ -837,9 +849,60 @@ impl Json {
 #[cfg(test)]
 mod tests {
     use super::Json;
-    use crate::Container::ContentItem;
+    use crate::Container::{Container, ContentItem};
     use crate::SimpleJson::Writer;
     use crate::Value::Value;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn count_choice_points(content: &ContentItem) -> usize {
+        match content {
+            ContentItem::ChoicePoint(_) => 1,
+            ContentItem::Container(container) => {
+                let mut total = 0;
+                for item in container.get_content() {
+                    total += count_choice_points(item);
+                }
+                for item in container.get_namedContent().values() {
+                    total += count_choice_points(item);
+                }
+                total
+            }
+            _ => 0,
+        }
+    }
+
+    fn direct_choice_point_count(container: &Container) -> usize {
+        container
+            .get_content()
+            .iter()
+            .filter(|item| matches!(item, ContentItem::ChoicePoint(_)))
+            .count()
+    }
+
+    fn find_named_container<'a>(container: &'a Container, name: &str) -> Option<&'a Container> {
+        if container.get_name() == name {
+            return Some(container);
+        }
+
+        for item in container.get_content() {
+            if let ContentItem::Container(child) = item {
+                if let Some(found) = find_named_container(child.as_ref(), name) {
+                    return Some(found);
+                }
+            }
+        }
+
+        for item in container.get_namedContent().values() {
+            if let ContentItem::Container(child) = item {
+                if let Some(found) = find_named_container(child.as_ref(), name) {
+                    return Some(found);
+                }
+            }
+        }
+
+        None
+    }
 
     #[test]
     fn writes_and_parses_simple_strings() {
@@ -860,5 +923,55 @@ mod tests {
             }
             other => panic!("unexpected parsed value: {:?}", other),
         }
+    }
+
+    #[test]
+    fn parses_choice_points_from_conditional_choice_fixture() {
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../ink-tests/fixtures/conformance/inkfiles/choices/conditional-choice.ink.json");
+        let json = fs::read_to_string(fixture).expect("fixture json must exist");
+        let root = Json::JTokenToRuntimeObject(
+            crate::SimpleJson::SimpleJson::TextToDictionary(json)
+                .unwrap()
+                .get("root")
+                .cloned()
+                .expect("root token"),
+        )
+        .expect("root container");
+
+        assert!(matches!(root, ContentItem::Container(_)));
+        assert!(
+            count_choice_points(&root) > 0,
+            "expected at least one choice point"
+        );
+    }
+
+    #[test]
+    fn choice_test_knot_contains_direct_choice_points() {
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../ink-tests/fixtures/conformance/inkfiles/test1.ink.json");
+        let json = fs::read_to_string(fixture).expect("fixture json must exist");
+        let json = json.strip_prefix('\u{feff}').unwrap_or(&json).to_string();
+        let root = Json::JTokenToRuntimeObject(
+            crate::SimpleJson::SimpleJson::TextToDictionary(json)
+                .unwrap()
+                .get("root")
+                .cloned()
+                .expect("root token"),
+        )
+        .expect("root container");
+
+        let root_container = match root {
+            ContentItem::Container(container) => container,
+            _ => panic!("root is not a container"),
+        };
+
+        let knot = find_named_container(root_container.as_ref(), "choice_test")
+            .expect("choice_test knot missing");
+
+        assert!(
+            count_choice_points(&ContentItem::Container(knot.clone().into())) > 0,
+            "expected choice points inside choice_test knot"
+        );
     }
 }

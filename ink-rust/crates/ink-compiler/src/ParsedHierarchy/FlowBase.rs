@@ -163,7 +163,7 @@ impl FlowBase {
             gather_obj.set_indentationDepth(gather.get_indentationDepth());
             gather_obj.set_identifier(gather.get_identifier().cloned());
             if let ContentItem::Container(container) = gather.GenerateRuntimeObject() {
-                gather_obj.set_runtimeObject(Some(*container));
+                gather_obj.set_runtimeObject(Some(container.as_ref().clone()));
             }
             weaveObjs.push(gather_obj);
 
@@ -365,7 +365,7 @@ impl FlowBase {
 
         if let Some(root_weave) = self.rootWeave.as_mut() {
             if let ContentItem::Container(root_container) = root_weave.GenerateRuntimeObject() {
-                container.AddContent(*root_container);
+                container.AddContent(root_container.as_ref().clone());
             }
         }
 

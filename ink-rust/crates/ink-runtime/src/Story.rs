@@ -7,6 +7,7 @@ use crate::ControlCommand::{CommandType, ControlCommand};
 use crate::Divert::Divert;
 use crate::Error::{ErrorHandler, ErrorType};
 use crate::Glue::Glue;
+use crate::InkList::{InkList, InkListItem, ListBound};
 use crate::ListDefinition::ListDefinition;
 use crate::ListDefinitionsOrigin::ListDefinitionsOrigin;
 use crate::NativeFunctionCall::NativeFunctionCall;
@@ -17,16 +18,99 @@ use crate::SearchResult::SearchResult;
 use crate::StoryException::StoryException;
 use crate::StoryState::StoryState;
 use crate::Tag::Tag;
-use crate::Value::{StringValue, Value, ValueInput};
+use crate::Value::{ListValue, StringValue, Value, ValueInput};
 use crate::VariablesState::VariableObserver;
 use crate::VariablesState::VariablesState;
+use crate::Void::Void;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::io::Write;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
 pub type ExternalFunction = Arc<dyn Fn(&[ValueInput]) -> Option<Value> + Send + Sync>;
+
+pub(crate) struct SimpleRandom {
+    inext: i32,
+    inextp: i32,
+    seed_array: [i32; 56],
+}
+
+impl SimpleRandom {
+    const MBIG: i32 = i32::MAX;
+    const MSEED: i32 = 161803398;
+
+    pub(crate) fn new(seed: i32) -> Self {
+        let mut random = Self {
+            inext: 0,
+            inextp: 21,
+            seed_array: [0; 56],
+        };
+
+        let subtraction = if seed == i32::MIN {
+            i32::MAX
+        } else {
+            seed.abs()
+        };
+        let mut mj = Self::MSEED - subtraction;
+        if mj < 0 {
+            mj += Self::MBIG;
+        }
+
+        random.seed_array[55] = mj;
+        let mut mk = 1;
+        for i in 1..55 {
+            let ii = (21 * i) % 55;
+            random.seed_array[ii as usize] = mk;
+            mk = mj - mk;
+            if mk < 0 {
+                mk += Self::MBIG;
+            }
+            mj = random.seed_array[ii as usize];
+        }
+
+        for _ in 0..4 {
+            for i in 1..56 {
+                let j = 1 + (i + 30) % 55;
+                random.seed_array[i as usize] -= random.seed_array[j as usize];
+                if random.seed_array[i as usize] < 0 {
+                    random.seed_array[i as usize] += Self::MBIG;
+                }
+            }
+        }
+
+        random
+    }
+
+    pub(crate) fn next(&mut self) -> i32 {
+        let mut loc_inext = self.inext + 1;
+        if loc_inext >= 56 {
+            loc_inext = 1;
+        }
+
+        let mut loc_inextp = self.inextp + 1;
+        if loc_inextp >= 56 {
+            loc_inextp = 1;
+        }
+
+        let mut ret_val =
+            self.seed_array[loc_inext as usize] - self.seed_array[loc_inextp as usize];
+        if ret_val == Self::MBIG {
+            ret_val -= 1;
+        }
+        if ret_val < 0 {
+            ret_val += Self::MBIG;
+        }
+
+        self.seed_array[loc_inext as usize] = ret_val;
+        self.inext = loc_inext;
+        self.inextp = loc_inextp;
+        ret_val
+    }
+}
 
 #[derive(Default)]
 pub struct Story {
@@ -51,6 +135,49 @@ pub struct Story {
     async_saving: bool,
     allowExternalFunctionFallbacks: bool,
     pub _port_marker: (),
+}
+
+impl Story {
+    fn debug_choice_log(message: &str) {
+        if std::env::var_os("INK_DEBUG_CHOICE").is_none() {
+            return;
+        }
+        static DEBUG_CHOICE_LOG_COUNT: AtomicUsize = AtomicUsize::new(0);
+        if DEBUG_CHOICE_LOG_COUNT.fetch_add(1, Ordering::Relaxed) > 2000 {
+            return;
+        }
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/ink_choice_debug.log")
+        {
+            let _ = writeln!(file, "{}", message);
+        }
+    }
+
+    fn debug_runtime_log(message: &str) {
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_none() {
+            return;
+        }
+        static DEBUG_RUNTIME_LOG_COUNT: AtomicUsize = AtomicUsize::new(0);
+        if DEBUG_RUNTIME_LOG_COUNT.fetch_add(1, Ordering::Relaxed) > 300 {
+            return;
+        }
+        eprintln!("{}", message);
+    }
+
+    fn pointer_debug_string(pointer: &Pointer) -> String {
+        let path = pointer
+            .get_path()
+            .map(|path| path.ToString())
+            .unwrap_or_else(|| "<null>".to_string());
+        format!(
+            "path={} index={} null={}",
+            path,
+            pointer.index,
+            pointer.get_isNull()
+        )
+    }
 }
 
 impl std::fmt::Debug for Story {
@@ -118,9 +245,12 @@ impl Clone for Story {
         Self {
             main_content_container: self.main_content_container.clone(),
             listDefinitions: self.listDefinitions.clone(),
-            state: None,
-            state_snapshot_at_last_new_line: None,
-            temporary_evaluation_container: None,
+            state: self.state.as_ref().map(|state| Box::new((**state).clone())),
+            state_snapshot_at_last_new_line: self
+                .state_snapshot_at_last_new_line
+                .as_ref()
+                .map(|state| Box::new((**state).clone())),
+            temporary_evaluation_container: self.temporary_evaluation_container.clone(),
             _externals: self._externals.clone(),
             on_error: self.on_error.clone(),
             on_did_continue: self.on_did_continue.clone(),
@@ -128,11 +258,12 @@ impl Clone for Story {
             on_evaluate_function: self.on_evaluate_function.clone(),
             on_complete_evaluate_function: self.on_complete_evaluate_function.clone(),
             on_choose_path_string: self.on_choose_path_string.clone(),
-            _profiler: None,
-            recursive_continue_count: 0,
-            async_continue_active: false,
-            saw_lookahead_unsafe_function_after_newline: false,
-            _has_validated_externals: false,
+            _profiler: self._profiler.clone(),
+            recursive_continue_count: self.recursive_continue_count,
+            async_continue_active: self.async_continue_active,
+            saw_lookahead_unsafe_function_after_newline: self
+                .saw_lookahead_unsafe_function_after_newline,
+            _has_validated_externals: self._has_validated_externals,
             async_saving: self.async_saving,
             allowExternalFunctionFallbacks: self.allowExternalFunctionFallbacks,
             _port_marker: (),
@@ -160,6 +291,31 @@ pub struct ExternalFunctionDef {
 }
 
 impl Story {
+    pub(crate) fn clone_without_state(&self) -> Self {
+        Self {
+            main_content_container: self.main_content_container.clone(),
+            listDefinitions: self.listDefinitions.clone(),
+            state: None,
+            state_snapshot_at_last_new_line: None,
+            temporary_evaluation_container: None,
+            _externals: self._externals.clone(),
+            on_error: self.on_error.clone(),
+            on_did_continue: self.on_did_continue.clone(),
+            on_make_choice: self.on_make_choice.clone(),
+            on_evaluate_function: self.on_evaluate_function.clone(),
+            on_complete_evaluate_function: self.on_complete_evaluate_function.clone(),
+            on_choose_path_string: self.on_choose_path_string.clone(),
+            _profiler: None,
+            recursive_continue_count: 0,
+            async_continue_active: false,
+            saw_lookahead_unsafe_function_after_newline: false,
+            _has_validated_externals: false,
+            async_saving: self.async_saving,
+            allowExternalFunctionFallbacks: self.allowExternalFunctionFallbacks,
+            _port_marker: (),
+        }
+    }
+
     const INK_VERSION_CURRENT: i32 = 21;
     const INK_VERSION_MINIMUM_COMPATIBLE: i32 = 18;
 
@@ -222,7 +378,9 @@ impl Story {
 
         let main_content_container =
             match crate::JsonSerialisation::Json::JTokenToRuntimeObject(root_token) {
-                Some(crate::Container::ContentItem::Container(container)) => *container,
+                Some(crate::Container::ContentItem::Container(container)) => {
+                    container.as_ref().clone()
+                }
                 _ => panic!("Root node for ink was not a container"),
             };
 
@@ -318,7 +476,7 @@ impl Story {
 
     // C# signature: public void ResetState()
     pub fn ResetState(&mut self) {
-        let story_snapshot = self.clone();
+        let story_snapshot = self.clone_without_state();
         self.state = Some(Box::new(StoryState::new(story_snapshot)));
         self.state_snapshot_at_last_new_line = None;
         self.temporary_evaluation_container = None;
@@ -327,6 +485,7 @@ impl Story {
         self.async_continue_active = false;
         self.saw_lookahead_unsafe_function_after_newline = false;
         self._has_validated_externals = false;
+        self.ResetGlobals();
     }
 
     fn story_state_ref(&self) -> &StoryState {
@@ -350,6 +509,96 @@ impl Story {
         self.temporary_evaluation_container
             .as_ref()
             .unwrap_or(&self.main_content_container)
+    }
+
+    fn next_sequence_shuffle_index(&mut self) -> i32 {
+        let num_elements = match self.story_state_mut().PopEvaluationStack() {
+            ContentItem::Value(Value::Int(int_val)) => int_val.value,
+            other => {
+                self.Error(
+                    format!(
+                        "expected number of elements in sequence for shuffle index, saw {}",
+                        other
+                    ),
+                    false,
+                );
+                return 0;
+            }
+        };
+
+        let seq_count = match self.story_state_mut().PopEvaluationStack() {
+            ContentItem::Value(Value::Int(int_val)) => int_val.value,
+            other => {
+                self.Error(
+                    format!(
+                        "expected sequence count value for shuffle index, saw {}",
+                        other
+                    ),
+                    false,
+                );
+                return 0;
+            }
+        };
+
+        let seq_container = self
+            .story_state_ref()
+            .get_currentPointer()
+            .container
+            .as_ref()
+            .expect("current pointer should have a container")
+            .clone();
+
+        let loop_index = seq_count / num_elements;
+        let iteration_index = seq_count % num_elements;
+
+        let seq_path_str = seq_container.get_path().ToString();
+        let sequence_hash = seq_path_str.chars().map(|c| c as i32).sum::<i32>();
+        let random_seed = sequence_hash + loop_index + self.story_state_ref().get_storySeed();
+        let mut random = StdRng::seed_from_u64(random_seed as u64);
+
+        let mut unpicked_indices: Vec<i32> = (0..num_elements).collect();
+        for i in 0..=iteration_index {
+            let chosen = random
+                .random::<i32>()
+                .rem_euclid(unpicked_indices.len() as i32) as usize;
+            let chosen_index = unpicked_indices.remove(chosen);
+            if i == iteration_index {
+                return chosen_index;
+            }
+        }
+
+        panic!("Should never reach here");
+    }
+
+    fn ink_list_from_list_value(list_value: &ListValue) -> InkList {
+        let mut ink_list = InkList::new();
+        for (item, value) in &list_value.value {
+            ink_list.insert_entry(item.clone(), *value);
+        }
+        if let Some(origin_names) = list_value.originNames.clone() {
+            ink_list.SetInitialOriginNames(origin_names);
+        }
+        if let Some(origins) = list_value.origins.clone() {
+            ink_list.origins = Some(origins);
+        }
+        ink_list
+    }
+
+    fn ResetGlobals(&mut self) {
+        if self
+            .main_content_container
+            .get_namedContent()
+            .contains_key("global decl")
+        {
+            let original_pointer = self.story_state_ref().get_currentPointer();
+            self.ChoosePath(Path::new_overload_4("global decl".to_string()), false);
+            self.ContinueInternal(0.0);
+            self.story_state_mut().set_currentPointer(original_pointer);
+        }
+
+        self.story_state_mut()
+            .get_variablesState_mut()
+            .SnapshotDefaultGlobals();
     }
 
     // C# signature: public void ResetCallstack()
@@ -388,11 +637,18 @@ impl Story {
 
     // C# signature: public void ContinueAsync (float millisecsLimitAsync)
     pub fn ContinueAsync(&mut self, millisecsLimitAsync: f32) {
+        Self::debug_choice_log(&format!(
+            "continue_async start limit={} validated={} generated_choices={}",
+            millisecsLimitAsync,
+            self._has_validated_externals,
+            self.story_state_ref().get_generatedChoices().len()
+        ));
         if !self._has_validated_externals {
             self.ValidateExternalBindings();
             self._has_validated_externals = true;
         }
         self.ContinueInternal(millisecsLimitAsync);
+        Self::debug_choice_log("continue_async end");
     }
 
     // C# signature: public string ContinueMaximally()
@@ -444,7 +700,7 @@ impl Story {
             container.ContentAtPath(_path.clone(), 0, -1)
         };
 
-        let mut pointer = if let Some(container) = result.get_container() {
+        let mut pointer = if let Some(ContentItem::Container(container)) = result.obj.as_ref() {
             Pointer::StartOf(container.clone())
         } else {
             Pointer::Null()
@@ -536,21 +792,78 @@ impl Story {
         if let Some(state) = self.state.as_mut() {
             state.ChoosePath(p, incrementingTurnIndex);
         }
+        self.visit_changed_containers_due_to_divert();
     }
 
     // C# signature: public void ChooseChoiceIndex(int choiceIdx)
     pub fn ChooseChoiceIndex(&mut self, choiceIdx: i32) {
         let choices = self.get_currentChoices();
+        if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
+            eprintln!(
+                "choose_choice_index enter idx={} len={} current_ptr={} canContinue={}",
+                choiceIdx,
+                choices.len(),
+                self.story_state_ref()
+                    .get_currentPointer()
+                    .get_path()
+                    .map(|p| p.ToString())
+                    .unwrap_or_else(|| "<null>".to_string()),
+                self.get_canContinue()
+            );
+        }
         assert!(
             choiceIdx >= 0 && (choiceIdx as usize) < choices.len(),
             "choice out of range"
         );
         let choice_to_choose = choices[choiceIdx as usize].clone();
         if let Some(callback) = &self.on_make_choice {
-            callback(choice_to_choose);
+            callback(choice_to_choose.clone());
         }
-        if let Some(state) = self.state.as_mut() {
-            state.ChooseChoiceIndex(choiceIdx);
+        if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
+            let choice_thread_ptr = choice_to_choose
+                .get_threadAtGeneration()
+                .map(|thread| {
+                    thread
+                        .callstack
+                        .last()
+                        .and_then(|el| el.currentPointer.get_path())
+                        .map(|p| p.ToString())
+                        .unwrap_or_else(|| "<null>".to_string())
+                })
+                .unwrap_or_else(|| "<none>".to_string());
+            eprintln!(
+                "choose_choice_index target={} thread_ptr={} choice_thread_ptr={}",
+                choice_to_choose
+                    .targetPath
+                    .as_ref()
+                    .map(|p| p.ToString())
+                    .unwrap_or_else(|| "<none>".to_string()),
+                self.story_state_ref()
+                    .get_callStack()
+                    .currentElement()
+                    .currentPointer
+                    .get_path()
+                    .map(|p| p.ToString())
+                    .unwrap_or_else(|| "<null>".to_string()),
+                choice_thread_ptr
+            );
+        }
+        Self::debug_choice_log(&format!(
+            "choose_choice_index idx={} target={}",
+            choiceIdx,
+            choices[choiceIdx as usize]
+                .targetPath
+                .as_ref()
+                .map(|p| p.ToString())
+                .unwrap_or_else(|| "<none>".to_string())
+        ));
+        if let Some(thread) = choice_to_choose.get_threadAtGeneration() {
+            if let Some(state) = self.state.as_mut() {
+                state.SetCurrentThread(thread.clone());
+            }
+        }
+        if let Some(target_path) = choices[choiceIdx as usize].targetPath.clone() {
+            self.ChoosePath(target_path, true);
         }
     }
 
@@ -659,50 +972,80 @@ impl Story {
 
     // C# signature: public void CallExternalFunction(string funcName, int numberOfArguments)
     pub fn CallExternalFunction(&mut self, funcName: String, numberOfArguments: i32) {
-        let Some(funcDef) = self._externals.get(&funcName) else {
+        let funcDef = self._externals.get(&funcName).cloned();
+        let fallbackFunctionContainer = if funcDef.is_none() && self.allowExternalFunctionFallbacks
+        {
+            Some(self.KnotContainerWithName(funcName.clone()).unwrap_or_else(|| {
+                panic!(
+                    "Trying to call EXTERNAL function '{}' which has not been bound, and fallback ink function could not be found.",
+                    funcName
+                )
+            }))
+        } else {
+            None
+        };
+
+        let Some(state) = self.state.as_mut() else {
+            return;
+        };
+
+        let Some(funcDef) = funcDef else {
+            if let Some(fallbackFunctionContainer) = fallbackFunctionContainer {
+                state.PushCallstack(
+                    crate::PushPop::PushPopType::Function,
+                    0,
+                    state.get_outputStream().len() as i32,
+                );
+                state.set_divertedPointer(Pointer::StartOf(Rc::new(fallbackFunctionContainer)));
+                return;
+            }
+
             panic!(
                 "Trying to call EXTERNAL function '{}' which has not been bound.",
                 funcName
             );
         };
 
-        if let Some(state) = self.state.as_mut() {
-            if !funcDef.lookaheadSafe && state.get_inStringEvaluation() {
-                self.Error(
-                    format!(
-                        "External function {} could not be called because it wasn't marked as lookaheadSafe when BindExternalFunction was called and the story is in the middle of string generation.",
-                        funcName
-                    ),
-                    false,
-                );
-                return;
-            }
-
-            let mut arguments: Vec<ValueInput> = Vec::new();
-            for _ in 0..numberOfArguments {
-                let popped = state.PopEvaluationStack();
-                if let crate::Container::ContentItem::Value(value) = popped {
-                    arguments.push(value.value_object());
-                }
-            }
-            arguments.reverse();
-
-            if let Some(function) = &funcDef.function {
-                let return_value = (function)(&arguments);
-                match return_value {
-                    Some(value) => {
-                        state.PushEvaluationStack(crate::Container::ContentItem::Value(value))
-                    }
-                    None => state.PushEvaluationStack(crate::Container::ContentItem::Void(
-                        crate::Void::Void::new(),
-                    )),
-                }
-            } else {
-                panic!(
-                    "Trying to call EXTERNAL function '{}' which has not been bound.",
+        if !funcDef.lookaheadSafe && state.get_inStringEvaluation() {
+            self.Error(
+                format!(
+                    "External function {} could not be called because it wasn't marked as lookaheadSafe when BindExternalFunction was called and the story is in the middle of string generation.",
                     funcName
-                );
+                ),
+                false,
+            );
+            return;
+        }
+
+        if !funcDef.lookaheadSafe && self.state_snapshot_at_last_new_line.is_some() {
+            self.saw_lookahead_unsafe_function_after_newline = true;
+            return;
+        }
+
+        let mut arguments: Vec<ValueInput> = Vec::new();
+        for _ in 0..numberOfArguments {
+            let popped = state.PopEvaluationStack();
+            if let crate::Container::ContentItem::Value(value) = popped {
+                arguments.push(value.value_object());
             }
+        }
+        arguments.reverse();
+
+        if let Some(function) = &funcDef.function {
+            let return_value = (function)(&arguments);
+            match return_value {
+                Some(value) => {
+                    state.PushEvaluationStack(crate::Container::ContentItem::Value(value))
+                }
+                None => state.PushEvaluationStack(crate::Container::ContentItem::Void(
+                    crate::Void::Void::new(),
+                )),
+            }
+        } else {
+            panic!(
+                "Trying to call EXTERNAL function '{}' which has not been bound.",
+                funcName
+            );
         }
     }
 
@@ -756,9 +1099,11 @@ impl Story {
     // C# signature: public void ValidateExternalBindings()
     pub fn ValidateExternalBindings(&mut self) {
         let mut missing_externals = std::collections::HashSet::new();
+        let mut visited_containers = std::collections::HashSet::new();
         self.ValidateExternalBindings_container(
             &self.main_content_container,
             &mut missing_externals,
+            &mut visited_containers,
         );
 
         if !missing_externals.is_empty() {
@@ -810,19 +1155,36 @@ impl Story {
         &self,
         container: &Container,
         missingExternals: &mut std::collections::HashSet<String>,
+        visitedContainers: &mut std::collections::HashSet<usize>,
     ) {
+        if !visitedContainers.insert(container.get_uid()) {
+            return;
+        }
+
         for innerContent in container.get_content() {
             if let crate::Container::ContentItem::Container(child) = innerContent {
                 if !child.get_hasValidName() {
-                    self.ValidateExternalBindings_content(innerContent, missingExternals);
+                    self.ValidateExternalBindings_content(
+                        innerContent,
+                        missingExternals,
+                        visitedContainers,
+                    );
                 }
             } else {
-                self.ValidateExternalBindings_content(innerContent, missingExternals);
+                self.ValidateExternalBindings_content(
+                    innerContent,
+                    missingExternals,
+                    visitedContainers,
+                );
             }
         }
 
         for innerKeyValue in container.get_namedContent().values() {
-            self.ValidateExternalBindings_content(innerKeyValue, missingExternals);
+            self.ValidateExternalBindings_content(
+                innerKeyValue,
+                missingExternals,
+                visitedContainers,
+            );
         }
     }
 
@@ -830,9 +1192,10 @@ impl Story {
         &self,
         content: &crate::Container::ContentItem,
         missingExternals: &mut std::collections::HashSet<String>,
+        visitedContainers: &mut std::collections::HashSet<usize>,
     ) {
         if let crate::Container::ContentItem::Container(container) = content {
-            self.ValidateExternalBindings_container(container, missingExternals);
+            self.ValidateExternalBindings_container(container, missingExternals, visitedContainers);
             return;
         }
 
@@ -883,6 +1246,18 @@ impl Story {
     }
 
     fn state_snapshot(&mut self) {
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!(
+                "snapshot current temps={:?}",
+                self.story_state_ref()
+                    .get_callStack()
+                    .currentElement()
+                    .temporaryVariables
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>()
+            );
+        }
         let mut tmp_state = self.story_state_mut().CopyAndStartPatching(false);
         let current_state = self.state.as_mut().expect("story state not initialized");
         std::mem::swap(&mut tmp_state, current_state);
@@ -890,13 +1265,24 @@ impl Story {
     }
 
     fn restore_state_snapshot(&mut self) {
-        if let Some(snapshot) = self.state_snapshot_at_last_new_line.as_mut() {
-            snapshot.RestoreAfterPatch();
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!("restore snapshot");
         }
-        self.state = Some(self.state_snapshot_at_last_new_line.take().unwrap());
+        let live_state = self.story_state_ref().clone();
+        let snapshot = self
+            .state_snapshot_at_last_new_line
+            .as_mut()
+            .expect("state snapshot not initialized");
+        snapshot.merge_live_flow_state_from(&live_state);
+        snapshot.RestoreAfterPatch();
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!("restore snapshot after patch");
+        }
+        self.state = self.state_snapshot_at_last_new_line.take();
         if !self.async_saving {
             self.story_state_mut().ApplyAnyPatch();
         }
+        self.state_snapshot_at_last_new_line = None;
     }
 
     fn discard_snapshot(&mut self) {
@@ -936,6 +1322,15 @@ impl Story {
     }
 
     fn visit_container(&mut self, container: &Container, at_start: bool) {
+        Self::debug_choice_log(&format!(
+            "visit_container path={} at_start={} flags={} count_visits={} count_turns={} count_start_only={}",
+            container.get_path().ToString(),
+            at_start,
+            container.get_countFlags(),
+            container.get_visitsShouldBeCounted(),
+            container.get_turnIndexShouldBeCounted(),
+            container.get_countingAtStartOnly()
+        ));
         if !container.get_countingAtStartOnly() || at_start {
             if container.get_visitsShouldBeCounted() {
                 self.story_state_mut()
@@ -953,7 +1348,7 @@ impl Story {
         let mut current = Some(container.clone());
         while let Some(curr) = current {
             paths.push(curr.get_path().ToString());
-            current = curr.get_parent().cloned();
+            current = curr.get_parent().map(|parent| (*parent).clone());
         }
         paths
     }
@@ -966,50 +1361,53 @@ impl Story {
             return;
         }
 
-        let mut prev_ancestor_paths = HashSet::new();
+        let mut prev_containers: Vec<Rc<Container>> = Vec::new();
         if !previous_pointer.get_isNull() {
-            let mut prev_ancestor = previous_pointer.Resolve().and_then(|item| match item {
-                ContentItem::Container(container) => Some(*container),
-                _ => None,
-            });
+            let mut prev_ancestor: Option<Rc<Container>> =
+                previous_pointer.Resolve().and_then(|item| match item {
+                    ContentItem::Container(container) => Some(container.clone()),
+                    _ => None,
+                });
             if prev_ancestor.is_none() {
                 prev_ancestor = previous_pointer.container.clone();
             }
             while let Some(prev) = prev_ancestor {
-                prev_ancestor_paths.insert(prev.get_path().ToString());
-                prev_ancestor = prev.get_parent().cloned();
+                prev_containers.push(prev.clone());
+                prev_ancestor = prev.get_parent();
             }
         }
 
-        let Some(current_child_of_container) = pointer.Resolve() else {
+        let Some(mut current_child_of_container) = pointer.Resolve() else {
             return;
         };
-        let current_child_of_container = match current_child_of_container {
-            ContentItem::Container(container) => *container,
-            _ => return,
+        let mut current_container_ancestor = match &current_child_of_container {
+            ContentItem::Container(container) => container.get_parent(),
+            _ => pointer.container.clone(),
         };
-
-        let mut current_container_ancestor = current_child_of_container.get_parent().cloned();
+        let mut all_children_entered_at_start = true;
 
         while let Some(current_container) = current_container_ancestor {
-            let current_path = current_container.get_path().ToString();
-            if !prev_ancestor_paths.contains(&current_path)
-                || current_container.get_countingAtStartOnly()
+            if prev_containers
+                .iter()
+                .any(|previous| Rc::ptr_eq(previous, &current_container))
+                && !current_container.get_countingAtStartOnly()
             {
-                let entering_at_start = current_container
-                    .get_content()
-                    .first()
-                    .and_then(|first| match first {
-                        ContentItem::Container(container) => Some(container.get_path().ToString()),
-                        _ => None,
-                    })
-                    .map(|first_path| {
-                        first_path == current_child_of_container.get_path().ToString()
-                    })
-                    .unwrap_or(false);
-                self.visit_container(&current_container, entering_at_start);
+                break;
             }
-            current_container_ancestor = current_container.get_parent().cloned();
+
+            let entering_at_start = current_container
+                .get_content()
+                .first()
+                .map(|first| first == &current_child_of_container && all_children_entered_at_start)
+                .unwrap_or(false);
+
+            if !entering_at_start {
+                all_children_entered_at_start = false;
+            }
+
+            self.visit_container(&current_container, entering_at_start);
+            current_child_of_container = ContentItem::Container(current_container.clone());
+            current_container_ancestor = current_container.get_parent();
         }
     }
 
@@ -1036,9 +1434,20 @@ impl Story {
         &mut self,
         choice_point: &mut ChoicePoint,
     ) -> Result<Option<Choice>, StoryException> {
+        Self::debug_choice_log(&format!(
+            "process_choice {} flags={} cond={} start={} only={} once={} eval_stack={}",
+            choice_point.ToString(),
+            choice_point.get_flags(),
+            choice_point.get_hasCondition(),
+            choice_point.get_hasStartContent(),
+            choice_point.get_hasChoiceOnlyContent(),
+            choice_point.get_onceOnly(),
+            self.story_state_ref().get_evaluationStack().len(),
+        ));
         let mut show_choice = true;
 
         if choice_point.get_hasCondition() {
+            Self::debug_choice_log("process_choice pop condition");
             let condition_value = self.story_state_mut().PopEvaluationStack();
             if !self.is_truthy(condition_value)? {
                 show_choice = false;
@@ -1058,21 +1467,34 @@ impl Story {
         }
 
         if choice_point.get_onceOnly() {
+            Self::debug_choice_log("process_choice before onceOnly target");
             if let Some(choice_target) = choice_point.get_choiceTarget() {
-                if self
+                let visit_count = self
                     .story_state_mut()
-                    .VisitCountForContainer(choice_target.clone())
-                    > 0
-                {
+                    .VisitCountForContainer(choice_target.clone());
+                Self::debug_choice_log(&format!(
+                    "process_choice onceOnly resolved target={} visit_count={}",
+                    choice_target.get_path().ToString(),
+                    visit_count
+                ));
+                Self::debug_choice_log(&format!(
+                    "process_choice onceOnly target path={} len={}",
+                    choice_target.get_path().ToString(),
+                    choice_target.get_content().len()
+                ));
+                if visit_count > 0 {
                     show_choice = false;
                 }
+                Self::debug_choice_log("process_choice onceOnly visit count done");
             }
         }
 
         if !show_choice {
+            Self::debug_choice_log("process_choice hidden");
             return Ok(None);
         }
 
+        Self::debug_choice_log("process_choice shown");
         start_text.push_str(&choice_only_text);
         let choice = Choice {
             text: start_text.trim().to_string(),
@@ -1119,6 +1541,20 @@ impl Story {
     }
 
     fn pop_choice_string_and_tags(&mut self, tags: &mut Vec<String>) -> String {
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!(
+                "pop choice string stack={} inExpr={} temps={:?}",
+                self.story_state_ref().get_evaluationStack().len(),
+                self.story_state_ref().get_inExpressionEvaluation(),
+                self.story_state_ref()
+                    .get_callStack()
+                    .currentElement()
+                    .temporaryVariables
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>()
+            );
+        }
         let obj = self.story_state_mut().PopEvaluationStack();
         let choice_only_str_val = match obj {
             ContentItem::Value(Value::String(value)) => value,
@@ -1162,6 +1598,12 @@ impl Story {
                     .get_variableDivertName()
                     .unwrap_or_default()
                     .to_string();
+                Self::debug_choice_log(&format!(
+                    "divert variable target lookup var={} eval={} stack={}",
+                    var_name,
+                    self.story_state_ref().get_inExpressionEvaluation(),
+                    self.story_state_ref().get_callStack().currentElementIndex(),
+                ));
                 let variable_value = self
                     .story_state_ref()
                     .get_variablesState()
@@ -1169,7 +1611,7 @@ impl Story {
                 if let Some(var_contents) = variable_value {
                     if let Value::DivertTarget(target_value) = var_contents {
                         if let Some(target_path) = target_value.value {
-                            let p = self.PointerAtPath(target_path);
+                            let p = self.PointerAtPath(target_path.clone());
                             self.story_state_mut().set_divertedPointer(p);
                         } else {
                             return Err(StoryException::new_overload_2(format!(
@@ -1196,11 +1638,8 @@ impl Story {
                 );
                 return Ok(true);
             } else {
-                let target_pointer = current_divert
-                    .get_targetPath()
-                    .map(|target_path| self.PointerAtPath(target_path))
-                    .unwrap_or_else(|| current_divert.get_targetPointer());
-                self.story_state_mut().set_divertedPointer(target_pointer);
+                self.story_state_mut()
+                    .set_divertedPointer(current_divert.get_targetPointer());
             }
 
             if current_divert.get_pushesToStack() {
@@ -1237,8 +1676,13 @@ impl Story {
                 CommandType::EvalOutput => {
                     if !self.story_state_ref().get_evaluationStack().is_empty() {
                         let output = self.story_state_mut().PopEvaluationStack();
+                        Self::debug_runtime_log(&format!(
+                            "eval output pop {:?} remaining={}",
+                            output,
+                            self.story_state_ref().get_evaluationStack().len()
+                        ));
                         if !matches!(output, ContentItem::Void(_)) {
-                            let text = Value::new_string(format!("{:?}", output));
+                            let text = Value::new_string(output.to_string());
                             self.story_state_mut()
                                 .PushToOutputStream(ContentItem::Value(text));
                         }
@@ -1311,20 +1755,22 @@ impl Story {
                         }
                         if matches!(obj, ContentItem::Tag(_)) {
                             content_to_retain.push_back(obj.clone());
-                        } else {
+                        } else if matches!(obj, ContentItem::Value(Value::String(_))) {
                             content_stack_for_string.push_front(obj.clone());
                         }
                     }
-                    while let Some(obj) = content_stack_for_string.pop_front() {
-                        self.story_state_mut().PushToOutputStream(obj);
-                    }
+                    self.story_state_mut()
+                        .PopFromOutputStream(output_count_consumed as i32);
                     while let Some(obj) = content_to_retain.pop_front() {
                         self.story_state_mut().PushToOutputStream(obj);
                     }
+                    self.story_state_mut().set_inExpressionEvaluation(true);
+                    let mut sb = String::new();
+                    for c in content_stack_for_string {
+                        sb.push_str(&c.to_string());
+                    }
                     self.story_state_mut()
-                        .PopFromOutputStream(output_count_consumed as i32);
-                    self.story_state_mut()
-                        .PushToOutputStream(ContentItem::ControlCommand(eval_command.clone()));
+                        .PushEvaluationStack(ContentItem::Value(Value::new_string(sb)));
                 }
                 CommandType::NoOp => {}
                 CommandType::ChoiceCount => {
@@ -1339,20 +1785,149 @@ impl Story {
                             current_turn_index,
                         )));
                 }
-                CommandType::TurnsSince => {}
-                CommandType::ReadCount => {}
-                CommandType::Random => {}
-                CommandType::SeedRandom => {}
-                CommandType::VisitIndex => {}
-                CommandType::SequenceShuffleIndex => {}
-                CommandType::StartThread => {
-                    let output_len = self.story_state_ref().get_outputStream().len() as i32;
-                    self.story_state_mut().PushCallstack(
-                        crate::PushPop::PushPopType::Tunnel,
-                        0,
-                        output_len,
-                    );
-                    self.story_state_mut().PushThread();
+                CommandType::TurnsSince | CommandType::ReadCount => {
+                    let target = self.story_state_mut().PopEvaluationStack();
+                    let divert_target = match target {
+                        ContentItem::Value(Value::DivertTarget(divert_target)) => divert_target,
+                        other => {
+                            let extra_note = match other {
+                                ContentItem::Value(Value::Int(_)) => ". Did you accidentally pass a read count ('knot_name') instead of a target ('-> knot_name')?",
+                                _ => "",
+                            };
+                            self.Error(format!(
+                                "TURNS_SINCE expected a divert target (knot, stitch, label name), but saw {}{}",
+                                other, extra_note
+                            ), false);
+                            return Ok(true);
+                        }
+                    };
+
+                    let container = divert_target
+                        .value
+                        .and_then(|path| self.ContentAtPath(path).get_container().cloned());
+                    let either_count = if let Some(container) = container {
+                        if eval_command.get_commandType() == CommandType::TurnsSince {
+                            self.story_state_mut().TurnsSinceForContainer(container)
+                        } else {
+                            self.story_state_mut().VisitCountForContainer(container)
+                        }
+                    } else {
+                        if eval_command.get_commandType() == CommandType::TurnsSince {
+                            -1
+                        } else {
+                            0
+                        }
+                    };
+                    self.story_state_mut()
+                        .PushEvaluationStack(ContentItem::Value(Value::new_int(either_count)));
+                }
+                CommandType::Random => {
+                    let max_int = match self.story_state_mut().PopEvaluationStack() {
+                        ContentItem::Value(Value::Int(int_val)) => int_val.value,
+                        other => {
+                            self.Error(
+                                format!(
+                                    "Invalid value for maximum parameter of RANDOM(min, max): {}",
+                                    other
+                                ),
+                                false,
+                            );
+                            return Ok(true);
+                        }
+                    };
+                    let min_int = match self.story_state_mut().PopEvaluationStack() {
+                        ContentItem::Value(Value::Int(int_val)) => int_val.value,
+                        other => {
+                            self.Error(
+                                format!(
+                                    "Invalid value for minimum parameter of RANDOM(min, max): {}",
+                                    other
+                                ),
+                                false,
+                            );
+                            return Ok(true);
+                        }
+                    };
+
+                    let random_range = match max_int
+                        .checked_sub(min_int)
+                        .and_then(|v| v.checked_add(1))
+                    {
+                        Some(v) => v,
+                        None => {
+                            self.Error(
+                                "RANDOM was called with a range that exceeds the size that ink numbers can use."
+                                    .to_string(),
+                                false,
+                            );
+                            i32::MAX
+                        }
+                    };
+                    if random_range <= 0 {
+                        self.Error(format!(
+                            "RANDOM was called with minimum as {} and maximum as {}. The maximum must be larger",
+                            min_int, max_int
+                        ), false);
+                        return Ok(true);
+                    }
+
+                    let result_seed = self.story_state_ref().get_storySeed()
+                        + self.story_state_ref().get_previousRandom();
+                    let mut random = StdRng::seed_from_u64(result_seed as u64);
+                    let next_random = random.random::<u32>();
+                    let chosen_value = (next_random % random_range as u32) as i32 + min_int;
+                    let previous_random = self.story_state_ref().get_previousRandom();
+                    self.story_state_mut()
+                        .PushEvaluationStack(ContentItem::Value(Value::new_int(chosen_value)));
+                    self.story_state_mut()
+                        .set_previousRandom(previous_random + 1);
+                }
+                CommandType::SeedRandom => {
+                    let seed = match self.story_state_mut().PopEvaluationStack() {
+                        ContentItem::Value(Value::Int(int_val)) => int_val.value,
+                        other => {
+                            self.Error(
+                                format!("Invalid value passed to SEED_RANDOM: {}", other),
+                                false,
+                            );
+                            return Ok(true);
+                        }
+                    };
+                    self.story_state_mut().set_storySeed(seed);
+                    self.story_state_mut().set_previousRandom(0);
+                    self.story_state_mut()
+                        .PushEvaluationStack(ContentItem::Void(Void::new()));
+                }
+                CommandType::VisitIndex => {
+                    let current_pointer = self.story_state_ref().get_currentPointer();
+                    let current_container = current_pointer
+                        .container
+                        .as_ref()
+                        .expect("current pointer has no container")
+                        .as_ref()
+                        .clone();
+                    if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+                        eprintln!(
+                            "visit index ptr={} container_path={} content_len={} flags visits={} turns={} start_only={}",
+                            Self::pointer_debug_string(&current_pointer),
+                            current_container.get_path().ToString(),
+                            current_container.get_content().len(),
+                            current_container.get_visitsShouldBeCounted(),
+                            current_container.get_turnIndexShouldBeCounted(),
+                            current_container.get_countingAtStartOnly()
+                        );
+                    }
+                    let count = self
+                        .story_state_mut()
+                        .VisitCountForContainer(current_container)
+                        - 1;
+                    self.story_state_mut()
+                        .PushEvaluationStack(ContentItem::Value(Value::new_int(count)));
+                }
+                CommandType::SequenceShuffleIndex => {
+                    let shuffle_index = self.next_sequence_shuffle_index();
+                    self.story_state_mut()
+                        .PushEvaluationStack(ContentItem::Value(Value::new_int(shuffle_index)));
                 }
                 CommandType::Done => {
                     if self.story_state_ref().get_callStack().canPopThread() {
@@ -1365,14 +1940,289 @@ impl Story {
                 CommandType::End => {
                     self.story_state_mut().ForceEnd();
                 }
-                CommandType::ListFromInt | CommandType::ListRange | CommandType::ListRandom => {}
-                CommandType::BeginTag | CommandType::EndTag => {
+                CommandType::ListFromInt => {
+                    let int_val = match self.story_state_mut().PopEvaluationStack() {
+                        ContentItem::Value(Value::Int(int_val)) => int_val.value,
+                        _ => {
+                            self.Error(
+                                "Passed non-integer when creating a list element from a numerical value."
+                                    .to_string(),
+                                false,
+                            );
+                            return Ok(true);
+                        }
+                    };
+                    let list_name_val = match self.story_state_mut().PopEvaluationStack() {
+                        ContentItem::Value(Value::String(string_val)) => string_val.value,
+                        other => {
+                            self.Error(format!("Failed to find LIST called {}", other), false);
+                            return Ok(true);
+                        }
+                    };
+
+                    let generated_list_value = if let Some(found_list_def) = self
+                        .listDefinitions
+                        .TryListGetDefinition(list_name_val.clone())
+                    {
+                        if let Some(found_item) = found_list_def.TryGetItemWithValue(int_val) {
+                            let list = ListValue::new_overload_3(found_item, int_val);
+                            Some(list)
+                        } else {
+                            Some(ListValue::new())
+                        }
+                    } else {
+                        self.Error(
+                            format!("Failed to find LIST called {}", list_name_val),
+                            false,
+                        );
+                        return Ok(true);
+                    };
+
+                    if let Some(generated_list_value) = generated_list_value {
+                        self.story_state_mut()
+                            .PushEvaluationStack(ContentItem::Value(Value::new_list(
+                                generated_list_value,
+                            )));
+                    }
+                }
+                CommandType::ListRange => {
+                    let max = match self.story_state_mut().PopEvaluationStack() {
+                        ContentItem::Value(Value::Int(value)) => ListBound::Int(value.value),
+                        ContentItem::Value(Value::List(list_value)) => {
+                            ListBound::List(Self::ink_list_from_list_value(&list_value))
+                        }
+                        other => {
+                            self.Error(
+                                format!(
+                                    "Expected list, minimum and maximum for LIST_RANGE, saw {}",
+                                    other
+                                ),
+                                false,
+                            );
+                            return Ok(true);
+                        }
+                    };
+                    let min = match self.story_state_mut().PopEvaluationStack() {
+                        ContentItem::Value(Value::Int(value)) => ListBound::Int(value.value),
+                        ContentItem::Value(Value::List(list_value)) => {
+                            ListBound::List(Self::ink_list_from_list_value(&list_value))
+                        }
+                        other => {
+                            self.Error(
+                                format!(
+                                    "Expected list, minimum and maximum for LIST_RANGE, saw {}",
+                                    other
+                                ),
+                                false,
+                            );
+                            return Ok(true);
+                        }
+                    };
+                    let target_list = match self.story_state_mut().PopEvaluationStack() {
+                        ContentItem::Value(Value::List(list_val)) => list_val,
+                        other => {
+                            self.Error(
+                                format!(
+                                    "Expected list, minimum and maximum for LIST_RANGE, saw {}",
+                                    other
+                                ),
+                                false,
+                            );
+                            return Ok(true);
+                        }
+                    };
+
+                    let target_ink_list = Self::ink_list_from_list_value(&target_list);
+                    let mut result = target_ink_list.ListWithSubRange(min, max);
+                    let mut result_list = ListValue::new_overload_2(result.get_entries().clone());
+                    result_list.originNames = result.get_originNames();
+                    result_list.origins = result
+                        .get_origins()
+                        .map(|origins: &[ListDefinition]| origins.to_vec());
+                    self.story_state_mut()
+                        .PushEvaluationStack(ContentItem::Value(Value::new_list(result_list)));
+                }
+                CommandType::ListRandom => {
+                    let list_val = match self.story_state_mut().PopEvaluationStack() {
+                        ContentItem::Value(Value::List(list_val)) => list_val,
+                        _ => {
+                            self.Error("Expected list for LIST_RANDOM".to_string(), false);
+                            return Ok(true);
+                        }
+                    };
+
+                    let list = list_val.value;
+                    let mut new_list = if list.is_empty() {
+                        InkList::new()
+                    } else {
+                        let result_seed = self.story_state_ref().get_storySeed()
+                            + self.story_state_ref().get_previousRandom();
+                        let mut random = StdRng::seed_from_u64(result_seed as u64);
+                        let next_random = random.random::<u32>();
+                        let list_item_index = (next_random as usize) % list.len();
+                        let mut sorted = list.iter().collect::<Vec<_>>();
+                        sorted.sort_by(|left, right| right.1.cmp(left.1));
+                        let random_item = sorted[list_item_index];
+                        let mut new_list = InkList::new();
+                        new_list.insert_entry(random_item.0.clone(), *random_item.1);
+                        if let Some(origin_name) = random_item.0.originName.clone() {
+                            new_list.SetInitialOriginName(origin_name);
+                        }
+                        self.story_state_mut()
+                            .set_previousRandom(next_random as i32);
+                        new_list
+                    };
+
+                    let mut result_list = ListValue::new_overload_2(new_list.get_entries().clone());
+                    result_list.originNames = new_list.get_originNames();
+                    result_list.origins = new_list.get_origins().map(|origins| origins.to_vec());
+                    self.story_state_mut()
+                        .PushEvaluationStack(ContentItem::Value(Value::new_list(result_list)));
+                }
+                CommandType::BeginTag => {
                     self.story_state_mut()
                         .PushToOutputStream(ContentItem::ControlCommand(eval_command.clone()));
                 }
+                CommandType::EndTag => {
+                    if self.story_state_ref().get_inStringEvaluation() {
+                        let mut content_stack_for_tag: VecDeque<ContentItem> = VecDeque::new();
+                        let mut output_count_consumed = 0;
+                        for obj in self.story_state_ref().get_outputStream().iter().rev() {
+                            output_count_consumed += 1;
+                            if matches!(obj, ContentItem::ControlCommand(command) if command.get_commandType() == CommandType::BeginTag)
+                            {
+                                break;
+                            }
+                            match obj {
+                                ContentItem::Value(Value::String(_)) => {
+                                    content_stack_for_tag.push_front(obj.clone());
+                                }
+                                ContentItem::ControlCommand(_) => {
+                                    self.Error(
+                                        "Unexpected ControlCommand while extracting tag from choice"
+                                            .to_string(),
+                                        false,
+                                    );
+                                    return Ok(true);
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        self.story_state_mut()
+                            .PopFromOutputStream(output_count_consumed as i32);
+
+                        let mut sb = String::new();
+                        for c in content_stack_for_tag {
+                            sb.push_str(&c.to_string());
+                        }
+
+                        let cleaned = self.story_state_ref().CleanOutputWhitespace(sb);
+                        self.story_state_mut()
+                            .PushEvaluationStack(ContentItem::Tag(Tag::new(cleaned)));
+                    } else {
+                        self.story_state_mut()
+                            .PushToOutputStream(ContentItem::ControlCommand(eval_command.clone()));
+                    }
+                }
                 CommandType::TOTAL_VALUES => {}
+                CommandType::StartThread => {}
                 CommandType::NotSet => {}
             }
+            return Ok(true);
+        }
+
+        if let ContentItem::VariableAssignment(var_ass) = content_obj.clone() {
+            Self::debug_choice_log(&format!(
+                "var assign enter var={} ptr={} eval={} stack={} out={} choices={} generated={}",
+                var_ass.get_variableName().unwrap_or(""),
+                Self::pointer_debug_string(&self.story_state_ref().get_currentPointer()),
+                self.story_state_ref().get_inExpressionEvaluation(),
+                self.story_state_ref().get_evaluationStack().len(),
+                self.story_state_ref().get_outputStream().len(),
+                self.story_state_ref().get_currentChoices().len(),
+                self.story_state_ref().get_generatedChoices().len(),
+            ));
+            let assigned_val = match self.story_state_mut().PopEvaluationStack() {
+                ContentItem::Value(value) => value,
+                other => panic!("Expected value for variable assignment, got {:?}", other),
+            };
+            Self::debug_runtime_log(&format!(
+                "assign {} <- {:?}",
+                var_ass.get_variableName().unwrap_or(""),
+                assigned_val.value_type()
+            ));
+            Self::debug_choice_log(&format!(
+                "assign var={} value={} eval={} stack={}",
+                var_ass.get_variableName().unwrap_or(""),
+                assigned_val,
+                self.story_state_ref().get_inExpressionEvaluation(),
+                self.story_state_ref().get_callStack().currentElementIndex(),
+            ));
+            let assigned_name = var_ass.get_variableName().unwrap_or("").to_string();
+            self.story_state_mut()
+                .get_variablesState_mut()
+                .Assign(var_ass.clone(), assigned_val);
+            self.story_state_mut().sync_variables_callstack();
+            let assigned_lookup = self
+                .story_state_ref()
+                .get_variablesState()
+                .GetVariableWithName(assigned_name.clone());
+            Self::debug_choice_log(&format!(
+                "assign lookup var={} found={}",
+                assigned_name,
+                assigned_lookup.is_some(),
+            ));
+            return Ok(true);
+        }
+
+        if let ContentItem::VariableReference(var_ref) = content_obj.clone() {
+            self.story_state_mut().sync_variables_callstack();
+            let found_value = if let Some(path_for_count) = var_ref.get_pathForCount() {
+                let count = self
+                    .story_state_mut()
+                    .VisitCountForContainer(var_ref.get_containerForCount());
+                ContentItem::Value(Value::new_int(count))
+            } else {
+                let name = var_ref.get_name().unwrap_or_default().to_string();
+                let found = self
+                    .story_state_ref()
+                    .get_variablesState()
+                    .GetVariableWithName(name.clone());
+                let value = if let Some(value) = found {
+                    Self::debug_runtime_log(&format!("read {} => {:?}", name, value.value_type()));
+                    value
+                } else {
+                    self.Warning(format!(
+                        "Variable not found: '{}'. Using default value of 0 (false). This can happen with temporary variables if the declaration hasn't yet been hit. Globals are always given a default value on load if a value doesn't exist in the save state.",
+                        name
+                    ));
+                    Value::new_int(0)
+                };
+                ContentItem::Value(value)
+            };
+
+            self.story_state_mut().PushEvaluationStack(found_value);
+            return Ok(true);
+        }
+
+        if let ContentItem::NativeFunctionCall(mut func) = content_obj {
+            let func_params = self
+                .story_state_mut()
+                .PopEvaluationStack_overload_2(func.get_numberOfParameters());
+            let values = func_params
+                .into_iter()
+                .map(|content| match content {
+                    ContentItem::Value(value) => value,
+                    other => panic!(
+                        "Expected value for native function parameters, got {:?}",
+                        other
+                    ),
+                })
+                .collect();
+            let result = func.Call(values);
+            self.story_state_mut()
+                .PushEvaluationStack(ContentItem::Value(result));
             return Ok(true);
         }
 
@@ -1388,6 +2238,14 @@ impl Story {
     }
 
     fn continue_single_step(&mut self) -> Result<bool, StoryException> {
+        let start_ptr = self.story_state_ref().get_currentPointer();
+        Self::debug_choice_log(&format!(
+            "continue_single_step start {} choices={} generated={} canContinue={}",
+            Self::pointer_debug_string(&start_ptr),
+            self.story_state_ref().get_currentChoices().len(),
+            self.story_state_ref().get_generatedChoices().len(),
+            self.get_canContinue(),
+        ));
         self.step()?;
 
         if !self.get_canContinue() {
@@ -1407,9 +2265,15 @@ impl Story {
                 if change == OutputStateChange::ExtendedBeyondNewline
                     || self.saw_lookahead_unsafe_function_after_newline
                 {
+                    Self::debug_choice_log(&format!(
+                        "newline restore change={:?} snapshot_choices={}",
+                        change,
+                        self.story_state_ref().get_generatedChoices().len()
+                    ));
                     self.restore_state_snapshot();
                     return Ok(true);
                 } else if change == OutputStateChange::NewlineRemoved {
+                    Self::debug_choice_log("newline removed -> discard snapshot");
                     self.state_snapshot_at_last_new_line = None;
                     self.discard_snapshot();
                 }
@@ -1418,18 +2282,43 @@ impl Story {
             if self.story_state_ref().get_outputStreamEndsInNewline() {
                 if self.get_canContinue() {
                     if self.state_snapshot_at_last_new_line.is_none() {
+                        Self::debug_choice_log(&format!(
+                            "snapshot create ptr={} choices={} out={}",
+                            Self::pointer_debug_string(
+                                &self.story_state_ref().get_currentPointer()
+                            ),
+                            self.story_state_ref().get_generatedChoices().len(),
+                            self.story_state_ref().get_outputStream().len()
+                        ));
                         self.state_snapshot();
                     }
                 } else {
+                    Self::debug_choice_log("snapshot discard at newline because cannot continue");
                     self.discard_snapshot();
                 }
             }
         }
 
+        Self::debug_choice_log(&format!(
+            "continue_single_step end {} choices={} generated={} canContinue={}",
+            Self::pointer_debug_string(&self.story_state_ref().get_currentPointer()),
+            self.story_state_ref().get_currentChoices().len(),
+            self.story_state_ref().get_generatedChoices().len(),
+            self.get_canContinue(),
+        ));
         Ok(false)
     }
 
     fn step(&mut self) -> Result<(), StoryException> {
+        let step_ptr = self.story_state_ref().get_currentPointer();
+        Self::debug_choice_log(&format!(
+            "step enter {} eval={} out={} choices={} generated={}",
+            Self::pointer_debug_string(&step_ptr),
+            self.story_state_ref().get_inExpressionEvaluation(),
+            self.story_state_ref().get_outputStream().len(),
+            self.story_state_ref().get_currentChoices().len(),
+            self.story_state_ref().get_generatedChoices().len(),
+        ));
         let mut should_add_to_stream = true;
         let mut pointer = self.story_state_ref().get_currentPointer();
 
@@ -1437,17 +2326,74 @@ impl Story {
             return Ok(());
         }
 
-        let mut current_content_obj = pointer.Resolve();
-        while let Some(ContentItem::Container(container)) = current_content_obj.clone() {
+        let mut container_to_enter = match pointer.Resolve() {
+            Some(ContentItem::Container(container)) => Some(container),
+            _ => None,
+        };
+
+        while let Some(container) = container_to_enter {
             self.visit_container(&container, true);
+
             if container.get_content().is_empty() {
                 break;
             }
-            pointer = Pointer::StartOf((*container).clone());
-            current_content_obj = pointer.Resolve();
+
+            pointer = Pointer::StartOf(container.clone());
+            container_to_enter = match pointer.Resolve() {
+                Some(ContentItem::Container(container)) => Some(container),
+                _ => None,
+            };
         }
 
         self.story_state_mut().set_currentPointer(pointer.clone());
+
+        let mut current_content_obj = pointer.Resolve();
+        let current_kind = match &current_content_obj {
+            Some(ContentItem::Container(_)) => "Container",
+            Some(ContentItem::ChoicePoint(_)) => "ChoicePoint",
+            Some(ContentItem::ControlCommand(_)) => "ControlCommand",
+            Some(ContentItem::Value(_)) => "Value",
+            Some(ContentItem::Divert(_)) => "Divert",
+            Some(ContentItem::Glue(_)) => "Glue",
+            Some(ContentItem::VariableReference(_)) => "VariableReference",
+            Some(ContentItem::VariableAssignment(_)) => "VariableAssignment",
+            Some(ContentItem::NativeFunctionCall(_)) => "NativeFunctionCall",
+            Some(ContentItem::Tag(_)) => "Tag",
+            Some(ContentItem::Choice(_)) => "Choice",
+            Some(ContentItem::Void(_)) => "Void",
+            None => "None",
+        };
+        Self::debug_choice_log(&format!(
+            "step resolved {} kind={} eval={} out={} generated={}",
+            Self::pointer_debug_string(&pointer),
+            current_kind,
+            self.story_state_ref().get_inExpressionEvaluation(),
+            self.story_state_ref().get_outputStream().len(),
+            self.story_state_ref().get_generatedChoices().len(),
+        ));
+        if let Some(ContentItem::Divert(divert)) = &current_content_obj {
+            let target_path_string = divert.get_targetPathString();
+            let target_pointer = divert.get_targetPointer();
+            let own_path = divert
+                .get_path()
+                .map(|path| path.ToString())
+                .unwrap_or_else(|| "<none>".to_string());
+            let parent_exists = divert.get_parent().is_some();
+            let parent_path = divert
+                .get_parent()
+                .map(|parent| parent.get_path().ToString())
+                .unwrap_or_else(|| "<none>".to_string());
+            Self::debug_choice_log(&format!(
+                "step divert own={} parent_exists={} parent={} target={} pushes={} stack={:?} ptr={}",
+                own_path,
+                parent_exists,
+                parent_path,
+                target_path_string,
+                divert.get_pushesToStack(),
+                divert.get_stackPushType(),
+                Self::pointer_debug_string(&target_pointer),
+            ));
+        }
         let is_logic_or_flow_control = self.perform_logic_and_flow_control(&current_content_obj)?;
 
         if self.story_state_ref().get_currentPointer().get_isNull() {
@@ -1459,14 +2405,11 @@ impl Story {
         }
 
         if let Some(content_obj) = current_content_obj.clone() {
-            if matches!(content_obj, ContentItem::Container(_)) {
+            if matches!(content_obj, ContentItem::ChoicePoint(_)) {
+                current_content_obj = None;
                 should_add_to_stream = false;
             }
-            if let ContentItem::ChoicePoint(mut choice_point) = content_obj {
-                let choice = self.process_choice(&mut choice_point)?;
-                if let Some(choice) = choice {
-                    self.story_state_mut().AddGeneratedChoice(choice);
-                }
+            if matches!(content_obj, ContentItem::Container(_)) {
                 should_add_to_stream = false;
             }
         }
@@ -1507,6 +2450,15 @@ impl Story {
             }
         }
 
+        Self::debug_choice_log(&format!(
+            "step exit {} eval={} out={} choices={} generated={} threads={}",
+            Self::pointer_debug_string(&self.story_state_ref().get_currentPointer()),
+            self.story_state_ref().get_inExpressionEvaluation(),
+            self.story_state_ref().get_outputStream().len(),
+            self.story_state_ref().get_currentChoices().len(),
+            self.story_state_ref().get_generatedChoices().len(),
+            self.story_state_ref().get_callStack().threads.len(),
+        ));
         Ok(())
     }
 
@@ -1518,7 +2470,16 @@ impl Story {
             let dp = self.story_state_ref().get_divertedPointer();
             self.story_state_mut().set_currentPointer(dp);
             self.story_state_mut().set_divertedPointer(Pointer::Null());
+            Self::debug_choice_log(&format!(
+                "next_content divert after_set {}",
+                Self::pointer_debug_string(&self.story_state_ref().get_currentPointer()),
+            ));
             self.visit_changed_containers_due_to_divert();
+            Self::debug_choice_log(&format!(
+                "next_content divert current={} diverted_cleared={}",
+                Self::pointer_debug_string(&self.story_state_ref().get_currentPointer()),
+                self.story_state_ref().get_divertedPointer().get_isNull(),
+            ));
             if !self.story_state_ref().get_currentPointer().get_isNull() {
                 return Ok(());
             }
@@ -1565,8 +2526,15 @@ impl Story {
 
         while pointer.index >= container.get_content().len() as i32 {
             successful_increment = false;
-            let next_ancestor = container.get_parent().cloned();
+            let next_ancestor = container.get_parent().map(|parent| (*parent).clone());
             let Some(next_ancestor) = next_ancestor else {
+                Self::debug_choice_log(&format!(
+                    "increment stop no ancestor current={} container={} uid={} parent={}",
+                    Self::pointer_debug_string(&pointer),
+                    container.get_path().ToString(),
+                    container.get_uid(),
+                    container.get_parent().is_some()
+                ));
                 break;
             };
 
@@ -1575,15 +2543,21 @@ impl Story {
                     .get_content()
                     .iter()
                     .position(|content| match content {
-                        ContentItem::Container(child) => child.get_path() == container.get_path(),
+                        ContentItem::Container(child) => child.get_uid() == container.get_uid(),
                         _ => false,
                     });
 
             let Some(index_in_ancestor) = index_in_ancestor else {
+                Self::debug_choice_log(&format!(
+                    "increment stop no index current={} container={} ancestor={}",
+                    Self::pointer_debug_string(&pointer),
+                    container.get_path().ToString(),
+                    next_ancestor.get_path().ToString()
+                ));
                 break;
             };
 
-            pointer = Pointer::new(next_ancestor, index_in_ancestor as i32);
+            pointer = Pointer::new(Rc::new(next_ancestor), index_in_ancestor as i32);
             container = pointer.container.clone().unwrap();
             pointer.index += 1;
             successful_increment = true;
@@ -1643,6 +2617,12 @@ impl Story {
         }
 
         let mut changed_variables_to_observe = None;
+        Self::debug_choice_log(&format!(
+            "end loop choices={} canContinue={} snapshot={}",
+            self.story_state_ref().get_currentChoices().len(),
+            self.get_canContinue(),
+            self.state_snapshot_at_last_new_line.is_some()
+        ));
         if output_stream_ends_in_newline || !self.get_canContinue() {
             if self.state_snapshot_at_last_new_line.is_some() {
                 self.restore_state_snapshot();
@@ -1839,6 +2819,14 @@ impl Story {
             .unwrap_or_default()
     }
 
+    // C# signature: VariablesState variablesState { get; }
+    pub fn get_variablesState_mut(&mut self) -> &mut VariablesState {
+        self.state
+            .as_mut()
+            .map(|state| state.get_variablesState_mut())
+            .expect("story state not initialised")
+    }
+
     // C# signature: ListDefinitionsOrigin listDefinitions { get; }
     pub fn get_listDefinitions(&mut self) -> ListDefinitionsOrigin {
         self.listDefinitions.clone()
@@ -1892,9 +2880,17 @@ impl Story {
 
     fn TagsAtStartOfFlowContainerWithPathString(&mut self, pathString: String) -> Vec<String> {
         let path = Path::new_overload_4(pathString);
-        let Some(mut flow_container) = self.ContentAtPath(path).get_container().cloned() else {
+        let content_at_path = self.ContentAtPath(path);
+        let Some(mut flow_container) = content_at_path.get_container().cloned() else {
             return Vec::new();
         };
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!(
+                "tags_at_path container_path={} content_len={}",
+                flow_container.get_path().ToString(),
+                flow_container.get_content().len()
+            );
+        }
 
         loop {
             let Some(first_content) = flow_container.get_content().first() else {
@@ -1924,14 +2920,11 @@ impl Story {
                     tags.push(str_value.value.clone());
                 }
                 crate::Container::ContentItem::Value(_) if in_tag => {
-                    // Match C# behavior: only plain text is allowed inside tags.
-                    // The runtime error path is not wired yet, so keep the behavior visible.
-                    return tags;
-                }
-                _ if in_tag => {
+                    // C# raises an error here. We stop at the first non-text tag content.
                     break;
                 }
-                _ => {}
+                _ if in_tag => break,
+                _ => break,
             }
         }
 

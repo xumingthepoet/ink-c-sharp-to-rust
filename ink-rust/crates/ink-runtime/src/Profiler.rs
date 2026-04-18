@@ -510,12 +510,13 @@ mod tests {
     use crate::Path::Path;
     use crate::Pointer::Pointer;
     use crate::PushPop::PushPopType;
+    use std::rc::Rc;
 
     fn callstack_with_command(command: ControlCommand) -> CallStack {
         let mut container = Container::new();
         container.AddContent(command);
 
-        let pointer = Pointer::StartOf(container);
+        let pointer = Pointer::StartOf(Rc::new(container));
         let element = Element::new(PushPopType::Tunnel, pointer, false);
         let thread = Thread {
             callstack: vec![element],

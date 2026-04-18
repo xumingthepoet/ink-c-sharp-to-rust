@@ -146,7 +146,7 @@ impl Compiler {
         }
 
         self.parsedStory = Some(parsed_story);
-        self.runtimeStory = runtime_story.clone();
+        self.runtimeStory = None;
         runtime_story
     }
 
@@ -317,7 +317,9 @@ impl Compiler {
                     if let ink_runtime::Container::ContentItem::Container(container) =
                         runtime_object
                     {
-                        if let Some(value) = runtime_story.EvaluateExpression(*container) {
+                        if let Some(value) =
+                            runtime_story.EvaluateExpression(container.as_ref().clone())
+                        {
                             result.output = Some(value.ToString());
                         }
                     }

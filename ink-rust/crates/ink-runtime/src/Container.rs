@@ -14,14 +14,23 @@ use crate::Value::{ListValue, StringValue, Value};
 use crate::VariableAssignment::VariableAssignment;
 use crate::VariableReference::VariableReference;
 use crate::Void::Void;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static NEXT_CONTAINER_UID: AtomicUsize = AtomicUsize::new(1);
+
+fn next_container_uid() -> usize {
+    NEXT_CONTAINER_UID.fetch_add(1, Ordering::Relaxed)
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ContentItem {
     Value(Value),
     ControlCommand(ControlCommand),
     Void(Void),
-    Container(Box<Container>),
+    Container(Rc<Container>),
     VariableReference(VariableReference),
     Divert(Divert),
     ChoicePoint(ChoicePoint),
@@ -64,7 +73,7 @@ impl From<Void> for ContentItem {
 
 impl From<Container> for ContentItem {
     fn from(value: Container) -> Self {
-        Self::Container(Box::new(value))
+        Self::Container(Rc::new(value))
     }
 }
 
@@ -116,6 +125,25 @@ impl From<Choice> for ContentItem {
     }
 }
 
+impl std::fmt::Display for ContentItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ContentItem::Value(value) => write!(f, "{}", value),
+            ContentItem::ControlCommand(command) => write!(f, "{}", command),
+            ContentItem::Void(_) => write!(f, "void"),
+            ContentItem::Container(container) => write!(f, "{container:?}"),
+            ContentItem::VariableReference(reference) => write!(f, "{reference:?}"),
+            ContentItem::Divert(divert) => write!(f, "{divert:?}"),
+            ContentItem::ChoicePoint(choice) => write!(f, "{choice:?}"),
+            ContentItem::Glue(glue) => write!(f, "{glue:?}"),
+            ContentItem::NativeFunctionCall(call) => write!(f, "{call:?}"),
+            ContentItem::VariableAssignment(var) => write!(f, "{var:?}"),
+            ContentItem::Tag(tag) => write!(f, "{tag:?}"),
+            ContentItem::Choice(choice) => write!(f, "{choice:?}"),
+        }
+    }
+}
+
 fn content_item_name(content: &ContentItem) -> Option<String> {
     match content {
         ContentItem::Container(container) => {
@@ -129,20 +157,44 @@ fn content_item_name(content: &ContentItem) -> Option<String> {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+fn path_without_last_component(path: &Path) -> Path {
+    let length = path.get_length();
+    if length <= 0 {
+        return Path::new();
+    }
+
+    let mut components = Vec::new();
+    for index in 0..(length - 1) {
+        if let Some(component) = path.GetComponent(index) {
+            components.push(component.clone());
+        }
+    }
+    Path::new_overload_3(components, path.get_isRelative())
+}
+
+#[derive(Clone, Debug)]
 pub struct Container {
-    parent: Option<Box<Container>>,
+    parent: RefCell<Option<Rc<Container>>>,
     content: Vec<ContentItem>,
     named_content: HashMap<String, ContentItem>,
     named_only_content: HashMap<String, ContentItem>,
     name: Option<String>,
-    path: Path,
+    path: RefCell<Path>,
     path_to_first_leaf_content: Option<Path>,
     debug_metadata: Option<DebugMetadata>,
     visitsShouldBeCounted: bool,
     turnIndexShouldBeCounted: bool,
     countingAtStartOnly: bool,
+    uid: usize,
 }
+
+impl PartialEq for Container {
+    fn eq(&self, other: &Self) -> bool {
+        self.uid == other.uid
+    }
+}
+
+impl Eq for Container {}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CountFlags {
@@ -158,11 +210,11 @@ impl Container {
     }
 
     pub fn from_content(content: Vec<ContentItem>) -> Self {
-        Self {
-            content,
-            path: Path::new(),
-            ..Default::default()
+        let mut container = Self::new();
+        for item in content {
+            container.AddContent(item);
         }
+        container
     }
 
     // C# signature: public void AddContent(Runtime.Object contentObj)
@@ -171,29 +223,29 @@ impl Container {
         if Self::content_item_has_parent(&content) {
             panic!("content is already in a container");
         }
-        if let ContentItem::Container(ref mut container) = content {
-            container.parent = Some(Box::new(self.clone()));
-            let index = self.content.len() as i32;
-            let child_path = if container.get_hasValidName() {
-                self.path
+        let index = self.content.len() as i32;
+        let child_path = match &content {
+            ContentItem::Container(container) => Some(if container.get_hasValidName() {
+                self.get_path()
                     .PathByAppendingComponent(Component::new_overload_2(
                         container.get_name().to_string(),
                     ))
             } else {
-                self.path.PathByAppendingComponent(Component::new(index))
-            };
-            container.set_path(child_path);
-        } else if let ContentItem::ChoicePoint(ref mut choice_point) = content {
-            choice_point.set_parent(Some(Box::new(self.clone())));
-        } else if let ContentItem::VariableReference(ref mut variable_reference) = content {
-            variable_reference.set_parent(Some(Box::new(self.clone())));
-        } else if let ContentItem::Divert(ref mut divert) = content {
-            divert.set_parent(Some(Box::new(self.clone())));
-            let index = self.content.len() as i32;
-            let child_path = self.path.PathByAppendingComponent(Component::new(index));
-            divert.set_path(child_path);
-        }
+                self.get_path()
+                    .PathByAppendingComponent(Component::new(index))
+            }),
+            ContentItem::Divert(_) => Some(
+                self.get_path()
+                    .PathByAppendingComponent(Component::new(index)),
+            ),
+            _ => None,
+        };
         self.content.push(content.clone());
+        let parent_snapshot = Rc::new(self.clone());
+        Self::attach_parent_metadata(&mut content, parent_snapshot.clone(), child_path.clone());
+        if let Some(stored) = self.content.last_mut() {
+            Self::attach_parent_metadata(stored, parent_snapshot, child_path);
+        }
         if let Some(name) = content_item_name(&content) {
             self.named_content.insert(name, content);
         }
@@ -213,33 +265,31 @@ impl Container {
         if Self::content_item_has_parent(&content) {
             panic!("content is already in a container");
         }
-        if let ContentItem::Container(ref mut container) = content {
-            container.parent = Some(Box::new(self.clone()));
-            let child_path = if container.get_hasValidName() {
-                self.path
-                    .PathByAppendingComponent(Component::new_overload_2(
-                        container.get_name().to_string(),
-                    ))
-            } else {
-                self.path
-                    .PathByAppendingComponent(Component::new(index as i32))
-            };
-            container.set_path(child_path);
-        } else if let ContentItem::ChoicePoint(ref mut choice_point) = content {
-            choice_point.set_parent(Some(Box::new(self.clone())));
-        } else if let ContentItem::VariableReference(ref mut variable_reference) = content {
-            variable_reference.set_parent(Some(Box::new(self.clone())));
-        } else if let ContentItem::Divert(ref mut divert) = content {
-            divert.set_parent(Some(Box::new(self.clone())));
-            let child_path = self
-                .path
-                .PathByAppendingComponent(Component::new(index as i32));
-            divert.set_path(child_path);
-        }
         if index >= self.content.len() {
             self.content.push(content.clone());
         } else {
             self.content.insert(index, content.clone());
+        }
+        let parent_snapshot = Rc::new(self.clone());
+        let child_path = match &content {
+            ContentItem::Container(container) => Some(if container.get_hasValidName() {
+                self.get_path()
+                    .PathByAppendingComponent(Component::new_overload_2(
+                        container.get_name().to_string(),
+                    ))
+            } else {
+                self.get_path()
+                    .PathByAppendingComponent(Component::new(index as i32))
+            }),
+            ContentItem::Divert(_) => Some(
+                self.get_path()
+                    .PathByAppendingComponent(Component::new(index as i32)),
+            ),
+            _ => None,
+        };
+        Self::attach_parent_metadata(&mut content, parent_snapshot.clone(), child_path.clone());
+        if let Some(stored) = self.content.get_mut(index) {
+            Self::attach_parent_metadata(stored, parent_snapshot, child_path);
         }
         if let Some(name) = content_item_name(&content) {
             self.named_content.insert(name, content);
@@ -254,16 +304,24 @@ impl Container {
     // C# signature: public void AddToNamedContentOnly(INamedContent namedContentObj)
     pub fn AddToNamedContentOnly<T: Into<ContentItem>>(&mut self, namedContentObj: T) {
         let mut content = namedContentObj.into();
-        if let ContentItem::Container(ref mut container) = content {
-            container.parent = Some(Box::new(self.clone()));
-        } else if let ContentItem::ChoicePoint(ref mut choice_point) = content {
-            choice_point.set_parent(Some(Box::new(self.clone())));
-        } else if let ContentItem::VariableReference(ref mut variable_reference) = content {
-            variable_reference.set_parent(Some(Box::new(self.clone())));
-        } else if let ContentItem::Divert(ref mut divert) = content {
-            divert.set_parent(Some(Box::new(self.clone())));
-        }
+        let parent_snapshot = Rc::new(self.clone());
+        let child_path = match &content {
+            ContentItem::Container(container) => {
+                if container.get_hasValidName() {
+                    Some(
+                        self.get_path()
+                            .PathByAppendingComponent(Component::new_overload_2(
+                                container.get_name().to_string(),
+                            )),
+                    )
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
         if let Some(name) = content_item_name(&content) {
+            Self::attach_parent_metadata(&mut content, parent_snapshot.clone(), child_path.clone());
             self.named_content.insert(name.clone(), content.clone());
             self.named_only_content.insert(name, content);
         }
@@ -281,7 +339,7 @@ impl Container {
     fn detach_parent(content: &mut ContentItem) {
         match content {
             ContentItem::Container(container) => {
-                container.parent = None;
+                container.as_ref().set_parent(None);
             }
             ContentItem::ChoicePoint(choice_point) => {
                 choice_point.set_parent(None);
@@ -296,9 +354,38 @@ impl Container {
         }
     }
 
+    fn attach_parent_metadata(
+        content: &mut ContentItem,
+        parent: Rc<Container>,
+        child_path: Option<Path>,
+    ) {
+        match content {
+            ContentItem::Container(container) => {
+                container.as_ref().set_parent(Some(parent));
+                if let Some(path) = child_path {
+                    container.as_ref().set_path(path);
+                }
+                container.as_ref().refresh_child_parents();
+            }
+            ContentItem::ChoicePoint(choice_point) => {
+                choice_point.set_parent(Some(parent));
+            }
+            ContentItem::Divert(divert) => {
+                divert.set_parent(Some(parent));
+                if let Some(path) = child_path {
+                    divert.set_path(path);
+                }
+            }
+            ContentItem::VariableReference(variable_reference) => {
+                variable_reference.set_parent(Some(parent));
+            }
+            _ => {}
+        }
+    }
+
     fn content_item_has_parent(content: &ContentItem) -> bool {
         match content {
-            ContentItem::Container(container) => container.parent.is_some(),
+            ContentItem::Container(container) => container.get_parent().is_some(),
             ContentItem::ChoicePoint(choice_point) => choice_point.get_parent().is_some(),
             ContentItem::Divert(divert) => divert.get_parent().is_some(),
             ContentItem::VariableReference(variable_reference) => {
@@ -318,13 +405,19 @@ impl Container {
                 None
             }
         } else if component.get_isParent() {
-            self.parent
-                .as_ref()
-                .map(|parent| ContentItem::Container(parent.clone()))
+            if let Some(parent) = self.parent.borrow().as_ref() {
+                Some(ContentItem::Container(parent.clone()))
+            } else {
+                None
+            }
         } else {
-            self.named_content
-                .get(component.get_name().unwrap_or(""))
+            let name = component.get_name().unwrap_or("");
+            let result = self
+                .named_content
+                .get(name)
                 .cloned()
+                .or_else(|| self.named_only_content.get(name).cloned());
+            result
         }
     }
 
@@ -335,6 +428,7 @@ impl Container {
         partialPathStart: i32,
         partialPathLength: i32,
     ) -> SearchResult {
+        let debug_path = path.ToString();
         let partialPathLength = if partialPathLength == -1 {
             path.get_length()
         } else {
@@ -344,7 +438,7 @@ impl Container {
         let mut result = SearchResult::new();
         let mut currentContainer: Option<Container> = Some(self.clone());
         let mut currentObj: Option<ContentItem> =
-            Some(ContentItem::Container(Box::new(self.clone())));
+            Some(ContentItem::Container(Rc::new(self.clone())));
 
         for i in partialPathStart..partialPathLength {
             let Some(mut container) = currentContainer.take() else {
@@ -356,7 +450,6 @@ impl Container {
                 result.approximate = true;
                 break;
             };
-
             let foundObj = container.ContentWithPathComponent(component.clone());
             let Some(foundObj) = foundObj else {
                 result.approximate = true;
@@ -461,7 +554,6 @@ impl Container {
                 }
             }
         }
-
         append_indentation(&mut sb, indentation);
         sb.Append("[");
 
@@ -471,7 +563,8 @@ impl Container {
             sb.Append(")");
         }
 
-        if pointedPath.as_ref() == Some(self.get_path()) {
+        let current_path = self.get_path();
+        if pointedPath.as_ref() == Some(&current_path) {
             sb.Append("  <---");
         }
 
@@ -521,6 +614,48 @@ impl Container {
         sb.Append("]");
     }
 
+    pub(crate) fn refresh_child_parents(&self) {
+        let parent_rc = Rc::new(self.clone());
+
+        for content in &self.content {
+            match content {
+                ContentItem::Container(container) => {
+                    container.as_ref().set_parent(Some(parent_rc.clone()));
+                    container.as_ref().refresh_child_parents();
+                }
+                ContentItem::ChoicePoint(choice_point) => {
+                    choice_point.set_parent(Some(parent_rc.clone()));
+                }
+                ContentItem::Divert(divert) => {
+                    divert.set_parent(Some(parent_rc.clone()));
+                }
+                ContentItem::VariableReference(variable_reference) => {
+                    variable_reference.set_parent(Some(parent_rc.clone()));
+                }
+                _ => {}
+            }
+        }
+
+        for content in self.named_only_content.values() {
+            match content {
+                ContentItem::Container(container) => {
+                    container.as_ref().set_parent(Some(parent_rc.clone()));
+                    container.as_ref().refresh_child_parents();
+                }
+                ContentItem::ChoicePoint(choice_point) => {
+                    choice_point.set_parent(Some(parent_rc.clone()));
+                }
+                ContentItem::Divert(divert) => {
+                    divert.set_parent(Some(parent_rc.clone()));
+                }
+                ContentItem::VariableReference(variable_reference) => {
+                    variable_reference.set_parent(Some(parent_rc.clone()));
+                }
+                _ => {}
+            }
+        }
+    }
+
     // C# signature: public virtual string BuildStringOfHierarchy()
     pub fn BuildStringOfHierarchy_overload_2(&mut self) -> String {
         let sb = crate::StringBuilder::StringBuilder::new();
@@ -534,12 +669,42 @@ impl Container {
     }
 
     // C# signature: Path path { get; }
-    pub fn get_path(&self) -> &Path {
-        &self.path
+    pub fn get_path(&self) -> Path {
+        if self.parent.borrow().is_none() {
+            return self.path.borrow().clone();
+        }
+
+        let mut components = Vec::new();
+        let mut child = self.clone();
+        let mut container = child.parent.borrow().clone();
+
+        while let Some(parent) = container {
+            if child.get_hasValidName() {
+                components.push(Component::new_overload_2(child.get_name().to_string()));
+            } else {
+                let index = parent
+                    .content
+                    .iter()
+                    .position(|content| match content {
+                        ContentItem::Container(candidate) => candidate.as_ref() == &child,
+                        _ => false,
+                    })
+                    .unwrap_or(0);
+                components.push(Component::new(index as i32));
+            }
+
+            child = (*parent).clone();
+            container = child.parent.borrow().clone();
+        }
+
+        components.reverse();
+        let path = Path::new_overload_3(components, false);
+        self.path.replace(path.clone());
+        path
     }
 
-    pub fn set_path(&mut self, path: Path) {
-        self.path = path;
+    pub fn set_path(&self, path: Path) {
+        self.path.replace(path);
     }
 
     pub fn get_debugMetadata(&self) -> Option<&DebugMetadata> {
@@ -586,10 +751,22 @@ impl Container {
             return;
         };
 
-        for (name, content) in named_only_content {
+        for (name, mut content) in named_only_content {
+            if let ContentItem::Container(ref mut container) = content {
+                container.as_ref().set_parent(Some(Rc::new(self.clone())));
+            } else if let ContentItem::ChoicePoint(ref mut choice_point) = content {
+                choice_point.set_parent(Some(Rc::new(self.clone())));
+            } else if let ContentItem::VariableReference(ref mut variable_reference) = content {
+                variable_reference.set_parent(Some(Rc::new(self.clone())));
+            } else if let ContentItem::Divert(ref mut divert) = content {
+                divert.set_parent(Some(Rc::new(self.clone())));
+            }
+
             self.named_content.insert(name.clone(), content.clone());
             self.named_only_content.insert(name, content);
         }
+
+        self.refresh_child_parents();
     }
 
     // C# signature: bool visitsShouldBeCounted { get; }
@@ -607,16 +784,20 @@ impl Container {
         self.countingAtStartOnly
     }
 
-    pub fn get_parent(&self) -> Option<&Container> {
-        self.parent.as_deref()
+    pub fn get_parent(&self) -> Option<Rc<Container>> {
+        self.parent.borrow().clone()
+    }
+
+    pub fn set_parent(&self, parent: Option<Rc<Container>>) {
+        self.parent.replace(parent);
     }
 
     pub fn get_rootContentContainer(&self) -> Option<Container> {
-        let mut ancestor = self.clone();
+        let mut ancestor = self.parent.borrow().clone()?;
         while let Some(parent) = ancestor.get_parent() {
-            ancestor = parent.clone();
+            ancestor = parent;
         }
-        Some(ancestor)
+        Some((*ancestor).clone())
     }
 
     // C# signature: int countFlags { get; }
@@ -660,6 +841,29 @@ impl Container {
         }
         path
     }
+
+    pub fn get_uid(&self) -> usize {
+        self.uid
+    }
+}
+
+impl Default for Container {
+    fn default() -> Self {
+        Self {
+            parent: RefCell::new(None),
+            content: Vec::new(),
+            named_content: HashMap::new(),
+            named_only_content: HashMap::new(),
+            name: None,
+            path: RefCell::new(Path::new()),
+            path_to_first_leaf_content: None,
+            debug_metadata: None,
+            visitsShouldBeCounted: false,
+            turnIndexShouldBeCounted: false,
+            countingAtStartOnly: false,
+            uid: next_container_uid(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -667,6 +871,8 @@ mod tests {
     use super::{Container, ContentItem};
     use crate::ControlCommand::ControlCommand;
     use crate::Path::{Component, Path};
+    use std::collections::HashMap;
+    use std::rc::Rc;
 
     #[test]
     fn resolves_indexed_child_container_paths() {
@@ -722,5 +928,79 @@ mod tests {
             _ => panic!("child container missing"),
         };
         assert!(inserted.get_parent().is_some());
+    }
+
+    #[test]
+    fn computes_path_from_parent_chain_when_cached_path_is_empty() {
+        let mut child = Container::new();
+        child.set_name(Some("child".to_string()));
+
+        let mut root = Container::new();
+        root.AddContent(child.clone());
+
+        let inserted_child = match root.get_content().first() {
+            Some(ContentItem::Container(container)) => container.as_ref().clone(),
+            _ => panic!("child container missing"),
+        };
+
+        assert_eq!(inserted_child.get_path().ToString(), "child");
+    }
+
+    #[test]
+    fn resolves_named_child_container_through_content_at_path() {
+        let mut named_child = Container::new();
+        named_child.set_name(Some("child".to_string()));
+        named_child.AddContent(ControlCommand::BeginString());
+
+        let mut parent = Container::new();
+        parent.AddContent(named_child.clone());
+
+        let mut root = Container::new();
+        root.AddContent(parent.clone());
+
+        let result = root.ContentAtPath(
+            Path::new_overload_3(
+                vec![
+                    Component::new(0),
+                    Component::new_overload_2("child".to_string()),
+                ],
+                false,
+            ),
+            0,
+            -1,
+        );
+
+        assert!(!result.approximate);
+        assert!(matches!(
+            result.get_correctObj(),
+            Some(ContentItem::Container(container)) if container.get_name() == "child"
+        ));
+    }
+
+    #[test]
+    fn resolves_named_only_child_container_through_content_at_path() {
+        let mut named_only_child = Container::new();
+        named_only_child.set_name(Some("child".to_string()));
+        named_only_child.AddContent(ControlCommand::BeginString());
+
+        let mut parent = Container::new();
+        let mut named_only = HashMap::new();
+        named_only.insert(
+            "child".to_string(),
+            ContentItem::Container(Rc::new(named_only_child.clone())),
+        );
+        parent.set_namedOnlyContent(Some(named_only));
+
+        let result = parent.ContentAtPath(
+            Path::new_overload_3(vec![Component::new_overload_2("child".to_string())], false),
+            0,
+            -1,
+        );
+
+        assert!(!result.approximate);
+        assert!(matches!(
+            result.get_correctObj(),
+            Some(ContentItem::Container(container)) if container.get_name() == "child"
+        ));
     }
 }

@@ -593,7 +593,7 @@ impl Object {
 
     fn container_from_content_item(content_item: ContentItem) -> Option<Container> {
         match content_item {
-            ContentItem::Container(container) => Some(*container),
+            ContentItem::Container(container) => Some(container.as_ref().clone()),
             other => {
                 let mut container = Container::new();
                 container.AddContent(other);
@@ -668,7 +668,7 @@ impl From<ContentList> for Object {
 impl From<Weave> for Object {
     fn from(mut value: Weave) -> Self {
         let runtimeObject = match value.GenerateRuntimeObject() {
-            ContentItem::Container(container) => Some(*container),
+            ContentItem::Container(container) => Some(container.as_ref().clone()),
             _ => None,
         };
 

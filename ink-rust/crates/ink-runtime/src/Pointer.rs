@@ -2,16 +2,17 @@
 
 use crate::Container::{Container, ContentItem};
 use crate::Path::{Component, Path};
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Pointer {
-    pub container: Option<Container>,
+    pub container: Option<Rc<Container>>,
     pub index: i32,
 }
 
 impl Pointer {
     // C# signature: public Pointer (Container container, int index)
-    pub fn new(container: Container, index: i32) -> Self {
+    pub fn new(container: Rc<Container>, index: i32) -> Self {
         Self {
             container: Some(container),
             index,
@@ -22,10 +23,10 @@ impl Pointer {
     pub fn Resolve(&self) -> Option<ContentItem> {
         let container = self.container.as_ref()?;
         if self.index < 0 {
-            return Some(ContentItem::Container(Box::new(container.clone())));
+            return Some(ContentItem::Container(container.clone()));
         }
         if container.get_content().is_empty() {
-            return Some(ContentItem::Container(Box::new(container.clone())));
+            return Some(ContentItem::Container(container.clone()));
         }
         container.get_content().get(self.index as usize).cloned()
     }
@@ -36,7 +37,7 @@ impl Pointer {
     }
 
     // C# signature: public static Pointer StartOf (Container container)
-    pub fn StartOf(container: Container) -> Self {
+    pub fn StartOf(container: Rc<Container>) -> Self {
         Self {
             container: Some(container),
             index: 0,
@@ -90,6 +91,7 @@ mod tests {
     use super::Pointer;
     use crate::Container::{Container, ContentItem};
     use crate::ControlCommand::ControlCommand;
+    use std::rc::Rc;
 
     #[test]
     fn resolves_content_and_paths() {
@@ -97,7 +99,7 @@ mod tests {
         container.AddContent(ControlCommand::BeginString());
         container.AddContent(ControlCommand::EndString());
 
-        let pointer = Pointer::StartOf(container.clone());
+        let pointer = Pointer::StartOf(Rc::new(container.clone()));
         assert!(!pointer.get_isNull());
         assert!(matches!(
             pointer.Resolve(),

@@ -10,6 +10,7 @@ use ink_runtime::Container::{Container, ContentItem};
 use ink_runtime::ControlCommand::ControlCommand;
 use ink_runtime::Divert::Divert as RuntimeDivert;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GatherPointToResolve {
@@ -169,7 +170,7 @@ impl Weave {
 
         self.PassLooseEndsToAncestors();
 
-        ContentItem::Container(Box::new(
+        ContentItem::Container(Rc::new(
             self.rootContainer.clone().unwrap_or(root_container),
         ))
     }
@@ -177,7 +178,7 @@ impl Weave {
     // C# signature: public void AddRuntimeForNestedWeave(Weave nestedResult)
     pub fn AddRuntimeForNestedWeave(&mut self, mut nestedResult: Weave) {
         if let Some(nested_root) = nestedResult.get_rootContainer() {
-            self.AddGeneralRuntimeContent(Some(ContentItem::Container(Box::new(nested_root))));
+            self.AddGeneralRuntimeContent(Some(ContentItem::Container(Rc::new(nested_root))));
         }
 
         if let Some(previous) = &self.previousWeavePoint {
@@ -347,12 +348,12 @@ impl Weave {
         self.hasSeenChoiceInSection = false;
 
         let gather_container = match gather.GenerateRuntimeObject() {
-            ContentItem::Container(container) => *container,
+            ContentItem::Container(container) => container.as_ref().clone(),
             _ => Container::new(),
         };
 
         if auto_enter {
-            self.AddGeneralRuntimeContent(Some(ContentItem::Container(Box::new(
+            self.AddGeneralRuntimeContent(Some(ContentItem::Container(Rc::new(
                 gather_container.clone(),
             ))));
         } else if let Some(root) = self.rootContainer.as_mut() {

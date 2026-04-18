@@ -7,6 +7,7 @@ use ink_runtime::ControlCommand::{CommandType, ControlCommand};
 use ink_runtime::Value::{DivertTargetValue, Value};
 use ink_runtime::VariableReference::VariableReference as RuntimeVariableReference;
 use ink_runtime::Void::Void as RuntimeVoid;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TunnelOnwards {
@@ -77,7 +78,7 @@ impl TunnelOnwards {
         container.AddContent(ControlCommand::EvalEnd());
         container.AddContent(ControlCommand::PopTunnel());
 
-        ContentItem::Container(Box::new(container))
+        ContentItem::Container(Rc::new(container))
     }
 
     // C# signature: public override void ResolveReferences (Story context)

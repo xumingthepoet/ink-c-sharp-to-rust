@@ -9,8 +9,10 @@ use ink_runtime::Container::CountFlags;
 use ink_runtime::Container::{Container, ContentItem};
 use ink_runtime::ControlCommand::ControlCommand;
 use ink_runtime::Divert::Divert as RuntimeDivert;
+use ink_runtime::Path::Component;
 use ink_runtime::Value::{DivertTargetValue, Value};
 use ink_runtime::VariableAssignment::VariableAssignment as RuntimeVariableAssignment;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Default)]
 pub struct Choice {
@@ -94,7 +96,12 @@ impl Choice {
         }
 
         if let Some(start_content) = self.startContent.as_mut() {
-            self.returnToR1 = Some(DivertTargetValue::new(None));
+            let r1_index = outer.get_content().len() as i32 + 4;
+            let r1_label_path = outer
+                .get_path()
+                .PathByAppendingComponent(Component::new(r1_index));
+
+            self.returnToR1 = Some(DivertTargetValue::new(Some(r1_label_path.clone())));
             outer.AddContent(ContentItem::Value(Value::DivertTarget(
                 self.returnToR1.clone().unwrap(),
             )));
@@ -103,21 +110,34 @@ impl Choice {
             outer.AddContent(ControlCommand::BeginString());
 
             self.divertToStartContentOuter = Some(RuntimeDivert::new());
-            outer.AddContent(self.divertToStartContentOuter.clone().unwrap());
 
             let mut start_container = start_content.GenerateRuntimeObject();
             start_container.set_name(Some("s".to_string()));
+            start_container.set_path(
+                outer
+                    .get_path()
+                    .PathByAppendingComponent(Component::new_overload_2("s".to_string())),
+            );
 
             let mut var_divert = RuntimeDivert::new();
             var_divert.set_variableDivertName(Some("$r".to_string()));
             start_container.AddContent(var_divert);
 
+            if let (Some(divert), Some(start_container)) = (
+                self.divertToStartContentOuter.as_mut(),
+                Some(&start_container),
+            ) {
+                divert.set_targetPathString(Some(start_container.get_path().ToString()));
+            }
+
+            outer.AddContent(self.divertToStartContentOuter.clone().unwrap());
             outer.AddToNamedContentOnly(start_container.clone());
             self.startContentRuntimeContainer = Some(start_container);
 
             let mut r1_label = Container::new();
             r1_label.set_name(Some("$r1".to_string()));
             outer.AddContent(r1_label.clone());
+            r1_label.set_path(r1_label_path);
             self.r1Label = Some(r1_label);
 
             outer.AddContent(ControlCommand::EndString());
@@ -152,16 +172,31 @@ impl Choice {
             outer.AddContent(ControlCommand::EvalEnd());
         }
 
+        self.innerContentContainer = Some(Container::new());
+        let inner = self.innerContentContainer.as_mut().unwrap();
+        inner.set_name(Some(format!("c-{}", outer.get_content().len())));
+        inner.set_path(
+            outer
+                .get_path()
+                .PathByAppendingComponent(Component::new_overload_2(inner.get_name().to_string())),
+        );
+
+        if let Some(choice) = self.runtimeChoice.as_mut() {
+            choice.set_pathStringOnChoice(inner.get_path().ToString());
+        }
+
         if let Some(choice) = self.runtimeChoice.clone() {
             outer.AddContent(choice);
         }
 
-        self.innerContentContainer = Some(Container::new());
-        let inner = self.innerContentContainer.as_mut().unwrap();
-
         if self.startContent.is_some() {
-            self.returnToR2 = Some(DivertTargetValue::new(None));
+            let r2_index = inner.get_content().len() as i32 + 5;
+            let r2_label_path = inner
+                .get_path()
+                .PathByAppendingComponent(Component::new(r2_index));
+
             inner.AddContent(ControlCommand::EvalStart());
+            self.returnToR2 = Some(DivertTargetValue::new(Some(r2_label_path.clone())));
             inner.AddContent(ContentItem::Value(Value::DivertTarget(
                 self.returnToR2.clone().unwrap(),
             )));
@@ -169,11 +204,18 @@ impl Choice {
             inner.AddContent(RuntimeVariableAssignment::new("$r".to_string(), true));
 
             self.divertToStartContentInner = Some(RuntimeDivert::new());
+            if let (Some(divert), Some(start_container)) = (
+                self.divertToStartContentInner.as_mut(),
+                self.startContentRuntimeContainer.as_ref(),
+            ) {
+                divert.set_targetPathString(Some(start_container.get_path().ToString()));
+            }
             inner.AddContent(self.divertToStartContentInner.clone().unwrap());
 
             let mut r2_label = Container::new();
             r2_label.set_name(Some("$r2".to_string()));
             inner.AddContent(r2_label.clone());
+            r2_label.set_path(r2_label_path);
             self.r2Label = Some(r2_label);
         }
 
@@ -184,47 +226,22 @@ impl Choice {
 
         inner.set_countFlags(CountFlags::CountStartOnly as i32);
 
-        ContentItem::Container(Box::new(outer.clone()))
+        outer.AddToNamedContentOnly(inner.clone());
+
+        ContentItem::Container(Rc::new(outer.clone()))
     }
 
     // C# signature: public override void ResolveReferences(Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
         if let Some(inner) = &mut self.innerContentContainer {
-            if let Some(choice) = self.runtimeChoice.as_mut() {
-                choice.set_pathStringOnChoice(inner.get_path().ToString());
-            }
-
             if context.countAllVisits {
                 inner.set_countFlags(
                     (CountFlags::Visits as i32) | (CountFlags::CountStartOnly as i32),
                 );
             }
-        }
-
-        if let (Some(return_to_r1), Some(r1_label)) =
-            (self.returnToR1.as_mut(), self.r1Label.as_ref())
-        {
-            *return_to_r1 = DivertTargetValue::new(Some(r1_label.get_path().clone()));
-        }
-
-        if let (Some(return_to_r2), Some(r2_label)) =
-            (self.returnToR2.as_mut(), self.r2Label.as_ref())
-        {
-            *return_to_r2 = DivertTargetValue::new(Some(r2_label.get_path().clone()));
-        }
-
-        if let (Some(divert), Some(start_container)) = (
-            self.divertToStartContentOuter.as_mut(),
-            self.startContentRuntimeContainer.as_ref(),
-        ) {
-            divert.set_targetPathString(Some(start_container.get_path().ToString()));
-        }
-
-        if let (Some(divert), Some(start_container)) = (
-            self.divertToStartContentInner.as_mut(),
-            self.startContentRuntimeContainer.as_ref(),
-        ) {
-            divert.set_targetPathString(Some(start_container.get_path().ToString()));
+            if self.onceOnly {
+                inner.set_countFlags(inner.get_countFlags() | (CountFlags::Visits as i32));
+            }
         }
 
         if let Some(start_content) = self.startContent.as_mut() {

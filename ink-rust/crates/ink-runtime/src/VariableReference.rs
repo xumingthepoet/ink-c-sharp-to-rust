@@ -1,10 +1,12 @@
 // Source: ink-c-sharp/ink-engine-runtime/VariableReference.cs
 
 use crate::Path::Path;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct VariableReference {
-    parent: Option<Box<crate::Container::Container>>,
+    parent: RefCell<Option<Rc<crate::Container::Container>>>,
     name: Option<String>,
     pathForCount: Option<Path>,
 }
@@ -13,7 +15,7 @@ impl VariableReference {
     // C# signature: public VariableReference (string name)
     pub fn new(name: String) -> Self {
         Self {
-            parent: None,
+            parent: RefCell::new(None),
             name: Some(name),
             pathForCount: None,
         }
@@ -59,7 +61,8 @@ impl VariableReference {
             .expect("variable reference count path must be set");
         let parent = self
             .parent
-            .as_ref()
+            .borrow()
+            .clone()
             .expect("variable reference must be parented");
         let root = parent
             .get_rootContentContainer()
@@ -70,10 +73,32 @@ impl VariableReference {
             root
         };
 
+        let resolved_path = if path.get_isRelative()
+            && path.get_length() > 0
+            && path
+                .GetComponent(0)
+                .map(|component| component.get_isParent())
+                .unwrap_or(false)
+        {
+            path.get_tail()
+        } else {
+            path
+        };
+
         search_root
-            .ContentAtPath(path, 0, -1)
+            .ContentAtPath(resolved_path, 0, -1)
             .get_container()
             .cloned()
+            .map(|container| {
+                if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
+                    eprintln!(
+                        "count_ref path={} resolved={}",
+                        self.get_pathStringForCount(),
+                        container.get_path().ToString()
+                    );
+                }
+                container
+            })
             .expect("variable reference container not found")
     }
 
@@ -89,12 +114,12 @@ impl VariableReference {
         self.pathForCount = value.map(Path::new_overload_4);
     }
 
-    pub fn set_parent(&mut self, parent: Option<Box<crate::Container::Container>>) {
-        self.parent = parent;
+    pub fn set_parent(&self, parent: Option<Rc<crate::Container::Container>>) {
+        self.parent.replace(parent);
     }
 
-    pub fn get_parent(&self) -> Option<&crate::Container::Container> {
-        self.parent.as_deref()
+    pub fn get_parent(&self) -> Option<Rc<crate::Container::Container>> {
+        self.parent.borrow().clone()
     }
 }
 
@@ -102,6 +127,7 @@ impl VariableReference {
 mod tests {
     use super::VariableReference;
     use crate::Container::Container;
+    use std::rc::Rc;
 
     #[test]
     fn stringifies_named_and_count_references() {
@@ -124,7 +150,7 @@ mod tests {
         root.AddToNamedContentOnly(target.clone());
 
         let mut reference = VariableReference::new_overload_2();
-        reference.set_parent(Some(Box::new(root.clone())));
+        reference.set_parent(Some(Rc::new(root.clone())));
         reference.set_pathStringForCount(Some("target".to_string()));
 
         let resolved = reference.get_containerForCount();

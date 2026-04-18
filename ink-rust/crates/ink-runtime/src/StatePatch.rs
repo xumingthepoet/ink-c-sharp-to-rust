@@ -60,6 +60,9 @@ impl StatePatch {
         {
             *count = *found;
             true
+        } else if let Some(found) = self.visitCountsByPath.get(&container.get_path()) {
+            *count = *found;
+            true
         } else {
             false
         }
@@ -87,6 +90,9 @@ impl StatePatch {
             .turnIndicesByContainer
             .get(&Self::container_key(container))
         {
+            *index = *found;
+            true
+        } else if let Some(found) = self.turnIndicesByPath.get(&container.get_path()) {
             *index = *found;
             true
         } else {

@@ -192,6 +192,13 @@ After any phase-level change, run `make -C ink-rust gate`. If it passes, the pha
 - Use `cargo fmt` for Rust formatting when Rust files are changed.
 - Do not rewrite unrelated files or clean up unrelated style issues.
 
+## Debug Notes
+
+- When a debugging session reveals a useful invariant, a recurring failure mode, or a better tool path, record it here in one or two sentences.
+- Prefer concrete observations over general advice. Write down the exact symptom, the file or symbol involved, and the shortest reliable way to reproduce or inspect it.
+- Keep the note actionable for future agents. The goal is to avoid re-discovering the same dead ends and to reduce token spent on repeated search.
+- Update this section when a diagnosis changes the preferred workflow for a subsystem, especially for parser, runtime, or testbed issues.
+
 ## Git And Workspace Hygiene
 
 - The root repository contains nested reference project directories. Check status in the root before committing, but do not make changes inside `ink-c-sharp/` or `blade-ink-rs/`.

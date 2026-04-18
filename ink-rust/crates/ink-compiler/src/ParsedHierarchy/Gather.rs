@@ -4,6 +4,7 @@ use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::Story::Story;
 use ink_runtime::Container::Container;
 use ink_runtime::Container::ContentItem;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Gather {
@@ -33,7 +34,7 @@ impl Gather {
             container.set_countFlags(4);
         }
 
-        ContentItem::Container(Box::new(container))
+        ContentItem::Container(Rc::new(container))
     }
 
     // C# signature: public override void ResolveReferences (Story context)
@@ -77,7 +78,7 @@ impl Gather {
     // C# signature: Runtime.Container runtimeContainer { get; }
     pub fn get_runtimeContainer(&mut self) -> Option<Container> {
         match self.GenerateRuntimeObject() {
-            ContentItem::Container(container) => Some(*container),
+            ContentItem::Container(container) => Some(container.as_ref().clone()),
             _ => None,
         }
     }

@@ -329,6 +329,21 @@ impl VariablesState {
             }
         }
 
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!(
+                "raw var miss name={} contextIndex={} currentElementIndex={} keys={:?}",
+                name,
+                contextIndex,
+                self.callStack.currentElementIndex(),
+                self.callStack
+                    .currentElement()
+                    .temporaryVariables
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>()
+            );
+        }
+
         self.callStack
             .GetTemporaryVariableWithName(name, contextIndex)
     }

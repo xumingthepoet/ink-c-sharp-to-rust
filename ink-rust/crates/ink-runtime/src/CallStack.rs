@@ -1,5 +1,6 @@
 // Source: ink-c-sharp/ink-engine-runtime/CallStack.cs
 
+use crate::Container::ContentItem;
 use crate::JsonSerialisation::Json;
 use crate::Path::Path;
 use crate::Pointer::Pointer;
@@ -8,6 +9,7 @@ use crate::SimpleJson::{JsonObject, JsonValue, Writer};
 use crate::Story::Story;
 use crate::Value::{ListValue, Value};
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Element {
@@ -89,7 +91,10 @@ impl Thread {
                 if let Some(JsonValue::String(currentContainerPathStr)) = jElementObj.get("cPath") {
                     let threadPointerResult = storyContext
                         .ContentAtPath(Path::new_overload_4(currentContainerPathStr.clone()));
-                    pointer.container = threadPointerResult.get_container().cloned();
+                    pointer.container = match threadPointerResult.obj.as_ref() {
+                        Some(ContentItem::Container(container)) => Some(container.clone()),
+                        _ => None,
+                    };
                     pointer.index = match jElementObj.get("idx") {
                         Some(JsonValue::Int(value)) => *value,
                         _ => -1,
@@ -246,7 +251,7 @@ impl CallStack {
             threadCounter: 0,
             startOfRoot: Pointer::Null(),
         };
-        callstack.startOfRoot = Pointer::StartOf(storyContext.get_mainContentContainer());
+        callstack.startOfRoot = Pointer::StartOf(Rc::new(storyContext.get_mainContentContainer()));
         callstack.Reset();
         callstack
     }
@@ -323,7 +328,7 @@ impl CallStack {
             Some(JsonValue::Int(value)) => *value,
             _ => 0,
         };
-        self.startOfRoot = Pointer::StartOf(storyContext.get_mainContentContainer());
+        self.startOfRoot = Pointer::StartOf(Rc::new(storyContext.get_mainContentContainer()));
     }
 
     // C# signature: public void WriteJson(SimpleJson.Writer w)
@@ -333,14 +338,53 @@ impl CallStack {
 
     // C# signature: public void PushThread()
     pub fn PushThread(&mut self) {
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!(
+                "push_thread before threads={} current_ptr={}",
+                self.threads.len(),
+                self.currentElement()
+                    .currentPointer
+                    .get_path()
+                    .map(|p| p.ToString())
+                    .unwrap_or_else(|| "<null>".to_string())
+            );
+        }
         let mut newThread = self.currentThread().Copy();
         self.threadCounter += 1;
         newThread.threadIndex = self.threadCounter;
         self.threads.push(newThread);
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!(
+                "push_thread after threads={} current_ptr={}",
+                self.threads.len(),
+                self.currentElement()
+                    .currentPointer
+                    .get_path()
+                    .map(|p| p.ToString())
+                    .unwrap_or_else(|| "<null>".to_string())
+            );
+        }
     }
 
     // C# signature: public Thread ForkThread()
     pub fn ForkThread(&mut self) -> Thread {
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            let current_thread = self.currentThread();
+            let current_element = current_thread
+                .callstack
+                .last()
+                .expect("call stack should always contain at least one element");
+            eprintln!(
+                "fork thread current len={} current inExpr={} current temps={:?}",
+                current_thread.callstack.len(),
+                current_element.inExpressionEvaluation,
+                current_element
+                    .temporaryVariables
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>()
+            );
+        }
         let mut forkedThread = self.currentThread().Copy();
         self.threadCounter += 1;
         forkedThread.threadIndex = self.threadCounter;
@@ -350,7 +394,29 @@ impl CallStack {
     // C# signature: public void PopThread()
     pub fn PopThread(&mut self) {
         if self.canPopThread() {
+            if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+                eprintln!(
+                    "pop_thread before threads={} current_ptr={}",
+                    self.threads.len(),
+                    self.currentElement()
+                        .currentPointer
+                        .get_path()
+                        .map(|p| p.ToString())
+                        .unwrap_or_else(|| "<null>".to_string())
+                );
+            }
             self.threads.pop();
+            if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+                eprintln!(
+                    "pop_thread after threads={} current_ptr={}",
+                    self.threads.len(),
+                    self.currentElement()
+                        .currentPointer
+                        .get_path()
+                        .map(|p| p.ToString())
+                        .unwrap_or_else(|| "<null>".to_string())
+                );
+            }
         } else {
             panic!("Can't pop thread");
         }
@@ -401,7 +467,30 @@ impl CallStack {
             .callStack()
             .get((contextIndex - 1) as usize)
             .expect("temporary variable context index out of range");
-        contextElement.temporaryVariables.get(&name).cloned()
+        if let Some(value) = contextElement.temporaryVariables.get(&name) {
+            return Some(value.clone());
+        }
+
+        if contextIndex == self.currentElementIndex() + 1 {
+            for fallback_index in (0..(contextIndex - 1)).rev() {
+                if let Some(value) = self.callStack()[fallback_index as usize]
+                    .temporaryVariables
+                    .get(&name)
+                {
+                    return Some(value.clone());
+                }
+            }
+
+            for thread in self.threads.iter().rev() {
+                for element in thread.callstack.iter().rev() {
+                    if let Some(value) = element.temporaryVariables.get(&name) {
+                        return Some(value.clone());
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     // C# signature: public void SetTemporaryVariable(string name, Runtime.Object value, bool declareNew, int contextIndex = -1)
@@ -433,6 +522,18 @@ impl CallStack {
             contextElement.temporaryVariables.insert(name, newValue);
         } else {
             contextElement.temporaryVariables.insert(name, value);
+        }
+
+        if std::env::var_os("INK_DEBUG_RUNTIME").is_some() {
+            eprintln!(
+                "set temp contextIndex={} keys={:?}",
+                contextIndex,
+                contextElement
+                    .temporaryVariables
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>()
+            );
         }
     }
 
@@ -485,11 +586,8 @@ impl CallStack {
     }
 
     pub fn set_currentThread(&mut self, thread: Thread) {
-        let last = self
-            .threads
-            .last_mut()
-            .expect("call stack should always contain at least one thread");
-        *last = thread;
+        self.threads.clear();
+        self.threads.push(thread);
     }
 
     // C# signature: bool canPop { get; }

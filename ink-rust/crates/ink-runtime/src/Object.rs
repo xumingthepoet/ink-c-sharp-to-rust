@@ -4,10 +4,11 @@ use crate::Container::Container;
 use crate::DebugMetadata::DebugMetadata;
 use crate::Path::Path;
 use crate::SearchResult::SearchResult;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Object {
-    parent: Option<Box<Container>>,
+    parent: Option<Rc<Container>>,
     debug_metadata: Option<DebugMetadata>,
     path: Option<Path>,
 }
@@ -41,14 +42,26 @@ impl Object {
     // C# signature: public SearchResult ResolvePath(Path path)
     pub fn ResolvePath(&self, path: Path) -> SearchResult {
         if path.get_isRelative() {
-            if let Some(mut parent) = self.parent.as_deref().cloned() {
-                return parent.ContentAtPath(path, 0, -1);
-            }
-
-            return SearchResult {
-                obj: None,
-                approximate: true,
+            let Some(parent) = self.parent.clone() else {
+                return SearchResult {
+                    obj: None,
+                    approximate: true,
+                };
             };
+
+            let mut nearest_container = (*parent).clone();
+            let resolved_path = if path.get_length() > 0
+                && path
+                    .GetComponent(0)
+                    .map(|component| component.get_isParent())
+                    .unwrap_or(false)
+            {
+                path.get_tail()
+            } else {
+                path
+            };
+
+            return nearest_container.ContentAtPath(resolved_path, 0, -1);
         }
 
         if let Some(mut root) = self.get_rootContentContainer() {
@@ -138,11 +151,11 @@ impl Object {
     }
 
     // C# signature: Runtime.Object parent { get; }
-    pub fn get_parent(&self) -> Option<&Container> {
-        self.parent.as_deref()
+    pub fn get_parent(&self) -> Option<Rc<Container>> {
+        self.parent.clone()
     }
 
-    pub fn set_parent(&mut self, parent: Option<Box<Container>>) {
+    pub fn set_parent(&mut self, parent: Option<Rc<Container>>) {
         self.parent = parent;
     }
 
@@ -171,11 +184,11 @@ impl Object {
 
     // C# signature: Container rootContentContainer { get; }
     pub fn get_rootContentContainer(&self) -> Option<Container> {
-        let mut ancestor = self.parent.as_deref().cloned()?;
+        let mut ancestor = self.parent.clone()?;
         while let Some(parent) = ancestor.get_parent() {
-            ancestor = parent.clone();
+            ancestor = parent;
         }
-        Some(ancestor)
+        Some((*ancestor).clone())
     }
 }
 
@@ -185,6 +198,7 @@ mod tests {
     use crate::Container::Container;
     use crate::DebugMetadata::DebugMetadata;
     use crate::Path::{Component, Path};
+    use std::rc::Rc;
 
     #[test]
     fn compact_path_prefers_shorter_representation() {
@@ -220,7 +234,7 @@ mod tests {
         };
 
         let mut obj = Object::new();
-        obj.parent = Some(Box::new(inserted_child));
+        obj.parent = Some(Rc::new(inserted_child));
 
         let root_container = obj.get_rootContentContainer().expect("root container");
         assert_eq!(root_container.get_name(), "root");
@@ -238,7 +252,7 @@ mod tests {
         root.AddContent(child);
 
         let mut obj = Object::new();
-        obj.parent = Some(Box::new(root));
+        obj.parent = Some(Rc::new(root));
 
         assert_eq!(
             obj.DebugLineNumberOfPath(Path::new_overload_3(vec![Component::new(0)], false)),
