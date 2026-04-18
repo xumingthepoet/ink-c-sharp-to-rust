@@ -8,7 +8,7 @@ fmt-check:
 	cargo fmt --all -- --check
 
 check:
-	cargo check --workspace
+	RUSTFLAGS="-D warnings" cargo check --workspace
 
 test: require-timeout
 	$(TIMEOUT) 15s cargo test -p ink-compiler

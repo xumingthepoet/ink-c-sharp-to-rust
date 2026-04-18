@@ -151,7 +151,7 @@ mod tests {
     #[test]
     fn resolve_references_updates_override_target_path() {
         let mut tunnel = TunnelOnwards::new();
-        let mut target_container = Container::new();
+        let target_container = Container::new();
         target_container.set_path(RuntimePath::new_overload_4("knot".to_string()));
 
         let mut target_object = Object::with_kind(ObjectKind::Plain);
