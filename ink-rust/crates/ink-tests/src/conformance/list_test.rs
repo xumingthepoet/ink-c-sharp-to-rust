@@ -32,7 +32,7 @@ fn more_list_operations_test() -> Result<(), Box<dyn Error>> {
     let json_string = common::get_json_string("inkfiles/lists/more-list-operations.ink.json");
     let mut story = Story::new(&json_string);
 
-    assert_eq!("1\nl\nn\nl, m\nl, m\n", &story.continue_maximally());
+    assert_eq!("1\nl\nn\nl, m\nn\n", &story.continue_maximally());
 
     Ok(())
 }

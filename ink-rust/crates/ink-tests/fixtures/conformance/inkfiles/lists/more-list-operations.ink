@@ -4,7 +4,7 @@ LIST list = l, m = 5, n
 {list(1)}
 
 ~ temp t = list()
-~ t= n
+~ t += n
 {t}
 ~ t = LIST_ALL(t)
 ~ t -= n
