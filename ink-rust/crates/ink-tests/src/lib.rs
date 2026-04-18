@@ -7,7 +7,6 @@
     non_upper_case_globals
 )]
 
-#[cfg(feature = "conformance-tests")]
 mod conformance;
 
 #[cfg(test)]

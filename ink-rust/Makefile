@@ -14,7 +14,7 @@ test: require-timeout
 	$(TIMEOUT) 15s cargo test -p ink-compiler
 	$(TIMEOUT) 5s cargo test -p ink-runtime
 	$(TIMEOUT) 5s cargo test -p inklecate
-	$(TIMEOUT) 5s cargo test -p ink-tests
+	$(TIMEOUT) 60s cargo test -p ink-tests
 
 require-timeout:
 	@test -n "$(TIMEOUT)" || (echo "error: install timeout or gtimeout" >&2; exit 1)
