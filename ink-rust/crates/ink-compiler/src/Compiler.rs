@@ -93,16 +93,34 @@ impl Compiler {
     // C# signature: public Parsed.Story Parse()
     pub fn Parse(&mut self) -> ParsedStory {
         self.hadParseError = false;
+        let source_filename = self.options.sourceFilename.clone();
         let had_parse_error = Arc::new(AtomicBool::new(false));
         let parse_error_handler = {
             let had_parse_error = Arc::clone(&had_parse_error);
+            let source_filename = source_filename.clone();
             Arc::new(
                 move |message: String, line: i32, _character: i32, is_warning: bool| {
+                    let full_message = if let Some(filename) = &source_filename {
+                        format!(
+                            "{}: '{}' line {}: {}",
+                            if is_warning { "WARNING" } else { "ERROR" },
+                            filename,
+                            line + 1,
+                            message
+                        )
+                    } else {
+                        format!(
+                            "{}: line {}: {}",
+                            if is_warning { "WARNING" } else { "ERROR" },
+                            line + 1,
+                            message
+                        )
+                    };
+
                     if !is_warning {
                         had_parse_error.store(true, Ordering::SeqCst);
-                        panic!("Error on line {}: {}", line + 1, message);
                     }
-                    eprintln!("Warning on line {}: {}", line + 1, message);
+                    panic!("{}", full_message);
                 },
             )
         };
