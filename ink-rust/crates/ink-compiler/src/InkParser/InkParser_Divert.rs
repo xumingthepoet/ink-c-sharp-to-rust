@@ -86,11 +86,7 @@ impl InkParser {
                 self.Error("Empty diverts (->) are only valid on choices".to_string());
             }
 
-            if matches!(&arrows_and_diverts[0], DivertParseItem::Arrow(arrow) if arrow == "->->") {
-                diverts.push(DivertPiece::TunnelOnwards(gather_divert));
-            } else {
-                diverts.push(DivertPiece::Divert(gather_divert));
-            }
+            diverts.push(DivertPiece::Divert(gather_divert));
         }
 
         Some(diverts)

@@ -34,15 +34,21 @@ impl VariableAssignment {
     // C# signature: public VariableAssignment (Identifier identifier, ListDefinition listDef)
     pub fn new_overload_2(
         identifier: crate::ParsedHierarchy::Identifier::Identifier,
-        mut listDef: ListDefinition,
+        listDef: ListDefinition,
     ) -> Self {
-        listDef.variableAssignment = None;
-        Self {
+        let mut assignment = Self {
             variableIdentifier: Some(identifier),
             listDefinition: Some(Box::new(listDef)),
             isGlobalDeclaration: true,
             ..Default::default()
+        };
+
+        let self_clone = assignment.clone();
+        if let Some(list_definition) = &mut assignment.listDefinition {
+            list_definition.variableAssignment = Some(self_clone);
         }
+
+        assignment
     }
 
     // C# signature: public override Runtime.Object GenerateRuntimeObject ()
@@ -272,5 +278,33 @@ mod tests {
             .as_ref();
         assert!(backref.is_some());
         assert_eq!(backref.unwrap().get_variableName(), "food");
+    }
+
+    #[test]
+    fn list_assignment_constructor_populates_backref() {
+        let list_definition = ListDefinition::new(vec![ListElementDefinition::new(
+            Identifier {
+                name: Some("item".to_string()),
+                debugMetadata: None,
+            },
+            true,
+            None,
+        )]);
+
+        let assignment = VariableAssignment::new_overload_2(
+            Identifier {
+                name: Some("food".to_string()),
+                debugMetadata: None,
+            },
+            list_definition,
+        );
+
+        assert_eq!(
+            assignment
+                .get_listDefinition()
+                .and_then(|list_def| list_def.variableAssignment.as_ref())
+                .map(|backref| backref.get_variableName().to_string()),
+            Some("food".to_string())
+        );
     }
 }

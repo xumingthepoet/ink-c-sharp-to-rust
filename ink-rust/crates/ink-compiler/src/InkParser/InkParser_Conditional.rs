@@ -181,7 +181,6 @@ impl InkParser {
                     "Expected one or two alternatives separated by '|' in inline conditional"
                         .to_string(),
                 );
-                return None;
             }
         }
 
@@ -327,5 +326,16 @@ mod tests {
             *seen.lock().unwrap(),
             Some(("boom".to_string(), 6, 3, false))
         );
+    }
+
+    #[test]
+    fn inline_conditionals_keep_parsed_branches_when_extra_pipe_is_present() {
+        let mut parser = InkParser::new("left|right|extra".to_string(), None, None, None);
+
+        let branches = parser.InlineConditionalBranches().expect("inline branches");
+
+        assert_eq!(branches.len(), 2);
+        assert!(branches[0].get_isTrueBranch());
+        assert!(branches[1].get_isElse());
     }
 }

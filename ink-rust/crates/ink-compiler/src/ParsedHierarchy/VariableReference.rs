@@ -2,6 +2,7 @@
 
 use crate::ParsedHierarchy::Expression::Expression;
 use crate::ParsedHierarchy::Identifier::Identifier;
+use crate::ParsedHierarchy::Object::{Object, ObjectKind};
 use crate::ParsedHierarchy::Path::Path;
 use crate::ParsedHierarchy::Story::Story;
 use ink_runtime::VariableReference::VariableReference as RuntimeVariableReference;
@@ -84,8 +85,40 @@ impl VariableReference {
                 Some(RuntimeVariableReference::new(self.name.clone()));
         }
 
-        // Full read-count and variable-resolution parity still depends on
-        // the unported object/path ancestry pipeline.
+        let parsedPath = Path::new_overload_2(self.pathIdentifiers.clone());
+        let mut synthetic_root = Object::with_kind(ObjectKind::Story);
+        synthetic_root.content = context.content.clone();
+
+        if let Some(targetForCount) = parsedPath.ResolveFromContext(&synthetic_root) {
+            if let Some(runtime_var_ref) = &mut *self.runtimeVarRef.borrow_mut() {
+                runtime_var_ref.set_pathForCount(Some(targetForCount.get_runtimePath()));
+                runtime_var_ref.set_name(None);
+            }
+            return;
+        }
+
+        if self.path.len() > 1 {
+            context.Error(
+                format!(
+                    "Could not find target for read count: {}",
+                    parsedPath.ToString()
+                ),
+                Default::default(),
+                false,
+            );
+            return;
+        }
+
+        if !context
+            .ResolveVariableWithName(self.name.clone(), Default::default())
+            .found
+        {
+            context.Error(
+                format!("Unresolved variable: {}", self.ToString()),
+                Default::default(),
+                false,
+            );
+        }
     }
 
     // C# signature: public override string ToString ()
@@ -131,6 +164,9 @@ impl VariableReference {
 mod tests {
     use super::VariableReference;
     use crate::ParsedHierarchy::Identifier::Identifier;
+    use crate::ParsedHierarchy::Knot::Knot;
+    use crate::ParsedHierarchy::Object::Object;
+    use crate::ParsedHierarchy::Story::Story;
 
     #[test]
     fn builds_name_and_identifier() {
@@ -162,5 +198,33 @@ mod tests {
 
         assert!(var.get_runtimeVarRef().is_some());
         assert_eq!(container.get_content().len(), 1);
+    }
+
+    #[test]
+    fn resolves_read_count_targets_from_story_content() {
+        let mut knot_obj = Object::from_knot(Knot::new(
+            Identifier {
+                name: Some("intro".to_string()),
+                debugMetadata: None,
+            },
+            vec![],
+            vec![],
+            false,
+        ));
+        let _ = knot_obj.EnsureRuntimeObject();
+
+        let mut story = Story::new(vec![knot_obj], false);
+        let mut reference = VariableReference::new(vec![Identifier {
+            name: Some("intro".to_string()),
+            debugMetadata: None,
+        }]);
+
+        reference.ResolveReferences(&mut story);
+
+        let runtime_ref = reference
+            .get_runtimeVarRef()
+            .expect("runtime variable reference");
+        assert!(runtime_ref.get_pathForCount().is_some());
+        assert!(runtime_ref.get_name().is_none());
     }
 }
