@@ -531,12 +531,30 @@ impl Weave {
     }
 
     fn BadNestedTerminationHandler(terminatingObj: &mut Object) {
-        terminatingObj.Error(
+        let mut error_msg =
             "Choices nested in conditionals or sequences need to explicitly divert afterwards."
-                .to_string(),
-            None,
-            false,
-        );
+                .to_string();
+
+        let mut conditional_ancestor: Option<Object> = None;
+        let mut ancestor = terminatingObj.get_parent();
+        while let Some(current) = ancestor {
+            if matches!(current.kind, ObjectKind::Sequence | ObjectKind::Conditional) {
+                conditional_ancestor = Some(current.clone());
+                break;
+            }
+            ancestor = current.get_parent();
+        }
+
+        if let Some(conditional) = conditional_ancestor {
+            if matches!(conditional.kind, ObjectKind::Conditional)
+                && Self::count_choices(&conditional) == 1
+            {
+                error_msg = "Choices with conditions should be written: '* {condition} choice'. Otherwise, choices nested in conditionals or sequences need to explicitly divert afterwards."
+                    .to_string();
+            }
+        }
+
+        terminatingObj.Error(error_msg, None, false);
     }
 
     fn CheckForWeavePointNamingCollisions(&mut self) {
@@ -628,6 +646,20 @@ impl Weave {
             ContentListItem::Object(object) => Self::object_contains_tunnel_onwards(object),
             _ => false,
         })
+    }
+
+    fn count_choices(obj: &Object) -> usize {
+        let mut count = if matches!(obj.payload.as_ref(), Some(ObjectPayload::Choice(_))) {
+            1
+        } else {
+            0
+        };
+
+        for child in &obj.content {
+            count += Self::count_choices(child);
+        }
+
+        count
     }
 }
 
