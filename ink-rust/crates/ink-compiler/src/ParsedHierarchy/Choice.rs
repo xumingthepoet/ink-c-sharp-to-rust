@@ -3,6 +3,7 @@
 use crate::ParsedHierarchy::ContentList::ContentList;
 use crate::ParsedHierarchy::Expression::Expression;
 use crate::ParsedHierarchy::Identifier::Identifier;
+use crate::ParsedHierarchy::Object::Object;
 use crate::ParsedHierarchy::Story::{Story, SymbolType};
 use ink_runtime::ChoicePoint::ChoicePoint;
 use ink_runtime::Container::CountFlags;
@@ -16,6 +17,7 @@ use std::rc::Rc;
 
 #[derive(Clone, Debug, Default)]
 pub struct Choice {
+    base: Object,
     startContent: Option<ContentList>,
     choiceOnlyContent: Option<ContentList>,
     innerContent: Option<ContentList>,
@@ -44,7 +46,19 @@ impl Choice {
         choiceOnlyContent: Option<ContentList>,
         innerContent: Option<ContentList>,
     ) -> Self {
+        let mut base = Object::new();
+        if let Some(start_content) = startContent.as_ref() {
+            base.AddContent(Object::from(start_content.clone()));
+        }
+        if let Some(choice_only_content) = choiceOnlyContent.as_ref() {
+            base.AddContent(Object::from(choice_only_content.clone()));
+        }
+        if let Some(inner_content) = innerContent.as_ref() {
+            base.AddContent(Object::from(inner_content.clone()));
+        }
+
         Self {
+            base,
             startContent,
             choiceOnlyContent,
             innerContent,
@@ -56,10 +70,14 @@ impl Choice {
 
     pub fn set_identifier(&mut self, value: Option<Identifier>) {
         self.identifier = value;
+        self.base.set_identifier(self.identifier.clone());
     }
 
     pub fn set_condition(&mut self, value: Option<Expression>) {
         self.condition = value;
+        if let Some(condition) = self.condition.clone() {
+            self.base.AddContent(Object::from_expression(condition));
+        }
     }
 
     pub fn set_onceOnly(&mut self, value: bool) {
@@ -244,19 +262,6 @@ impl Choice {
             }
         }
 
-        if let Some(start_content) = self.startContent.as_mut() {
-            start_content.ResolveReferences(context);
-        }
-        if let Some(choice_only) = self.choiceOnlyContent.as_mut() {
-            choice_only.ResolveReferences(context);
-        }
-        if let Some(inner_content) = self.innerContent.as_mut() {
-            inner_content.ResolveReferences(context);
-        }
-        if let Some(condition) = self.condition.as_mut() {
-            condition.ResolveReferences(context);
-        }
-
         if let Some(identifier) = &self.identifier {
             if identifier
                 .name
@@ -272,6 +277,8 @@ impl Choice {
                 );
             }
         }
+
+        self.base.ResolveReferences(context);
     }
 
     // C# signature: public override string ToString ()
@@ -299,6 +306,10 @@ impl Choice {
 
     pub fn get_innerContent(&self) -> Option<&ContentList> {
         self.innerContent.as_ref()
+    }
+
+    pub fn get_base(&self) -> &Object {
+        &self.base
     }
 
     // C# signature: string name { get; }

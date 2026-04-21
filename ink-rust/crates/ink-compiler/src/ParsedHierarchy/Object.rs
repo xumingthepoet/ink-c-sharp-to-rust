@@ -123,6 +123,7 @@ impl Object {
         let mut object = Object::with_kind(ObjectKind::WeavePoint);
         object.set_identifier(identifier);
         object.set_indentationDepth(indentationDepth);
+        object.content = choice.get_base().content.clone();
         object.set_runtimeObject(runtimeObject);
         object.payload = Some(ObjectPayload::Choice(Box::new(choice)));
         object
