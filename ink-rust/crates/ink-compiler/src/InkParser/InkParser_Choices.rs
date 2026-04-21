@@ -62,6 +62,7 @@ impl InkParser {
 
             if let Some(option_only) = option_only_content.as_mut() {
                 option_only.TrimTrailingWhitespace();
+                self.EndTagIfNecessary_overload_2(option_only);
             }
 
             if let Some(inner_text_and_logic) = self.MixedTextAndLogic() {
