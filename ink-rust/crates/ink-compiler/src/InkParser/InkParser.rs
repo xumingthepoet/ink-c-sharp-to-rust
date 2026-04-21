@@ -18,6 +18,7 @@ pub struct InkParser {
     fileHandler: Arc<dyn IFileHandler + Send + Sync>,
     openFilenames: Rc<RefCell<HashSet<String>>>,
     parsingChoice: bool,
+    isInclude: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,6 +55,7 @@ impl InkParser {
             fileHandler,
             openFilenames,
             parsingChoice: false,
+            isInclude: false,
         }
     }
 
@@ -63,7 +65,7 @@ impl InkParser {
             .StatementsAtLevel(crate::InkParser::InkParser_Statements::StatementLevel::Top)
             .unwrap_or_default();
 
-        crate::ParsedHierarchy::Story::Story::new(top_level_objects, false)
+        crate::ParsedHierarchy::Story::Story::new(top_level_objects, self.isInclude)
     }
 
     // C# signature: protected List<T> SeparatedList<T> (SpecificParseRule<T> mainRule, ParseRule separatorRule)
@@ -152,6 +154,14 @@ impl InkParser {
 
     pub fn set_parsingChoice(&mut self, value: bool) {
         self.parsingChoice = value;
+    }
+
+    pub fn get_isInclude(&self) -> bool {
+        self.isInclude
+    }
+
+    pub fn set_isInclude(&mut self, value: bool) {
+        self.isInclude = value;
     }
 
     pub fn get_fileHandler(&self) -> &dyn IFileHandler {
@@ -545,5 +555,12 @@ mod tests {
 
         // Keep the constructed parser live to ensure the constructor path stays valid.
         assert!(parser.get_openFilenames().len() <= 1);
+    }
+
+    #[test]
+    fn parse_marks_include_stories_when_flagged() {
+        let mut parser = InkParser::new("Hello".to_string(), None, None, None);
+        parser.set_isInclude(true);
+        assert!(parser.Parse().get_isInclude());
     }
 }

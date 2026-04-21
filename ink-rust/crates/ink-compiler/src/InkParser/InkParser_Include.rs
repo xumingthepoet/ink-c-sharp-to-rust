@@ -47,6 +47,7 @@ impl InkParser {
             );
             parser.set_openFilenames_shared(self.clone_openFilenames());
             parser.AddOpenFilenameShared(fullFilename.clone());
+            parser.set_isInclude(true);
             parser.Parse()
         });
 
