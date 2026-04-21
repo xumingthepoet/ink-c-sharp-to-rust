@@ -45,10 +45,7 @@ impl InkParser {
         }
 
         if let Some(last_obj) = result.last() {
-            if !matches!(
-                last_obj,
-                ContentListItem::Divert(_) | ContentListItem::TunnelOnwards(_)
-            ) {
+            if !matches!(last_obj, ContentListItem::Divert(_)) {
                 self.trim_end_whitespace(&mut result, false);
             }
         }
