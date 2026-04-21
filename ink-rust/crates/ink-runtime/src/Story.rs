@@ -1686,7 +1686,16 @@ impl Story {
                             self.story_state_ref().get_evaluationStack().len()
                         ));
                         if !matches!(output, ContentItem::Void(_)) {
-                            let text = Value::new_string(output.to_string());
+                            let mut text = Value::new_string(output.to_string());
+                            if let ContentItem::Value(Value::String(source_text)) = &output {
+                                text = Value::String({
+                                    let mut string_value = source_text.clone();
+                                    string_value.set_debugMetadata(
+                                        source_text.get_debugMetadata().cloned(),
+                                    );
+                                    string_value
+                                });
+                            }
                             self.story_state_mut()
                                 .PushToOutputStream(ContentItem::Value(text));
                         }

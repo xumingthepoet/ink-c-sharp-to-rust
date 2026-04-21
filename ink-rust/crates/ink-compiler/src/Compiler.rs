@@ -244,7 +244,7 @@ impl Compiler {
                 {
                     self._debugSourceRanges.push(DebugSourceRange {
                         length: textContent.value.len() as i32,
-                        debugMetadata: None,
+                        debugMetadata: textContent.debugMetadata.clone(),
                         text: textContent.value.clone(),
                     });
                 }

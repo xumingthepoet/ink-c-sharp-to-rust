@@ -1,5 +1,6 @@
 // Source: ink-c-sharp/ink-engine-runtime/Value.cs
 
+use crate::DebugMetadata::DebugMetadata;
 use crate::InkList::InkListItem;
 use crate::ListDefinition::ListDefinition;
 use crate::Path::Path;
@@ -67,6 +68,7 @@ pub struct StringValue {
     pub value: String,
     pub isNewline: bool,
     pub isInlineWhitespace: bool,
+    pub debugMetadata: Option<DebugMetadata>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -314,6 +316,7 @@ impl StringValue {
             value,
             isNewline,
             isInlineWhitespace,
+            debugMetadata: None,
         }
     }
 
@@ -352,6 +355,14 @@ impl StringValue {
 
     pub fn get_isNonWhitespace(&self) -> bool {
         !self.isNewline && !self.isInlineWhitespace
+    }
+
+    pub fn get_debugMetadata(&self) -> Option<&DebugMetadata> {
+        self.debugMetadata.as_ref()
+    }
+
+    pub fn set_debugMetadata(&mut self, debugMetadata: Option<DebugMetadata>) {
+        self.debugMetadata = debugMetadata;
     }
 }
 
