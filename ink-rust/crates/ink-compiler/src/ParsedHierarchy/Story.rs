@@ -149,7 +149,13 @@ impl Story {
                 "export top-level kinds={:?}",
                 content
                     .iter()
-                    .map(|obj| format!("{:?}:{:?}", obj.kind, obj.payload.as_ref().map(|_| "payload")))
+                    .map(|obj| {
+                        format!(
+                            "{:?}:{:?}",
+                            obj.kind,
+                            obj.payload.as_ref().map(|_| "payload")
+                        )
+                    })
                     .collect::<Vec<_>>()
             );
         }

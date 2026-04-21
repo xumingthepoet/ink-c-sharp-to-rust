@@ -206,6 +206,7 @@ After any phase-level change, run `make -C ink-rust gate`. If it passes, the pha
 - `ParsedHierarchy/VariableAssignment` ownership is easiest to verify through `Object::from_variable_assignment(...).content` payloads. Runtime output alone can miss tree-wiring regressions for list-backed declarations.
 - `ink-tests/src/csharp_tests` now has a coverage check that diffs Rust `#[test]` names against `ink-c-sharp/tests/Tests.cs`; use it before adding more official cases so the port does not silently miss methods.
 - Expression-heavy official stories like `TestArithmetic` and list-evaluation cases can return empty from `Story::Continue()` even when `can_continue` starts true. That points at runtime expression/output handling, not the new test harness.
+- In the source-compiled `compiler_conformance` suite, `Read count for target (...) unknown` is usually a compiler parity problem, not a runtime harness bug. Compare the generated runtime JSON against the fixture JSON and check whether the compiler marked the target container with the visit/turn-count flags (`visitsShouldBeCounted`, `turnIndexShouldBeCounted`) before chasing runtime logic.
 
 ## Git And Workspace Hygiene
 

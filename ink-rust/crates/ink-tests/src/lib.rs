@@ -7,6 +7,7 @@
     non_upper_case_globals
 )]
 
+mod compiler_conformance;
 mod conformance;
 
 #[cfg(test)]
@@ -75,5 +76,5 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "csharp-tests"))]
 mod csharp_tests;

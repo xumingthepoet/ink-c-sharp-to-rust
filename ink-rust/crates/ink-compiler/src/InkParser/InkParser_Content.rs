@@ -283,7 +283,10 @@ mod tests {
         let line = parser.LineOfMixedTextAndLogic().expect("line");
         match &line[0] {
             ContentListItem::ContentList(list) => {
-                assert!(matches!(list.get_content()[0], ContentListItem::Expression(_)));
+                assert!(matches!(
+                    list.get_content()[0],
+                    ContentListItem::Expression(_)
+                ));
                 if let ContentListItem::Expression(expr) = &list.get_content()[0] {
                     assert!(expr.get_outputWhenComplete());
                 }
