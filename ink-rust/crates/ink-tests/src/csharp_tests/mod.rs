@@ -609,6 +609,12 @@ mod tests {
         names
     }
 
+    // C#:         [Test()]
+    //         public void TestHelloWorld()
+    //         {
+    //             Story story = CompileString("Hello world");
+    //             Assert.AreEqual("Hello world\n", story.Continue());
+    //         }
     #[test]
     fn TestHelloWorld() {
         run_in_both_modes(|suite| {
@@ -619,6 +625,21 @@ mod tests {
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestArithmetic()
+    //         {
+    //             Story story = CompileString(@"
+    // { 2 * 3 + 5 * 6 }
+    // {8 mod 3}
+    // {13 % 5}
+    // { 7 / 3 }
+    // { 7 / 3.0 }
+    // { 10 - 2 }
+    // { 2 * (5-1) }
+    // ");
+    // 
+    //             Assert.AreEqual("36\n2\n3\n2\n2"+System.Globalization.NumberFormatInfo.CurrentInfo.NumberDecimalSeparator+"3333333\n8\n8\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestArithmetic() {
         run_in_both_modes(|suite| {
@@ -658,6 +679,25 @@ mod tests {
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestBools()
+    //         {
+    //             Assert.AreEqual("true\n", CompileString("{true}").Continue());
+    //             Assert.AreEqual("2\n", CompileString("{true + 1}").Continue());
+    //             Assert.AreEqual("3\n", CompileString("{2 + true}").Continue());
+    //             Assert.AreEqual("0\n", CompileString("{false + false}").Continue());
+    //             Assert.AreEqual("2\n", CompileString("{true + true}").Continue());
+    //             Assert.AreEqual("true\n", CompileString("{true == 1}").Continue());
+    //             Assert.AreEqual("false\n", CompileString("{not 1}").Continue());
+    //             Assert.AreEqual("false\n", CompileString("{not true}").Continue());
+    //             Assert.AreEqual("true\n", CompileString("{3 > 1}").Continue());
+    // 
+    //             var listHasntStory = @"
+    //                 LIST list = a, (b), c, (d), e
+    //                 {list !? (c)}
+    //             ";
+    //             Assert.AreEqual("true\n", CompileString(listHasntStory).Continue());
+    //         }
     #[test]
     fn TestBools() {
         run_in_both_modes(|suite| {
@@ -738,6 +778,20 @@ mod tests {
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestAllSwitchBranchesFailIsClean ()
+    //         {
+    //         	var story = CompileString (@"
+    // { 1:
+    //     - 2: x
+    //     - 3: y
+    // }
+    //         ");
+    // 
+    //             story.Continue ();
+    // 
+    //         	Assert.IsTrue (story.state.evaluationStack.Count == 0);
+    //         }
     #[test]
     fn TestAllSwitchBranchesFailIsClean() {
         run_in_both_modes(|suite| {
@@ -758,6 +812,32 @@ mod tests {
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestArgumentNameCollisions()
+    //         {
+    //             CompileStringWithoutRuntime(@"
+    // VAR global_var = 5
+    // 
+    // ~ pass_divert(-> knot_name)
+    // {variable_param_test(10)}
+    // 
+    // === function aTarget() ===
+    //    ~ return true
+    // 
+    // === function pass_divert(aTarget) ===
+    //     Should be a divert target, but is a read count:- {aTarget}
+    // 
+    // === function variable_param_test(global_var) ===
+    //     ~ return global_var
+    // 
+    // === knot_name ===
+    //     -> END
+    // ", testingErrors: true);
+    // 
+    //             Assert.AreEqual(2, _errorMessages.Count);
+    //             Assert.IsTrue(HadError("name has already been used for a function"));
+    //             Assert.IsTrue(HadError("name has already been used for a var"));
+    //         }
     #[test]
     fn TestArgumentNameCollisions() {
         run_in_both_modes(|suite| {
@@ -790,6 +870,18 @@ VAR global_var = 5
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestArgumentShouldntConflictWithGatherElsewhere()
+    //         {
+    //             // Testing that there are no errors only
+    //             CompileStringWithoutRuntime(@"
+    // == knot ==
+    // - (x) -> DONE
+    // 
+    // == function f(x) ==
+    // Nothing
+    // ");
+    //         }
     #[test]
     fn TestArgumentShouldntConflictWithGatherElsewhere() {
         run_in_both_modes(|suite| {
@@ -808,6 +900,29 @@ Nothing
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestComplexTunnels()
+    //         {
+    //             Story story = CompileString(@"
+    // -> one (1) -> two (2) ->
+    // three (3)
+    // 
+    // == one(num) ==
+    // one ({num})
+    // -> oneAndAHalf (1.5) ->
+    // ->->
+    // 
+    // == oneAndAHalf(num) ==
+    // one and a half ({num})
+    // ->->
+    // 
+    // == two (num) ==
+    // two ({num})
+    // ->->
+    // ");
+    // 
+    //             Assert.AreEqual("one (1)\none and a half (1"+ System.Globalization.NumberFormatInfo.CurrentInfo.NumberDecimalSeparator+"5)\ntwo (2)\nthree (3)\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestComplexTunnels() {
         run_in_both_modes(|suite| {
@@ -840,6 +955,41 @@ two ({num})
             );
         });
     }
+
+    // C#: public void TestElseBranches()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:         @"
+    // C#: VAR x = 3
+    // C#:
+    // C#: {
+    // C#:     - x == 1: one
+    // C#:     - x == 2: two
+    // C#:     - else: other
+    // C#: }
+    // C#:
+    // C#: {
+    // C#:     - x == 1: one
+    // C#:     - x == 2: two
+    // C#:     - other
+    // C#: }
+    // C#:
+    // C#: { x == 4:
+    // C#:   - The main clause
+    // C#:   - else: other
+    // C#: }
+    // C#:
+    // C#: { x == 4:
+    // C#:   The main clause
+    // C#: - else:
+    // C#:   other
+    // C#: }
+    // C#:         ";
+    // C#:
+    // C#:     Story story = CompileString(storyStr);
+    // C#:
+    // C#:     Assert.AreEqual("other\nother\nother\nother\n", story.currentText);
+    // C#: }
 
     #[test]
     fn TestElseBranches() {
@@ -877,6 +1027,33 @@ VAR x = 3
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestEndOfContent()
+    //         {
+    //             Story story = CompileString("Hello world", false, true);
+    //             story.ContinueMaximally();
+    //             Assert.IsFalse(HadError());
+    // 
+    //             story = CompileString("== test ==\nContent\n-> END");
+    //             story.ContinueMaximally();
+    // 
+    //             // Should have runtime error due to running out of content
+    //             // (needs a -> END)
+    //             story = CompileString("== test ==\nContent", false, true);
+    //             story.ContinueMaximally();
+    //             Assert.IsTrue(HadWarning());
+    // 
+    //             // Should have warning that there's no "-> END"
+    //             CompileStringWithoutRuntime("== test ==\nContent", true);
+    //             Assert.IsFalse(HadError());
+    //             Assert.IsTrue(HadWarning());
+    // 
+    //             CompileStringWithoutRuntime("== test ==\n~return", testingErrors: true);
+    //             Assert.IsTrue(HadError("Return statements can only be used in knots that are declared as functions"));
+    // 
+    //             CompileStringWithoutRuntime("== function test ==\n-> END", testingErrors: true);
+    //             Assert.IsTrue(HadError("Functions may not contain diverts"));
+    //         }
     #[test]
     fn TestEndOfContent() {
         run_in_both_modes(|suite| {
@@ -917,6 +1094,15 @@ VAR x = 3
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestEscapeCharacter()
+    //         {
+    //             var storyStr = @"{true:this is a '\|' character|this isn't}";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("this is a '|' character\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestEscapeCharacter() {
         run_in_both_modes(|suite| {
@@ -931,6 +1117,45 @@ VAR x = 3
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestExternalBinding()
+    //         {
+    //             var story = CompileString(@"
+    // EXTERNAL message(x)
+    // EXTERNAL multiply(x,y)
+    // EXTERNAL times(i,str)
+    // ~ message(""hello world"")
+    // {multiply(5.0, 3)}
+    // {times(3, ""knock "")}
+    // ");
+    //             string message = null;
+    // 
+    //             story.BindExternalFunction("message", (string arg) =>
+    //             {
+    //                 message = "MESSAGE: " + arg;
+    //             });
+    // 
+    //             story.BindExternalFunction("multiply", (float arg1, int arg2) =>
+    //             {
+    //                 return arg1 * arg2;
+    //             });
+    // 
+    //             story.BindExternalFunction("times", (int numberOfTimes, string str) =>
+    //             {
+    //                 string result = "";
+    //                 for (int i = 0; i < numberOfTimes; i++)
+    //                 {
+    //                     result += str;
+    //                 }
+    //                 return result;
+    //             });
+    // 
+    //             Assert.AreEqual("15\n", story.Continue());
+    // 
+    //             Assert.AreEqual("knock knock knock\n", story.Continue());
+    // 
+    //             Assert.AreEqual("MESSAGE: hello world", message);
+    //         }
     #[test]
     fn TestExternalBinding() {
         run_in_both_modes(|suite| {
@@ -993,6 +1218,48 @@ EXTERNAL times(i,str)
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestLookupSafeOrNot()
+    //         {
+    //             var story = CompileString(@"
+    // EXTERNAL myAction()
+    // 
+    // One
+    // ~ myAction()
+    // Two
+    // ");
+    // 
+    //             // Lookahead SAFE - should get multiple calls to the ext function,
+    //             // one for lookahead on first line, one "for real" on second line.
+    //             int callCount = 0;
+    //             story.BindExternalFunction("myAction", () => callCount++, lookaheadSafe:true);
+    // 
+    //             story.ContinueMaximally();
+    //             Assert.AreEqual(2, callCount);
+    // 
+    //             // Lookahead UNSAFE - when it sees the function, it should break out early
+    //             // and stop lookahead, making sure that the action is only called for the second line.
+    //             callCount = 0;
+    //             story.ResetState();
+    //             story.UnbindExternalFunction("myAction");
+    //             story.BindExternalFunction("myAction", () => callCount++, lookaheadSafe:false);
+    // 
+    //             story.ContinueMaximally();
+    //             Assert.AreEqual(1, callCount);
+    // 
+    //             // Lookahead SAFE but breaks glue intentionally
+    //             var storyWithPostGlue = CompileString(@"
+    // EXTERNAL myAction()
+    // 
+    // One
+    // ~ myAction()
+    // <> Two
+    // ");
+    // 
+    //             storyWithPostGlue.BindExternalFunction("myAction", () => {});
+    //             var result = storyWithPostGlue.ContinueMaximally();
+    //             Assert.AreEqual("One\nTwo\n", result);
+    //         }
     #[test]
     fn TestLookupSafeOrNot() {
         run_in_both_modes(|suite| {
@@ -1065,6 +1332,29 @@ One
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestFactorialByReference()
+    //         {
+    //             var storyStr = @"
+    // VAR result = 0
+    // ~ factorialByRef(result, 5)
+    // { result }
+    // 
+    // == function factorialByRef(ref r, n) ==
+    // { r == 0:
+    //     ~ r = 1
+    // }
+    // { n > 1:
+    //     ~ r = r * n
+    //     ~ factorialByRef(r, n-1)
+    // }
+    // ~ return
+    // ";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("120\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestFactorialByReference() {
         run_in_both_modes(|suite| {
@@ -1093,6 +1383,24 @@ VAR result = 0
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestFactorialRecursive()
+    //         {
+    //             var storyStr = @"
+    // { factorial(5) }
+    // 
+    // == function factorial(n) ==
+    //  { n == 1:
+    //     ~ return 1
+    //  - else:
+    //     ~ return (n * factorial(n-1))
+    //  }
+    // ";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("120\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestFactorialRecursive() {
         run_in_both_modes(|suite| {
@@ -1116,6 +1424,32 @@ VAR result = 0
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestFunctionCallRestrictions()
+    //         {
+    //             CompileStringWithoutRuntime(@"
+    // // Allowed to do this
+    // ~ myFunc()
+    // 
+    // // Not allowed to to this
+    // ~ aKnot()
+    // 
+    // // Not allowed to do this
+    // -> myFunc
+    // 
+    // == function myFunc ==
+    // This is a function.
+    // ~ return
+    // 
+    // == aKnot ==
+    // This is a normal knot.
+    // -> END
+    // ", testingErrors: true);
+    // 
+    //             Assert.AreEqual(2, _errorMessages.Count);
+    //             Assert.IsTrue(_errorMessages[0].Contains("hasn't been marked as a function"));
+    //             Assert.IsTrue(_errorMessages[1].Contains("can only be called as a function"));
+    //         }
     #[test]
     fn TestFunctionCallRestrictions() {
         run_in_both_modes(|suite| {
@@ -1154,6 +1488,38 @@ This is a normal knot.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestFunctionPurityChecks()
+    //         {
+    //             CompileStringWithoutRuntime(@"
+    // -> test
+    // 
+    // == test ==
+    // ~ myFunc()
+    // = function myBadInnerFunc
+    // Not allowed!
+    // ~ return
+    // 
+    // == function myFunc ==
+    // Hello world
+    // * a choice
+    // * another choice
+    // -
+    // -> myFunc
+    // = testStitch
+    //     This is a stitch
+    // ~ return
+    // ", testingErrors: true);
+    // 
+    //             Assert.AreEqual(7, _errorMessages.Count);
+    //             Assert.IsTrue(_errorMessages[0].Contains("Return statements can only be used in knots that"));
+    //             Assert.IsTrue(_errorMessages[1].Contains("Functions cannot be stitches"));
+    //             Assert.IsTrue(_errorMessages[2].Contains("Functions may not contain stitches"));
+    //             Assert.IsTrue(_errorMessages[3].Contains("Functions may not contain diverts"));
+    //             Assert.IsTrue(_errorMessages[4].Contains("Functions may not contain choices"));
+    //             Assert.IsTrue(_errorMessages[5].Contains("Functions may not contain choices"));
+    //             Assert.IsTrue(_errorMessages[6].Contains("Return statements can only be used in knots that"));
+    //         }
     #[test]
     fn TestFunctionPurityChecks() {
         run_in_both_modes(|suite| {
@@ -1205,6 +1571,13 @@ Hello world
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestDisallowEmptyDiverts()
+    //         {
+    //             CompileStringWithoutRuntime ("->", testingErrors: true);
+    // 
+    //             Assert.IsTrue (HadError ("Empty diverts (->) are only valid on choices"));
+    //         }
     #[test]
     fn TestDisallowEmptyDiverts() {
         run_in_both_modes(|suite| {
@@ -1215,6 +1588,19 @@ Hello world
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestDoneStopsThread ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // -> DONE
+    // This content is inaccessible.
+    // ";
+    // 
+    //             Story story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual (string.Empty, story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestDoneStopsThread() {
         run_in_both_modes(|suite| {
@@ -1232,6 +1618,38 @@ This content is inaccessible.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestMultiFlowBasics()
+    //         {
+    //             var storyStr =
+    //         @"
+    // === knot1
+    // knot 1 line 1
+    // knot 1 line 2
+    // -> END
+    // 
+    // === knot2
+    // knot 2 line 1
+    // knot 2 line 2
+    // -> END
+    // ";
+    // 
+    //             var story = CompileString(storyStr);
+    // 
+    //             story.SwitchFlow("First");
+    //             story.ChoosePathString("knot1");
+    //             Assert.AreEqual("knot 1 line 1\n", story.Continue());
+    // 
+    //             story.SwitchFlow("Second");
+    //             story.ChoosePathString("knot2");
+    //             Assert.AreEqual("knot 2 line 1\n", story.Continue());
+    // 
+    //             story.SwitchFlow("First");
+    //             Assert.AreEqual("knot 1 line 2\n", story.Continue());
+    // 
+    //             story.SwitchFlow("Second");
+    //             Assert.AreEqual("knot 2 line 2\n", story.Continue());
+    //         }
     #[test]
     fn TestMultiFlowBasics() {
         run_in_both_modes(|suite| {
@@ -1265,6 +1683,97 @@ knot 2 line 2
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestMultiFlowSaveLoadThreads()
+    //         {
+    //             var storyStr =
+    //         @"
+    // Default line 1
+    // Default line 2
+    // 
+    // == red ==
+    // Hello I'm red
+    // <- thread1(""red"")
+    // <- thread2(""red"")
+    // -> DONE
+    // 
+    // == blue ==
+    // Hello I'm blue
+    // <- thread1(""blue"")
+    // <- thread2(""blue"")
+    // -> DONE
+    // 
+    // == thread1(name) ==
+    // + Thread 1 {name} choice
+    //     -> thread1Choice(name)
+    // 
+    // == thread2(name) ==
+    // + Thread 2 {name} choice
+    //     -> thread2Choice(name)
+    // 
+    // == thread1Choice(name) ==
+    // After thread 1 choice ({name})
+    // -> END
+    // 
+    // == thread2Choice(name) ==
+    // After thread 2 choice ({name})
+    // -> END
+    // ";
+    // 
+    //             var story = CompileString(storyStr);
+    // 
+    //             // Default flow
+    //             Assert.AreEqual("Default line 1\n", story.Continue());
+    // 
+    //             story.SwitchFlow("Blue Flow");
+    //             story.ChoosePathString("blue");
+    //             Assert.AreEqual("Hello I'm blue\n", story.Continue());
+    // 
+    //             story.SwitchFlow("Red Flow");
+    //             story.ChoosePathString("red");
+    //             Assert.AreEqual("Hello I'm red\n", story.Continue());
+    // 
+    //             // Test existing state remains after switch (blue)
+    //             story.SwitchFlow("Blue Flow");
+    //             Assert.AreEqual("Hello I'm blue\n", story.currentText);
+    //             Assert.AreEqual("Thread 1 blue choice", story.currentChoices[0].text);
+    // 
+    //             // Test existing state remains after switch (red)
+    //             story.SwitchFlow("Red Flow");
+    //             Assert.AreEqual("Hello I'm red\n", story.currentText);
+    //             Assert.AreEqual("Thread 1 red choice", story.currentChoices[0].text);
+    // 
+    //             // Save/load test
+    //             var saved = story.state.ToJson();
+    // 
+    //             // Test choice before reloading state before resetting
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("Thread 1 red choice\nAfter thread 1 choice (red)\n", story.ContinueMaximally());
+    //             story.ResetState();
+    // 
+    //             // Load to pre-choice: still red, choose second choice
+    //             story.state.LoadJson(saved);
+    // 
+    //             story.ChooseChoiceIndex(1);
+    //             Assert.AreEqual("Thread 2 red choice\nAfter thread 2 choice (red)\n", story.ContinueMaximally());
+    // 
+    // 
+    //             // Load: switch to blue, choose 1
+    //             story.state.LoadJson(saved);
+    //             story.SwitchFlow("Blue Flow");
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("Thread 1 blue choice\nAfter thread 1 choice (blue)\n", story.ContinueMaximally());
+    // 
+    //             // Load: switch to blue, choose 2
+    //             story.state.LoadJson(saved);
+    //             story.SwitchFlow("Blue Flow");
+    //             story.ChooseChoiceIndex(1);
+    //             Assert.AreEqual("Thread 2 blue choice\nAfter thread 2 choice (blue)\n", story.ContinueMaximally());
+    // 
+    //             // Remove active blue flow, should revert back to global flow
+    //             story.RemoveFlow("Blue Flow");
+    //             Assert.AreEqual("Default line 2\n", story.Continue());
+    //         }
     #[test]
     fn TestMultiFlowSaveLoadThreads() {
         run_in_both_modes(|suite| {
@@ -1356,6 +1865,28 @@ After thread 2 choice ({name})
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestCharacterRangeIdentifiersForConstNamesWithAsciiPrefix()
+    //         {
+    //             var ranges = InkParser.ListAllCharacterRanges();
+    //             for (int i = 0; i < ranges.Length; i++)
+    //             {
+    // 
+    //                 var range = ranges[i];
+    // 
+    //                 var identifier = GenerateIdentifierFromCharacterRange(range);
+    // 
+    //                 var storyStr = string.Format(@"
+    // CONST pi{0} = 3.1415
+    // CONST a{0} = ""World""
+    // CONST b{0} = 3
+    // ", identifier);
+    // 
+    //                 var compiledStory = CompileStringWithoutRuntime(storyStr);
+    // 
+    //                 Assert.IsNotNull(compiledStory);
+    //             }
+    //         }
     #[test]
     fn TestCharacterRangeIdentifiersForConstNamesWithAsciiPrefix() {
         run_in_both_modes(|suite| {
@@ -1374,6 +1905,28 @@ After thread 2 choice ({name})
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestCharacterRangeIdentifiersForConstNamesWithAsciiSuffix()
+    //         {
+    //             var ranges = InkParser.ListAllCharacterRanges();
+    //             for (int i = 0; i < ranges.Length; i++)
+    //             {
+    // 
+    //                 var range = ranges[i];
+    // 
+    //                 var identifier = GenerateIdentifierFromCharacterRange(range);
+    // 
+    //                 var storyStr = string.Format(@"
+    // CONST {0}pi = 3.1415
+    // CONST {0}a = ""World""
+    // CONST {0}b = 3
+    // ", identifier);
+    // 
+    //                 var compiledStory = CompileStringWithoutRuntime(storyStr);
+    // 
+    //                 Assert.IsNotNull(compiledStory);
+    //             }
+    //         }
     #[test]
     fn TestCharacterRangeIdentifiersForConstNamesWithAsciiSuffix() {
         run_in_both_modes(|suite| {
@@ -1392,6 +1945,28 @@ After thread 2 choice ({name})
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestCharacterRangeIdentifiersForSimpleVariableNamesWithAsciiPrefix()
+    //         {
+    //             var ranges = InkParser.ListAllCharacterRanges();
+    //             for (int i = 0; i < ranges.Length; i++)
+    //             {
+    // 
+    //                 var range = ranges[i];
+    // 
+    //                 var identifier = GenerateIdentifierFromCharacterRange(range);
+    // 
+    //                 var storyStr = string.Format(@"
+    // VAR pi{0} = 3.1415
+    // VAR a{0} = ""World""
+    // VAR b{0} = 3
+    // ", identifier);
+    // 
+    //                 var compiledStory = CompileStringWithoutRuntime(storyStr);
+    // 
+    //                 Assert.IsNotNull(compiledStory);
+    //             }
+    //         }
     #[test]
     fn TestCharacterRangeIdentifiersForSimpleVariableNamesWithAsciiPrefix() {
         run_in_both_modes(|suite| {
@@ -1410,6 +1985,28 @@ After thread 2 choice ({name})
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestCharacterRangeIdentifiersForSimpleVariableNamesWithAsciiSuffix()
+    //         {
+    //             var ranges = InkParser.ListAllCharacterRanges();
+    //             for (int i = 0; i < ranges.Length; i++)
+    //             {
+    // 
+    //                 var range = ranges[i];
+    // 
+    //                 var identifier = GenerateIdentifierFromCharacterRange(range);
+    // 
+    //                 var storyStr = string.Format(@"
+    // VAR {0}pi = 3.1415
+    // VAR {0}a = ""World""
+    // VAR {0}b = 3
+    // ", identifier);
+    // 
+    //                 var compiledStory = CompileStringWithoutRuntime(storyStr);
+    // 
+    //                 Assert.IsNotNull(compiledStory);
+    //             }
+    //         }
     #[test]
     fn TestCharacterRangeIdentifiersForSimpleVariableNamesWithAsciiSuffix() {
         run_in_both_modes(|suite| {
@@ -1428,6 +2025,28 @@ After thread 2 choice ({name})
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestCharacterRangeIdentifiersForDivertNamesWithAsciiPrefix()
+    //         {
+    //             var ranges = InkParser.ListAllCharacterRanges();
+    //             for (int i = 0; i < ranges.Length; i++) {
+    // 
+    //                 var range = ranges[i];
+    //                 var rangeString = GenerateIdentifierFromCharacterRange(range);
+    // 
+    // 
+    //                 var storyStr = string.Format(@"
+    // VAR z{0} = -> divert{0}
+    // 
+    // == divert{0} ==
+    // -> END
+    // ", rangeString);
+    // 
+    //                 var compiledStory = CompileStringWithoutRuntime (storyStr);
+    // 
+    //                 Assert.IsNotNull (compiledStory);
+    //             }
+    //         }
     #[test]
     fn TestCharacterRangeIdentifiersForDivertNamesWithAsciiPrefix() {
         run_in_both_modes(|suite| {
@@ -1446,6 +2065,29 @@ After thread 2 choice ({name})
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestCharacterRangeIdentifiersForDivertNamesWithAsciiSuffix()
+    //         {
+    //             var ranges = InkParser.ListAllCharacterRanges();
+    //             for (int i = 0; i < ranges.Length; i++)
+    //             {
+    // 
+    //                 var range = ranges[i];
+    //                 var rangeString = GenerateIdentifierFromCharacterRange(range);
+    // 
+    // 
+    //                 var storyStr = string.Format(@"
+    // VAR {0}z = -> {0}divert
+    // 
+    // == {0}divert ==
+    // -> END
+    // ", rangeString);
+    // 
+    //                 var compiledStory = CompileStringWithoutRuntime(storyStr);
+    // 
+    //                 Assert.IsNotNull(compiledStory);
+    //             }
+    //         }
     #[test]
     fn TestCharacterRangeIdentifiersForDivertNamesWithAsciiSuffix() {
         run_in_both_modes(|suite| {
@@ -1464,6 +2106,16 @@ After thread 2 choice ({name})
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestBasicStringLiterals()
+    //         {
+    //             var story = CompileString(@"
+    // VAR x = ""Hello world 1""
+    // {x}
+    // Hello {""world""} 2.
+    // ");
+    //             Assert.AreEqual("Hello world 1\nHello world 2.\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestBasicStringLiterals() {
         run_in_both_modes(|suite| {
@@ -1482,6 +2134,20 @@ Hello {"world"} 2.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestBasicTunnel()
+    //         {
+    //             Story story = CompileString(@"
+    // -> f ->
+    // <> world
+    // 
+    // == f ==
+    // Hello
+    // ->->
+    // ");
+    // 
+    //             Assert.AreEqual("Hello world\n", story.Continue());
+    //         }
     #[test]
     fn TestBasicTunnel() {
         run_in_both_modes(|suite| {
@@ -1503,6 +2169,23 @@ Hello
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestChoiceCount()
+    //         {
+    //             Story story = CompileString(@"
+    // <- choices
+    // { CHOICE_COUNT() }
+    // 
+    // = end
+    // -> END
+    // 
+    // = choices
+    // * one -> end
+    // * two -> end
+    // ");
+    // 
+    //             Assert.AreEqual("2\n", story.Continue());
+    //         }
     #[test]
     fn TestChoiceCount() {
         run_in_both_modes(|suite| {
@@ -1527,6 +2210,18 @@ Hello
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestChoiceDivertsToDone()
+    //         {
+    //             var story = CompileString(@"* choice -> DONE");
+    // 
+    //             story.Continue();
+    // 
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    //             story.ChooseChoiceIndex(0);
+    // 
+    //             Assert.AreEqual("choice", story.Continue());
+    //         }
     #[test]
     fn TestChoiceDivertsToDone() {
         run_in_both_modes(|suite| {
@@ -1540,6 +2235,21 @@ Hello
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestChoiceWithBracketsOnly()
+    //         {
+    //             var storyStr = "*   [Option]\n    Text";
+    // 
+    //             Story story = CompileString(storyStr);
+    //             story.Continue();
+    // 
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    //             Assert.AreEqual("Option", story.currentChoices[0].text);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    // 
+    //             Assert.AreEqual("Text\n", story.Continue());
+    //         }
     #[test]
     fn TestChoiceWithBracketsOnly() {
         run_in_both_modes(|suite| {
@@ -1554,6 +2264,32 @@ Hello
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestCompareDivertTargets()
+    //         {
+    //             var storyStr = @"
+    // VAR to_one = -> one
+    // VAR to_two = -> two
+    // 
+    // {to_one == to_two:same knot|different knot}
+    // {to_one == to_one:same knot|different knot}
+    // {to_two == to_two:same knot|different knot}
+    // { -> one == -> two:same knot|different knot}
+    // { -> one == to_one:same knot|different knot}
+    // { to_one == -> one:same knot|different knot}
+    // 
+    // == one
+    //     One
+    //     -> DONE
+    // 
+    // === two
+    //     Two
+    //     -> DONE";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("different knot\nsame knot\nsame knot\ndifferent knot\nsame knot\nsame knot\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestCompareDivertTargets() {
         run_in_both_modes(|suite| {
@@ -1589,6 +2325,62 @@ VAR to_two = -> two
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestBlanksInInlineSequences()
+    //         {
+    //             var story = CompileString(@"
+    // 1. -> seq1 ->
+    // 2. -> seq1 ->
+    // 3. -> seq1 ->
+    // 4. -> seq1 ->
+    // \---
+    // 1. -> seq2 ->
+    // 2. -> seq2 ->
+    // 3. -> seq2 ->
+    // \---
+    // 1. -> seq3 ->
+    // 2. -> seq3 ->
+    // 3. -> seq3 ->
+    // \---
+    // 1. -> seq4 ->
+    // 2. -> seq4 ->
+    // 3. -> seq4 ->
+    // 
+    // == seq1 ==
+    // {a||b}
+    // ->->
+    // 
+    // == seq2 ==
+    // {|a}
+    // ->->
+    // 
+    // == seq3 ==
+    // {a|}
+    // ->->
+    // 
+    // == seq4 ==
+    // {|}
+    // ->->".Replace("\r", ""));
+    // 
+    //             Assert.AreEqual(
+    // @"1. a
+    // 2.
+    // 3. b
+    // 4. b
+    // ---
+    // 1.
+    // 2. a
+    // 3. a
+    // ---
+    // 1. a
+    // 2.
+    // 3.
+    // ---
+    // 1.
+    // 2.
+    // 3.
+    // ".Replace("\r", ""), story.ContinueMaximally().Replace("\r", ""));
+    //         }
     #[test]
     fn TestBlanksInInlineSequences() {
         run_in_both_modes(|suite| {
@@ -1656,6 +2448,65 @@ VAR to_two = -> two
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestAllSequenceTypes()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // ~ SEED_RANDOM(1)
+    // 
+    // Once: {f_once()} {f_once()} {f_once()} {f_once()}
+    // Stopping: {f_stopping()} {f_stopping()} {f_stopping()} {f_stopping()}
+    // Default: {f_default()} {f_default()} {f_default()} {f_default()}
+    // Cycle: {f_cycle()} {f_cycle()} {f_cycle()} {f_cycle()}
+    // Shuffle: {f_shuffle()} {f_shuffle()} {f_shuffle()} {f_shuffle()}
+    // Shuffle stopping: {f_shuffle_stopping()} {f_shuffle_stopping()} {f_shuffle_stopping()} {f_shuffle_stopping()}
+    // Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()}
+    // 
+    // == function f_once ==
+    // {once:
+    //     - one
+    //     - two
+    // }
+    // 
+    // == function f_stopping ==
+    // {stopping:
+    //     - one
+    //     - two
+    // }
+    // 
+    // == function f_default ==
+    // {one|two}
+    // 
+    // == function f_cycle ==
+    // {cycle:
+    //     - one
+    //     - two
+    // }
+    // 
+    // == function f_shuffle ==
+    // {shuffle:
+    //     - one
+    //     - two
+    // }
+    // 
+    // == function f_shuffle_stopping ==
+    // {stopping shuffle:
+    //     - one
+    //     - two
+    //     - final
+    // }
+    // 
+    // == function f_shuffle_once ==
+    // {shuffle once:
+    //     - one
+    //     - two
+    // }
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    //             Assert.AreEqual("Once: one two\nStopping: one two two two\nDefault: one two two two\nCycle: one two one two\nShuffle: two one two one\nShuffle stopping: one two final final\nShuffle once: two one\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestAllSequenceTypes() {
         run_in_both_modes(|suite| {
@@ -1724,6 +2575,27 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestCallStackEvaluation()
+    //         {
+    //             var storyStr =
+    //                 @"
+    //                    { six() + two() }
+    //                     -> END
+    // 
+    //                 === function six
+    //                     ~ return four() + two()
+    // 
+    //                 === function four
+    //                     ~ return two() + two()
+    // 
+    //                 === function two
+    //                     ~ return 2
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    //             Assert.AreEqual("8\n", story.Continue());
+    //         }
     #[test]
     fn TestCallStackEvaluation() {
         run_in_both_modes(|suite| {
@@ -1750,6 +2622,32 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestConditionalChoiceInWeave()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // - start
+    //  {
+    //     - true: * [go to a stitch] -> a_stitch
+    //  }
+    // - gather should be seen
+    // -> DONE
+    // 
+    // = a_stitch
+    //     result
+    //     -> END
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("start\ngather should be seen\n", story.ContinueMaximally());
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    // 
+    //             Assert.AreEqual("result\n", story.Continue());
+    //         }
     #[test]
     fn TestConditionalChoiceInWeave() {
         run_in_both_modes(|suite| {
@@ -1779,6 +2677,31 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestConditionalChoiceInWeave2()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // - first gather
+    //     * [option 1]
+    //     * [option 2]
+    // - the main gather
+    // {false:
+    //     * unreachable option -> END
+    // }
+    // - bottom gather";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("first gather\n", story.Continue());
+    // 
+    //             Assert.AreEqual(2, story.currentChoices.Count);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    // 
+    //             Assert.AreEqual("the main gather\nbottom gather\n", story.ContinueMaximally());
+    //             Assert.AreEqual(0, story.currentChoices.Count);
+    //         }
     #[test]
     fn TestConditionalChoiceInWeave2() {
         run_in_both_modes(|suite| {
@@ -1806,6 +2729,32 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestConditionalChoices()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // * { true } { false } not displayed
+    // * { true } { true }
+    //   { true and true }  one
+    // * { false } not displayed
+    // * (name) { true } two
+    // * { true }
+    //   { true }
+    //   three
+    // * { true }
+    //   four
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    //             story.ContinueMaximally();
+    // 
+    //             Assert.AreEqual(4, story.currentChoices.Count);
+    //             Assert.AreEqual("one", story.currentChoices[0].text);
+    //             Assert.AreEqual("two", story.currentChoices[1].text);
+    //             Assert.AreEqual("three", story.currentChoices[2].text);
+    //             Assert.AreEqual("four", story.currentChoices[3].text);
+    //         }
     #[test]
     fn TestConditionalChoices() {
         run_in_both_modes(|suite| {
@@ -1837,6 +2786,43 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestConditionals()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // {false:not true|true}
+    // {
+    //    - 4 > 5: not true
+    //    - 5 > 4: true
+    // }
+    // { 2*2 > 3:
+    //    - true
+    //    - not true
+    // }
+    // {
+    //    - 1 > 3: not true
+    //    - { 2+2 == 4:
+    //         - true
+    //         - not true
+    //    }
+    // }
+    // { 2*3:
+    //    - 1+7: not true
+    //    - 9: not true
+    //    - 1+1+1+3: true
+    //    - 9-3: also true but not printed
+    // }
+    // { true:
+    //     great
+    //     right?
+    // }
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("true\ntrue\ntrue\ntrue\ntrue\ngreat\nright?\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestConditionals() {
         run_in_both_modes(|suite| {
@@ -1882,6 +2868,18 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestConst()
+    //         {
+    //             var story = CompileString(@"
+    // VAR x = c
+    // 
+    // CONST c = 5
+    // 
+    // {x}
+    // ");
+    //             Assert.AreEqual("5\n", story.Continue());
+    //         }
     #[test]
     fn TestConst() {
         run_in_both_modes(|suite| {
@@ -1902,6 +2900,34 @@ CONST c = 5
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestDefaultChoices()
+    //         {
+    //             Story story = CompileString(@"
+    //  - (start)
+    //  * [Choice 1]
+    //  * [Choice 2]
+    //  * {false} Impossible choice
+    //  * -> default
+    //  - After choice
+    //  -> start
+    // 
+    // == default ==
+    // This is default.
+    // -> DONE
+    // ");
+    // 
+    //             Assert.AreEqual("", story.Continue());
+    //             Assert.AreEqual(2, story.currentChoices.Count);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("After choice\n", story.Continue());
+    // 
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("After choice\nThis is default.\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestDefaultChoices() {
         run_in_both_modes(|suite| {
@@ -1935,6 +2961,16 @@ This is default.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestDefaultSimpleGather()
+    //         {
+    //             var story = CompileString(@"
+    // * ->
+    // - x
+    // -> DONE");
+    // 
+    //             Assert.AreEqual("x\n", story.Continue());
+    //         }
     #[test]
     fn TestDefaultSimpleGather() {
         run_in_both_modes(|suite| {
@@ -1952,6 +2988,24 @@ This is default.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestDivertInConditional()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // === intro
+    // = top
+    //     { main: -> done }
+    //     -> END
+    // = main
+    //     -> top
+    // = done
+    //     -> END
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    //             Assert.AreEqual("", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestDivertInConditional() {
         run_in_both_modes(|suite| {
@@ -1974,6 +3028,19 @@ This is default.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestDivertNotFoundError()
+    //         {
+    //             CompileStringWithoutRuntime(@"
+    // -> knot
+    // 
+    // == knot ==
+    // Knot.
+    // -> next
+    // ", testingErrors: true);
+    // 
+    //             Assert.IsTrue(HadError("not found"));
+    //         }
     #[test]
     fn TestDivertNotFoundError() {
         run_in_both_modes(|suite| {
@@ -1991,6 +3058,33 @@ Knot.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestDivertToWeavePoints()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // -> knot.stitch.gather
+    // 
+    // == knot ==
+    // = stitch
+    // - hello
+    //     * (choice) test
+    //         choice content
+    // - (gather)
+    //   gather
+    // 
+    //   {stopping:
+    //     - -> knot.stitch.choice
+    //     - second time round
+    //   }
+    // 
+    // -> END
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("gather\ntest\nchoice content\ngather\nsecond time round\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestDivertToWeavePoints() {
         run_in_both_modes(|suite| {
@@ -2024,6 +3118,13 @@ Knot.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestEmpty()
+    //         {
+    //             Story story = CompileString(@"");
+    // 
+    //             Assert.AreEqual(string.Empty, story.currentText);
+    //         }
     #[test]
     fn TestEmpty() {
         run_in_both_modes(|suite| {
@@ -2034,6 +3135,27 @@ Knot.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestEmptyChoice()
+    //         {
+    //             int warningCount = 0;
+    //             InkParser parser = new InkParser("*", null, (string message, ErrorType errorType) =>
+    //             {
+    //                 if (errorType == ErrorType.Warning)
+    //                 {
+    //                     warningCount++;
+    //                     Assert.IsTrue(message.Contains("completely empty"));
+    //                 }
+    //                 else
+    //                 {
+    //                     Assert.Fail("Shouldn't have had any errors");
+    //                 }
+    //             });
+    // 
+    //             parser.Parse();
+    // 
+    //             Assert.AreEqual(1, warningCount);
+    //         }
     #[test]
     fn TestEmptyChoice() {
         let warning_count = Arc::new(Mutex::new(0usize));
@@ -2058,6 +3180,25 @@ Knot.
         assert_eq!(1, *warning_count.lock().unwrap());
     }
 
+    // C#:         [Test()]
+    //         public void TestCommentEliminator()
+    //         {
+    //             var testContent =
+    // @"A// C
+    // A /* C */ A
+    // 
+    // A * A * /* * C *// A/*
+    // C C C
+    // 
+    // */";
+    // 
+    //             CommentEliminator p = new CommentEliminator(testContent);
+    //             var result = p.Process();
+    // 
+    //             var expected = "A\nA  A\n\nA * A * / A\n\n\n";
+    // 
+    //             Assert.AreEqual(expected.Replace("\r", ""), result.Replace("\r", "")); //Windows perculiarity
+    //         }
     #[test]
     fn TestCommentEliminator() {
         let test_content = "A// C\nA /* C */ A\n\nA * A * /* * C *// A/*\nC C C\n\n*/";
@@ -2068,6 +3209,20 @@ Knot.
         assert_eq!(expected.replace("\r", ""), processed.replace("\r", ""));
     }
 
+    // C#:         [Test()]
+    //         public void TestCommentEliminatorMixedNewlines()
+    //         {
+    //             var testContent =
+    //                 "A B\nC D // comment\nA B\r\nC D // comment\r\n/* block comment\r\nsecond line\r\n */ ";
+    // 
+    //             CommentEliminator p = new CommentEliminator(testContent);
+    //             var result = p.Process();
+    // 
+    //             var expected =
+    //                 "A B\nC D \nA B\nC D \n\n\n ";
+    // 
+    //             Assert.AreEqual(expected, result);
+    //         }
     #[test]
     fn TestCommentEliminatorMixedNewlines() {
         let test_content =
@@ -2079,6 +3234,17 @@ Knot.
         assert_eq!(expected, processed);
     }
 
+    // C#:         [Test()]
+    //         public void TestStringParserA()
+    //         {
+    //             StringParser p = new StringParser("A");
+    //             var results = p.Interleave<string>(
+    //                 () => p.ParseString("A"),
+    //                 () => p.ParseString("B"));
+    // 
+    //             var expected = new[] { "A" };
+    //             Assert.AreEqual(expected, results);
+    //         }
     #[test]
     fn TestStringParserA() {
         let mut p = StringParser::new("A".to_string());
@@ -2091,6 +3257,17 @@ Knot.
         assert_eq!(Some(vec!["A".to_string()]), results);
     }
 
+    // C#:         [Test()]
+    //         public void TestStringParserABAB()
+    //         {
+    //             StringParser p = new StringParser("ABAB");
+    //             var results = p.Interleave<string>(
+    //                 () => p.ParseString("A"),
+    //                 () => p.ParseString("B"));
+    // 
+    //             var expected = new[] { "A", "B", "A", "B" };
+    //             Assert.AreEqual(expected, results);
+    //         }
     #[test]
     fn TestStringParserABAB() {
         let mut p = StringParser::new("ABAB".to_string());
@@ -2111,6 +3288,17 @@ Knot.
         );
     }
 
+    // C#:         [Test()]
+    //         public void TestStringParserABAOptional()
+    //         {
+    //             StringParser p = new StringParser("ABAA");
+    //             var results = p.Interleave<string>(
+    //                 () => p.ParseString("A"),
+    //                 p.Optional(() => p.ParseString("B")));
+    // 
+    //             var expected = new[] { "A", "B", "A", "A" };
+    //             Assert.AreEqual(expected, results);
+    //         }
     #[test]
     #[ignore]
     fn TestStringParserABAOptional() {
@@ -2132,6 +3320,17 @@ Knot.
         );
     }
 
+    // C#:         [Test()]
+    //         public void TestStringParserABAOptional2()
+    //         {
+    //             StringParser p = new StringParser("BABB");
+    //             var results = p.Interleave<string>(
+    //                 p.Optional(() => p.ParseString("A")),
+    //                 () => p.ParseString("B"));
+    // 
+    //             var expected = new[] { "B", "A", "B", "B" };
+    //             Assert.AreEqual(expected, results);
+    //         }
     #[test]
     #[ignore]
     fn TestStringParserABAOptional2() {
@@ -2153,6 +3352,16 @@ Knot.
         );
     }
 
+    // C#:         [Test()]
+    //         public void TestStringParserB()
+    //         {
+    //             StringParser p = new StringParser("B");
+    //             var result = p.Interleave<string>(
+    //                 () => p.ParseString("A"),
+    //                 () => p.ParseString("B"));
+    // 
+    //             Assert.IsNull(result);
+    //         }
     #[test]
     fn TestStringParserB() {
         let mut p = StringParser::new("B".to_string());
@@ -2165,6 +3374,19 @@ Knot.
         assert!(result.is_none());
     }
 
+    // C#:         [Test()]
+    //         public void TestEmptyMultilineConditionalBranch()
+    //         {
+    //             var story = CompileString(@"
+    // { 3:
+    //     - 3:
+    //     - 4:
+    //         txt
+    // }
+    // ");
+    // 
+    //             Assert.AreEqual("", story.Continue());
+    //         }
     #[test]
     fn TestEmptyMultilineConditionalBranch() {
         run_in_both_modes(|suite| {
@@ -2186,6 +3408,28 @@ Knot.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestEmptySequenceContent()
+    //         {
+    //             var story = CompileString(@"
+    // -> thing ->
+    // -> thing ->
+    // -> thing ->
+    // -> thing ->
+    // -> thing ->
+    // Done.
+    // 
+    // == thing ==
+    // {once:
+    //   - Wait for it....
+    //   -
+    //   -
+    //   -  Surprise!
+    // }
+    // ->->
+    // ");
+    //             Assert.AreEqual("Wait for it....\nSurprise!\nDone.\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestEmptySequenceContent() {
         run_in_both_modes(|suite| {
@@ -2219,6 +3463,18 @@ Done.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestEnd()
+    //         {
+    //             Story story = CompileString(@"
+    // hello
+    // -> END
+    // world
+    // -> END
+    // ");
+    // 
+    //             Assert.AreEqual("hello\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestEnd() {
         run_in_both_modes(|suite| {
@@ -2238,6 +3494,21 @@ world
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestEnd2()
+    //         {
+    //             Story story = CompileString(@"
+    // -> test
+    // 
+    // == test ==
+    // hello
+    // -> END
+    // world
+    // -> END
+    // ");
+    // 
+    //             Assert.AreEqual("hello\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestEnd2() {
         run_in_both_modes(|suite| {
@@ -2260,6 +3531,22 @@ world
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestPaths()
+    //         {
+    //             // Different instances should ensure different instances of individual components
+    //             var path1 = new Path("hello.1.world");
+    //             var path2 = new Path("hello.1.world");
+    // 
+    //             var path3 = new Path(".hello.1.world");
+    //             var path4 = new Path(".hello.1.world");
+    // 
+    //             Assert.AreEqual(path1, path2);
+    // 
+    //             Assert.AreEqual(path3, path4);
+    // 
+    //             Assert.AreNotEqual(path1, path3);
+    //         }
     #[test]
     fn TestPaths() {
         let path1 = ink_runtime::Path::Path::new_overload_4("hello.1.world".to_string());
@@ -2272,6 +3559,29 @@ world
         assert_ne!(path1, path3);
     }
 
+    // C#:         [Test()]
+    //         public void TestPathToSelf()
+    //         {
+    //             var story = CompileString(@"
+    // - (dododo)
+    // -> tunnel ->
+    // -> dododo
+    // 
+    // == tunnel
+    // + A
+    // ->->
+    // ");
+    //             // We're only checking that the story copes
+    //             // okay without crashing
+    //             // (internally the "-> dododo" ends up generating
+    //             //  a very short path: ".^", and after walking into
+    //             // the parent, it didn't cope with the "." before
+    //             // I fixed it!)
+    //             story.Continue();
+    //             story.ChooseChoiceIndex(0);
+    //             story.Continue();
+    //             story.ChooseChoiceIndex(0);
+    //         }
     #[test]
     fn TestPathToSelf() {
         run_in_both_modes(|suite| {
@@ -2297,6 +3607,77 @@ world
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestPrintNum()
+    //         {
+    //             var story = CompileString(@"
+    // . {print_num(4)} .
+    // . {print_num(15)} .
+    // . {print_num(37)} .
+    // . {print_num(101)} .
+    // . {print_num(222)} .
+    // . {print_num(1234)} .
+    // 
+    // === function print_num(x) ===
+    // {
+    //     - x >= 1000:
+    //         {print_num(x / 1000)} thousand { x mod 1000 > 0:{print_num(x mod 1000)}}
+    //     - x >= 100:
+    //         {print_num(x / 100)} hundred { x mod 100 > 0:and {print_num(x mod 100)}}
+    //     - x == 0:
+    //         zero
+    //     - else:
+    //         { x >= 20:
+    //             { x / 10:
+    //                 - 2: twenty
+    //                 - 3: thirty
+    //                 - 4: forty
+    //                 - 5: fifty
+    //                 - 6: sixty
+    //                 - 7: seventy
+    //                 - 8: eighty
+    //                 - 9: ninety
+    //             }
+    //             { x mod 10 > 0:<>-<>}
+    //         }
+    //         { x < 10 || x > 20:
+    //             { x mod 10:
+    //                 - 1: one
+    //                 - 2: two
+    //                 - 3: three
+    //                 - 4: four
+    //                 - 5: five
+    //                 - 6: six
+    //                 - 7: seven
+    //                 - 8: eight
+    //                 - 9: nine
+    //             }
+    //         - else:
+    //             { x:
+    //                 - 10: ten
+    //                 - 11: eleven
+    //                 - 12: twelve
+    //                 - 13: thirteen
+    //                 - 14: fourteen
+    //                 - 15: fifteen
+    //                 - 16: sixteen
+    //                 - 17: seventeen
+    //                 - 18: eighteen
+    //                 - 19: nineteen
+    //             }
+    //         }
+    // }
+    // ");
+    // 
+    //             Assert.AreEqual(
+    // @". four .
+    // . fifteen .
+    // . thirty-seven .
+    // . one hundred and one .
+    // . two hundred and twenty-two .
+    // . one thousand two hundred and thirty-four .
+    // ".Replace("\r", ""), story.ContinueMaximally().Replace("\r", ""));
+    //         }
     #[test]
     fn TestPrintNum() {
         run_in_both_modes(|suite| {
@@ -2371,6 +3752,17 @@ world
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestQuoteCharacterSignificance()
+    //         {
+    //             // Confusing escaping + ink! Actual ink string is:
+    //             // My name is "{"J{"o"}e"}"
+    //             //  - First and last quotes are insignificant - they're part of the content
+    //             //  - Inner quotes are significant - they're part of the syntax for string expressions
+    //             // So output is: My name is "Joe"
+    //             var story = CompileString(@"My name is ""{""J{""o""}e""}""");
+    //             Assert.AreEqual("My name is \"Joe\"\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestQuoteCharacterSignificance() {
         run_in_both_modes(|suite| {
@@ -2381,6 +3773,24 @@ world
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestReadCountAcrossCallstack()
+    //         {
+    //             var story = CompileString(@"
+    // -> first
+    // 
+    // == first ==
+    // 1) Seen first {first} times.
+    // -> second ->
+    // 2) Seen first {first} times.
+    // -> DONE
+    // 
+    // == second ==
+    // In second.
+    // ->->
+    // ");
+    //             Assert.AreEqual("1) Seen first 1 times.\nIn second.\n2) Seen first 1 times.\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestReadCountAcrossCallstack() {
         run_in_both_modes(|suite| {
@@ -2410,6 +3820,24 @@ In second.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestReadCountAcrossThreads()
+    //         {
+    //             var story = CompileString(@"
+    //     -> top
+    // 
+    // = top
+    //     {top}
+    //     <- aside
+    //     {top}
+    //     -> DONE
+    // 
+    // = aside
+    //     * {false} DONE
+    // 	- -> DONE
+    // ");
+    //             Assert.AreEqual("1\n1\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestReadCountAcrossThreads() {
         run_in_both_modes(|suite| {
@@ -2436,6 +3864,24 @@ In second.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestReadCountDotSeparatedPath()
+    //         {
+    //             Story story = CompileString(@"
+    // -> hi ->
+    // -> hi ->
+    // -> hi ->
+    // 
+    // { hi.stitch_to_count }
+    // 
+    // == hi ==
+    // = stitch_to_count
+    // hi
+    // ->->
+    // ");
+    // 
+    //             Assert.AreEqual("hi\nhi\nhi\n3\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestReadCountDotSeparatedPath() {
         run_in_both_modes(|suite| {
@@ -2461,6 +3907,21 @@ hi
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestReturnTextWarning()
+    //         {
+    //             InkParser parser = new InkParser("== test ==\n return something",
+    //                 null,
+    //                 (string message, ErrorType errorType) =>
+    //                 {
+    //                     if (errorType == ErrorType.Warning)
+    //                     {
+    //                         throw new TestWarningException();
+    //                     }
+    //                 });
+    // 
+    //             Assert.Throws<TestWarningException>(() => parser.Parse());
+    //         }
     #[test]
     fn TestReturnTextWarning() {
         let warning = std::panic::catch_unwind(|| {
@@ -2481,6 +3942,21 @@ hi
         assert!(warning.is_err());
     }
 
+    // C#:         [Test()]
+    //         public void TestSameLineDivertIsInline()
+    //         {
+    //             var story = CompileString(@"
+    // -> hurry_home
+    // === hurry_home ===
+    // We hurried home to Savile Row -> as_fast_as_we_could
+    // 
+    // === as_fast_as_we_could ===
+    // as fast as we could.
+    // -> DONE
+    // ");
+    // 
+    //             Assert.AreEqual("We hurried home to Savile Row as fast as we could.\n", story.Continue());
+    //         }
     #[test]
     fn TestSameLineDivertIsInline() {
         run_in_both_modes(|suite| {
@@ -2506,6 +3982,22 @@ as fast as we could.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestShouldntGatherDueToChoice()
+    //         {
+    //             Story story = CompileString(@"
+    // * opt
+    //     - - text
+    //     * * {false} impossible
+    //     * * -> END
+    // - gather");
+    // 
+    //             story.ContinueMaximally();
+    //             story.ChooseChoiceIndex(0);
+    // 
+    //             // Shouldn't go to "gather"
+    //             Assert.AreEqual("opt\ntext\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestShouldntGatherDueToChoice() {
         run_in_both_modes(|suite| {
@@ -2527,6 +4019,15 @@ as fast as we could.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestSimpleGlue()
+    //         {
+    //             var storyStr = "Some <> \ncontent<> with glue.\n";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("Some content with glue.\n", story.Continue());
+    //         }
     #[test]
     fn TestSimpleGlue() {
         run_in_both_modes(|suite| {
@@ -2537,6 +4038,26 @@ as fast as we could.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestStickyChoicesStaySticky()
+    //         {
+    //             var story = CompileString(@"
+    // -> test
+    // == test ==
+    // First line.
+    // Second line.
+    // + Choice 1
+    // + Choice 2
+    // - -> test
+    // ");
+    // 
+    //             story.ContinueMaximally();
+    //             Assert.AreEqual(2, story.currentChoices.Count);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             story.ContinueMaximally();
+    //             Assert.AreEqual(2, story.currentChoices.Count);
+    //         }
     #[test]
     fn TestStickyChoicesStaySticky() {
         run_in_both_modes(|suite| {
@@ -2563,6 +4084,17 @@ Second line.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestStringConstants()
+    //         {
+    //             var story = CompileString(@"
+    // {x}
+    // VAR x = kX
+    // CONST kX = ""hi""
+    // ");
+    // 
+    //             Assert.AreEqual("hi\n", story.Continue());
+    //         }
     #[test]
     fn TestStringConstants() {
         run_in_both_modes(|suite| {
@@ -2581,6 +4113,21 @@ CONST kX = "hi"
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestStringsInChoices()
+    //         {
+    //             var story = CompileString(@"
+    // * \ {""test1""} [""test2 {""test3""}""] {""test4""}
+    // -> DONE
+    // ");
+    //             story.ContinueMaximally();
+    // 
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    //             Assert.AreEqual(@"test1 ""test2 test3""", story.currentChoices[0].text);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("test1 test4\n", story.Continue());
+    //         }
     #[test]
     fn TestStringsInChoices() {
         run_in_both_modes(|suite| {
@@ -2602,6 +4149,17 @@ CONST kX = "hi"
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestStringTypeCoersion()
+    //         {
+    //             var story = CompileString(@"
+    // {""5"" == 5:same|different}
+    // {""blah"" == 5:same|different}
+    // ");
+    // 
+    //             // Not sure that "5" should be equal to 5, but hmm.
+    //             Assert.AreEqual("same\ndifferent\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestStringTypeCoersion() {
         run_in_both_modes(|suite| {
@@ -2619,6 +4177,16 @@ CONST kX = "hi"
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestTemporariesAtGlobalScope()
+    //         {
+    //             var story = CompileString(@"
+    // VAR x = 5
+    // ~ temp y = 4
+    // {x}{y}
+    // ");
+    //             Assert.AreEqual("54\n", story.Continue());
+    //         }
     #[test]
     fn TestTemporariesAtGlobalScope() {
         run_in_both_modes(|suite| {
@@ -2637,6 +4205,23 @@ VAR x = 5
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestThreadDone()
+    //         {
+    //             Story story = CompileString(@"
+    // This is a thread example
+    // <- example_thread
+    // The example is now complete.
+    // 
+    // == example_thread ==
+    // Hello.
+    // -> DONE
+    // World.
+    // -> DONE
+    // ");
+    // 
+    //             Assert.AreEqual("This is a thread example\nHello.\nThe example is now complete.\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestThreadDone() {
         run_in_both_modes(|suite| {
@@ -2664,6 +4249,25 @@ World.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestTunnelOnwardsAfterTunnel()
+    //         {
+    //             var story = CompileString(@"
+    // -> tunnel1 ->
+    // The End.
+    // -> END
+    // 
+    // == tunnel1 ==
+    // Hello...
+    // -> tunnel2 ->->
+    // 
+    // == tunnel2 ==
+    // ...world.
+    // ->->
+    // ");
+    // 
+    //             Assert.AreEqual("Hello...\n...world.\nThe End.\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestTunnelOnwardsAfterTunnel() {
         run_in_both_modes(|suite| {
@@ -2690,6 +4294,46 @@ Hello...
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestTunnelVsThreadBehaviour()
+    //         {
+    //             Story story = CompileString(@"
+    // -> knot_with_options ->
+    // Finished tunnel.
+    // 
+    // Starting thread.
+    // <- thread_with_options
+    // * E
+    // -
+    // Done.
+    // 
+    // == knot_with_options ==
+    // * A
+    // * B
+    // -
+    // ->->
+    // 
+    // == thread_with_options ==
+    // * C
+    // * D
+    // - -> DONE
+    // ");
+    // 
+    //             Assert.IsFalse(story.ContinueMaximally().Contains("Finished tunnel"));
+    // 
+    //             // Choices should be A, B
+    //             Assert.AreEqual(2, story.currentChoices.Count);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    // 
+    //             // Choices should be C, D, E
+    //             Assert.IsTrue(story.ContinueMaximally().Contains("Finished tunnel"));
+    //             Assert.AreEqual(3, story.currentChoices.Count);
+    // 
+    //             story.ChooseChoiceIndex(2);
+    // 
+    //             Assert.IsTrue(story.ContinueMaximally().Contains("Done."));
+    //         }
     #[test]
     fn TestTunnelVsThreadBehaviour() {
         run_in_both_modes(|suite| {
@@ -2730,6 +4374,29 @@ Done.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestTurnsSince()
+    //         {
+    //             Story story = CompileString(@"
+    // { TURNS_SINCE(-> test) }
+    // ~ test()
+    // { TURNS_SINCE(-> test) }
+    // * [choice 1]
+    // - { TURNS_SINCE(-> test) }
+    // * [choice 2]
+    // - { TURNS_SINCE(-> test) }
+    // 
+    // == function test ==
+    // ~ return
+    // ");
+    //             Assert.AreEqual("-1\n0\n", story.ContinueMaximally());
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("1\n", story.ContinueMaximally());
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("2\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestTurnsSince() {
         run_in_both_modes(|suite| {
@@ -2759,6 +4426,31 @@ Done.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestTurnsSinceNested()
+    //         {
+    //             var story = CompileString(@"
+    // -> empty_world
+    // === empty_world ===
+    //     {TURNS_SINCE(-> then)} = -1
+    //     * (then) stuff
+    //         {TURNS_SINCE(-> then)} = 0
+    //         * * (next) more stuff
+    //             {TURNS_SINCE(-> then)} = 1
+    //         -> DONE
+    // ");
+    //             Assert.AreEqual("-1 = -1\n", story.ContinueMaximally());
+    // 
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    //             story.ChooseChoiceIndex(0);
+    // 
+    //             Assert.AreEqual("stuff\n0 = 0\n", story.ContinueMaximally());
+    // 
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    //             story.ChooseChoiceIndex(0);
+    // 
+    //             Assert.AreEqual("more stuff\n1 = 1\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestTurnsSinceNested() {
         run_in_both_modes(|suite| {
@@ -2788,6 +4480,30 @@ Done.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestTurnsSinceWithVariableTarget()
+    //         {
+    //             // Count all visits must be switched on for variable count targets
+    //             var story = CompileString(@"
+    // -> start
+    // 
+    // === start ===
+    //     {beats(-> start)}
+    //     {beats(-> start)}
+    //     *   [Choice]  -> next
+    // = next
+    //     {beats(-> start)}
+    //     -> END
+    // 
+    // === function beats(x) ===
+    //     ~ return TURNS_SINCE(x)
+    // ", countAllVisits: true);
+    // 
+    //             Assert.AreEqual("0\n0\n", story.ContinueMaximally());
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("1\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestTurnsSinceWithVariableTarget() {
         run_in_both_modes(|suite| {
@@ -2817,6 +4533,29 @@ Done.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestUnbalancedWeaveIndentation()
+    //         {
+    //             var story = CompileString(@"
+    // * * * First
+    // * * * * Very indented
+    // - - End
+    // -> END
+    // ");
+    //             story.ContinueMaximally();
+    // 
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    //             Assert.AreEqual("First", story.currentChoices[0].text);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("First\n", story.ContinueMaximally());
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    //             Assert.AreEqual("Very indented", story.currentChoices[0].text);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("Very indented\nEnd\n", story.ContinueMaximally());
+    //             Assert.AreEqual(0, story.currentChoices.Count);
+    //         }
     #[test]
     fn TestUnbalancedWeaveIndentation() {
         run_in_both_modes(|suite| {
@@ -2845,6 +4584,24 @@ Done.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestVariableDeclarationInConditional()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // VAR x = 0
+    // {true:
+    //     - ~ x = 5
+    // }
+    // {x}
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             // Extra newline is because there's a choice object sandwiched there,
+    //             // so it can't be absorbed :-/
+    //             Assert.AreEqual("5\n", story.Continue());
+    //         }
     #[test]
     fn TestVariableDeclarationInConditional() {
         run_in_both_modes(|suite| {
@@ -2865,6 +4622,58 @@ VAR x = 0
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestVariableGetSetAPI()
+    //         {
+    //             var story = CompileString(@"
+    // VAR x = 5
+    // 
+    // {x}
+    // 
+    // * [choice]
+    // -
+    // {x}
+    // 
+    // * [choice]
+    // -
+    // 
+    // {x}
+    // 
+    // * [choice]
+    // -
+    // 
+    // {x}
+    // 
+    // -> DONE
+    // ");
+    // 
+    //             // Initial state
+    //             Assert.AreEqual("5\n", story.ContinueMaximally());
+    //             Assert.AreEqual(5, story.variablesState["x"]);
+    // 
+    //             story.variablesState["x"] = 10;
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("10\n", story.ContinueMaximally());
+    //             Assert.AreEqual(10, story.variablesState["x"]);
+    // 
+    //             story.variablesState["x"] = 8.5f;
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("8"+ System.Globalization.NumberFormatInfo.CurrentInfo.NumberDecimalSeparator+"5\n", story.ContinueMaximally());
+    //             Assert.AreEqual(8.5f, story.variablesState["x"]);
+    // 
+    //             story.variablesState["x"] = "a string";
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("a string\n", story.ContinueMaximally());
+    //             Assert.AreEqual("a string", story.variablesState["x"]);
+    // 
+    //             Assert.AreEqual(null, story.variablesState["z"]);
+    // 
+    //             // Not allowed arbitrary types
+    //             Assert.Throws<Exception>(() =>
+    //             {
+    //                 story.variablesState["x"] = new System.Text.StringBuilder();
+    //             });
+    //         }
     #[test]
     fn TestVariableGetSetAPI() {
         run_in_both_modes(|suite| {
@@ -2923,6 +4732,49 @@ VAR x = 5
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestVariableObserver()
+    //         {
+    //             var story = CompileString(@"
+    // VAR testVar = 5
+    // VAR testVar2 = 10
+    // 
+    // Hello world!
+    // 
+    // ~ testVar = 15
+    // ~ testVar2 = 100
+    // 
+    // Hello world 2!
+    // 
+    // * choice
+    // 
+    //     ~ testVar = 25
+    //     ~ testVar2 = 200
+    // 
+    //     -> END
+    // ");
+    // 
+    //             int currentVarValue = 0;
+    //             int observerCallCount = 0;
+    // 
+    //             story.ObserveVariable("testVar", (string varName, object newValue) =>
+    //             {
+    //                 currentVarValue = (int)newValue;
+    //                 observerCallCount++;
+    //             });
+    // 
+    //             story.ContinueMaximally();
+    // 
+    //             Assert.AreEqual(15, currentVarValue);
+    //             Assert.AreEqual(1, observerCallCount);
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             story.Continue();
+    // 
+    //             Assert.AreEqual(25, currentVarValue);
+    //             Assert.AreEqual(2, observerCallCount);
+    //         }
     #[test]
     fn TestVariableObserver() {
         run_in_both_modes(|suite| {
@@ -2976,6 +4828,27 @@ Hello world 2!
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestVariablePointerRefFromKnot()
+    //         {
+    //             var story = CompileString(@"
+    // VAR val = 5
+    // 
+    // -> knot ->
+    // 
+    // -> END
+    // 
+    // == knot ==
+    // ~ inc(val)
+    // {val}
+    // ->->
+    // 
+    // == function inc(ref x) ==
+    //     ~ x = x + 1
+    // ");
+    // 
+    //             Assert.AreEqual("6\n", story.Continue());
+    //         }
     #[test]
     fn TestVariablePointerRefFromKnot() {
         run_in_both_modes(|suite| {
@@ -3005,6 +4878,26 @@ VAR val = 5
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestVariableSwapRecurse()
+    //         {
+    //             var storyStr = @"
+    // ~ f(1, 1)
+    // 
+    // == function f(x, y) ==
+    // { x == 1 and y == 1:
+    //   ~ x = 2
+    //   ~ f(y, x)
+    // - else:
+    //   {x} {y}
+    // }
+    // ~ return
+    // ";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("1 2\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestVariableSwapRecurse() {
         run_in_both_modes(|suite| {
@@ -3031,6 +4924,25 @@ VAR val = 5
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestVariableTunnel()
+    //         {
+    //             var story = CompileString(@"
+    // -> one_then_tother(-> tunnel)
+    // 
+    // === one_then_tother(-> x) ===
+    //     -> x -> end
+    // 
+    // === tunnel ===
+    //     STUFF
+    //     ->->
+    // 
+    // === end ===
+    //     -> END
+    // ");
+    // 
+    //             Assert.AreEqual("STUFF\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestVariableTunnel() {
         run_in_both_modes(|suite| {
@@ -3058,6 +4970,19 @@ VAR val = 5
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestEmptyListOrigin ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // LIST list = a, b
+    // {LIST_ALL(list)}
+    // 
+    // ";
+    //             var story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual ("a, b\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestEmptyListOrigin() {
         run_in_both_modes(|suite| {
@@ -3076,6 +5001,20 @@ LIST list = a, b
         });
     }
 
+    // C#:                 [Test ()]
+    //         public void TestContainsEmptyListAlwaysFalse ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // LIST list = (a), b
+    // {list ? ()}
+    // {() ? ()}
+    // {() ? list}
+    // ";
+    //             var story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual ("false\nfalse\nfalse\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestContainsEmptyListAlwaysFalse() {
         run_in_both_modes(|suite| {
@@ -3095,6 +5034,19 @@ LIST list = (a), b
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestEmptyListOriginAfterAssignment ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // LIST x = a, b, c
+    // ~ x = ()
+    // {LIST_ALL(x)}
+    // ";
+    //             var story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual ("a, b, c\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestEmptyListOriginAfterAssignment() {
         run_in_both_modes(|suite| {
@@ -3113,6 +5065,38 @@ LIST x = a, b, c
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestListSaveLoad ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // LIST l1 = (a), b, (c)
+    // LIST l2 = (x), y, z
+    // 
+    // VAR t = ()
+    // ~ t = l1 + l2
+    // {t}
+    // 
+    // == elsewhere ==
+    // ~ t += z
+    // {t}
+    // -> END
+    // ";
+    //             var story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual ("a, x, c\n", story.ContinueMaximally ());
+    // 
+    //             var savedState = story.state.ToJson ();
+    // 
+    //             // Compile new version of the story
+    //             story = CompileString (storyStr);
+    // 
+    //             // Load saved game
+    //             story.state.LoadJson (savedState);
+    // 
+    //             story.ChoosePathString ("elsewhere");
+    //             Assert.AreEqual ("a, x, c, z\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestListSaveLoad() {
         run_in_both_modes(|suite| {
@@ -3162,6 +5146,12 @@ VAR t = ()
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestEmptyThreadError ()
+    //         {
+    //             CompileStringWithoutRuntime ("<-", testingErrors:true);
+    //             Assert.IsTrue (HadError ("Expected target for new thread"));
+    //         }
     #[test]
     fn TestEmptyThreadError() {
         run_in_both_modes(|suite| {
@@ -3172,6 +5162,19 @@ VAR t = ()
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestAuthorWarningsInsideContentListBug ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // { once:
+    // - a
+    // TODO: b
+    // }
+    // ";
+    //             CompileString (storyStr, testingErrors:true);
+    //             Assert.IsFalse (HadError ());
+    //         }
     #[test]
     fn TestAuthorWarningsInsideContentListBug() {
         run_in_both_modes(|suite| {
@@ -3189,6 +5192,18 @@ TODO: b
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestNestedChoiceError()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // { true:
+    //     * choice
+    // }
+    // ";
+    //             CompileString(storyStr, testingErrors:true);
+    //             Assert.IsTrue(HadError("need to explicitly divert"));
+    //         }
     #[test]
     fn TestNestedChoiceError() {
         run_in_both_modes(|suite| {
@@ -3207,6 +5222,21 @@ TODO: b
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestStitchNamingCollision ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // VAR stitch = 0
+    // 
+    // == knot ==
+    // = stitch
+    // ->DONE
+    // ";
+    //             CompileString (storyStr, countAllVisits: false, testingErrors: true);
+    // 
+    //             Assert.IsTrue (HadError ("already been used for a var"));
+    //         }
     #[test]
     fn TestStitchNamingCollision() {
         run_in_both_modes(|suite| {
@@ -3227,6 +5257,21 @@ VAR stitch = 0
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestWeavePointNamingCollision ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // -(opts)
+    // opts1
+    // -(opts)
+    // opts1
+    // -> END
+    // ";
+    //             CompileString (storyStr, countAllVisits: false, testingErrors:true);
+    // 
+    //             Assert.IsTrue(HadError ("with the same label"));
+    //         }
     #[test]
     fn TestWeavePointNamingCollision() {
         run_in_both_modes(|suite| {
@@ -3247,6 +5292,23 @@ opts1
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestVariableNamingCollisionWithFlow ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // LIST someList = A, B
+    // 
+    // ~temp heldItems = (A)
+    // {LIST_COUNT (heldItems)}
+    // 
+    // === function heldItems ()
+    // ~ return (A)
+    //         ";
+    //             CompileString (storyStr, countAllVisits: false, testingErrors: true);
+    // 
+    //             Assert.IsTrue (HadError ("name has already been used for a function"));
+    //         }
     #[test]
     fn TestVariableNamingCollisionWithFlow() {
         run_in_both_modes(|suite| {
@@ -3269,6 +5331,17 @@ LIST someList = A, B
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestVariableNamingCollisionWithArg ()
+    //         {
+    //             var storyStr =
+    //                 @"=== function knot (a)
+    //                     ~temp a = 1";
+    // 
+    //             CompileString (storyStr, countAllVisits: false, testingErrors: true);
+    // 
+    //             Assert.IsTrue (HadError ("has already been used"));
+    //         }
     #[test]
     fn TestVariableNamingCollisionWithArg() {
         run_in_both_modes(|suite| {
@@ -3284,6 +5357,23 @@ LIST someList = A, B
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestVariousDefaultChoices ()
+    //         {
+    //             var storyStr =
+    // @"
+    // * -> hello
+    // Unreachable
+    // - (hello) 1
+    // * ->
+    //    - - 2
+    // - 3
+    // -> END
+    // ";
+    // 
+    //             var story = CompileString (storyStr);
+    //             Assert.AreEqual ("1\n2\n3\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestVariousDefaultChoices() {
         run_in_both_modes(|suite| {
@@ -3306,6 +5396,17 @@ Unreachable
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestVariousBlankChoiceWarning ()
+    //         {
+    //         	var storyStr =
+    //         @"
+    // * [] blank
+    //         ";
+    // 
+    //         	CompileString (storyStr, testingErrors:true);
+    //             Assert.IsTrue (HadWarning ("Blank choice"));
+    //         }
     #[test]
     fn TestVariousBlankChoiceWarning() {
         run_in_both_modes(|suite| {
@@ -3322,6 +5423,24 @@ Unreachable
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestTunnelOnwardsWithParamDefaultChoice ()
+    //         {
+    //             var storyStr =
+    // @"
+    // -> tunnel ->
+    // 
+    // == tunnel ==
+    // * ->-> elsewhere (8)
+    // 
+    // == elsewhere (x) ==
+    // {x}
+    // -> END
+    // ";
+    // 
+    //             var story = CompileString (storyStr);
+    //             Assert.AreEqual ("8\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestTunnelOnwardsWithParamDefaultChoice() {
         run_in_both_modes(|suite| {
@@ -3345,6 +5464,28 @@ Unreachable
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestTunnelOnwardsToVariableDivertTarget ()
+    //         {
+    //             var storyStr =
+    // @"
+    // -> outer ->
+    // 
+    // == outer
+    // This is outer
+    // -> cut_to(-> the_esc)
+    // 
+    // === cut_to(-> escape)
+    //     ->-> escape
+    // 
+    // == the_esc
+    // This is the_esc
+    // -> END
+    // ";
+    // 
+    //             var story = CompileString (storyStr);
+    //             Assert.AreEqual ("This is outer\nThis is the_esc\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestTunnelOnwardsToVariableDivertTarget() {
         run_in_both_modes(|suite| {
@@ -3372,6 +5513,31 @@ This is the_esc
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestReadCountVariableTarget ()
+    //         {
+    //             var storyStr =
+    // @"
+    // VAR x = ->knot
+    // 
+    // Count start: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
+    // 
+    // -> x (1) ->
+    // -> x (2) ->
+    // -> x (3) ->
+    // 
+    // Count end: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
+    // -> END
+    // 
+    // 
+    // == knot (a) ==
+    // {a}
+    // ->->
+    // ";
+    // 
+    //             var story = CompileString (storyStr, countAllVisits:true);
+    //             Assert.AreEqual ("Count start: 0 0 0\n1\n2\n3\nCount end: 3 3 3\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestReadCountVariableTarget() {
         run_in_both_modes(|suite| {
@@ -3405,6 +5571,24 @@ Count end: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestDivertTargetsWithParameters ()
+    //         {
+    //             var storyStr =
+    // @"
+    // VAR x = ->place
+    // 
+    // ->x (5)
+    // 
+    // == place (a) ==
+    // {a}
+    // -> DONE
+    // ";
+    // 
+    //             var story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual ("5\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestDivertTargetsWithParameters() {
         run_in_both_modes(|suite| {
@@ -3431,6 +5615,40 @@ VAR x = ->place
     // Missing tests below this line - ported from ink-c-sharp/tests/Tests.cs
     // ---------------------------------------------------------------------------
 
+    // C#:         [Test()]
+    //         public void TestChoiceThreadForking()
+    //         {
+    //             var storyStr =
+    //         @"
+    // -> generate_choice(1) ->
+    // 
+    // == generate_choice(x) ==
+    // {true:
+    //     + A choice
+    //         Vaue of local var is: {x}
+    //         -> END
+    // }
+    // ->->
+    // ";
+    // 
+    //             // Generate the choice with the forked thread
+    //             var story = CompileString(storyStr);
+    //             story.Continue();
+    // 
+    //             // Save/reload
+    //             var savedState = story.state.ToJson();
+    //             story = CompileString(storyStr);
+    //             story.state.LoadJson(savedState);
+    // 
+    //             // Load the choice, it should have its own thread still
+    //             // that still has the captured temp x
+    //             story.ChooseChoiceIndex(0);
+    //             story.ContinueMaximally();
+    // 
+    //             // Don't want this warning:
+    //             // RUNTIME WARNING: '' line 7: Variable not found: 'x'
+    //             Assert.IsFalse(story.hasWarning);
+    //         }
     #[test]
     fn TestChoiceThreadForking() {
         run_in_both_modes(|suite| {
@@ -3477,6 +5695,30 @@ VAR x = ->place
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestCleanCallstackResetOnPathChoice()
+    //         {
+    //             var storyStr =
+    //         @"
+    // {RunAThing()}
+    // 
+    // == function RunAThing ==
+    // The first line.
+    // The second line.
+    // 
+    // == SomewhereElse ==
+    // {""somewhere else""}
+    // ->END
+    // ";
+    // 
+    //             var story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("The first line.\n", story.Continue());
+    // 
+    //             story.ChoosePathString("SomewhereElse");
+    // 
+    //             Assert.AreEqual("somewhere else\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestCleanCallstackResetOnPathChoice() {
         run_in_both_modes(|suite| {
@@ -3503,6 +5745,36 @@ The second line.
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestConstRedefinition ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // CONST pi = 3.1415
+    // CONST pi = 3.1415
+    // 
+    // CONST x = ""Hello""
+    // CONST x = ""World""
+    // 
+    // CONST y = 3
+    // CONST y = 3.0
+    // 
+    // CONST z = -> somewhere
+    // CONST z = -> elsewhere
+    // 
+    // == somewhere ==
+    // -> DONE
+    // 
+    // == elsewhere ==
+    // -> DONE
+    // ";
+    //             CompileStringWithoutRuntime (storyStr, testingErrors:true);
+    // 
+    //             Assert.IsFalse (HadError ("'pi' has been redefined"));
+    //             Assert.IsTrue (HadError ("'x' has been redefined"));
+    //             Assert.IsTrue (HadError ("'y' has been redefined"));
+    //             Assert.IsTrue (HadError ("'z' has been redefined"));
+    //         }
     #[test]
     fn TestConstRedefinition() {
         let mut suite = CSharpHarness::new(TestMode::Normal);
@@ -3534,6 +5806,45 @@ CONST z = -> elsewhere
         assert!(suite.had_error(Some("'z' has been redefined")));
     }
 
+    // C#:         [Test ()]
+    //         public void TestEvaluatingFunctionVariableStateBug ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // Start
+    // -> tunnel ->
+    // End
+    // -> END
+    // 
+    // == tunnel ==
+    // In tunnel.
+    // ->->
+    // 
+    // === function function_to_evaluate() ===
+    //     { zero_equals_(1):
+    //         ~ return ""WRONG""
+    //     - else:
+    //         ~ return ""RIGHT""
+    //     }
+    // 
+    // === function zero_equals_(k) ===
+    //     ~ do_nothing(0)
+    //     ~ return  (0 == k)
+    // 
+    // === function do_nothing(k)
+    //     ~ return 0
+    // ";
+    // 
+    //             Story story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual ("Start\n", story.Continue ());
+    //             Assert.AreEqual ("In tunnel.\n", story.Continue ());
+    // 
+    //             var funcResult = story.EvaluateFunction ("function_to_evaluate");
+    //             Assert.AreEqual ("RIGHT", funcResult);
+    // 
+    //             Assert.AreEqual ("End\n", story.Continue ());
+    //         }
     #[test]
     fn TestEvaluatingFunctionVariableStateBug() {
         run_in_both_modes(|suite| {
@@ -3576,6 +5887,30 @@ In tunnel.
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestEvaluatingInkFunctionsFromGame ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // Top level content
+    // * choice
+    // 
+    // == somewhere ==
+    // = here
+    // -> DONE
+    // 
+    // == function test ==
+    // ~ return -> somewhere.here
+    // ";
+    // 
+    //             Story story = CompileString (storyStr);
+    //             story.Continue ();
+    // 
+    //             var returnedDivertTarget = story.EvaluateFunction ("test");
+    // 
+    //             // Divert target should get returned as a string
+    //             Assert.AreEqual ("somewhere.here", returnedDivertTarget);
+    //         }
     #[test]
     fn TestEvaluatingInkFunctionsFromGame() {
         run_in_both_modes(|suite| {
@@ -3608,6 +5943,49 @@ Top level content
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestEvaluatingInkFunctionsFromGame2 ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // One
+    // Two
+    // Three
+    // 
+    // == function func1 ==
+    // This is a function
+    // ~ return 5
+    // 
+    // == function func2 ==
+    // This is a function without a return value
+    // ~ return
+    // 
+    // == function add(x,y) ==
+    // x = {x}, y = {y}
+    // ~ return x + y
+    // ";
+    // 
+    //             Story story = CompileString (storyStr);
+    // 
+    //             string textOutput;
+    //             var funcResult = story.EvaluateFunction ("func1", out textOutput);
+    //             Assert.AreEqual ("This is a function\n", textOutput);
+    //             Assert.AreEqual (5, funcResult);
+    // 
+    //             Assert.AreEqual ("One\n", story.Continue());
+    // 
+    //             funcResult = story.EvaluateFunction ("func2", out textOutput);
+    //             Assert.AreEqual ("This is a function without a return value\n", textOutput);
+    //             Assert.AreEqual (null, funcResult);
+    // 
+    //             Assert.AreEqual ("Two\n", story.Continue ());
+    // 
+    //             funcResult = story.EvaluateFunction ("add", out textOutput, 1, 2);
+    //             Assert.AreEqual ("x = 1, y = 2\n", textOutput);
+    //             Assert.AreEqual (3, funcResult);
+    // 
+    //             Assert.AreEqual ("Three\n", story.Continue ());
+    //         }
     #[test]
     fn TestEvaluatingInkFunctionsFromGame2() {
         run_in_both_modes(|suite| {
@@ -3656,6 +6034,39 @@ x = {x}, y = {y}
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestEvaluationStackLeaks ()
+    //         {
+    //         	var storyStr =
+    // @"
+    // {false:
+    // 
+    // - else:
+    //     else
+    // }
+    // 
+    // {6:
+    // - 5: five
+    // - else: else
+    // }
+    // 
+    // -> onceTest ->
+    // -> onceTest ->
+    // 
+    // == onceTest ==
+    // {once:
+    // - hi
+    // }
+    // ->->
+    // ";
+    // 
+    //         	var story = CompileString (storyStr);
+    // 
+    //         	var result = story.ContinueMaximally ();
+    // 
+    //         	Assert.AreEqual ("else\nelse\nhi\n", result);
+    //             Assert.IsTrue (story.state.evaluationStack.Count == 0);
+    //         }
     #[test]
     fn TestEvaluationStackLeaks() {
         run_in_both_modes(|suite| {
@@ -3691,6 +6102,23 @@ x = {x}, y = {y}
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestFallbackChoiceOnThread()
+    //         {
+    //             var storyStr =
+    //         @"
+    // <- knot
+    // 
+    // == knot
+    //    ~ temp x = 1
+    //    *   ->
+    //        Should be 1 not 0: {x}.
+    //        -> DONE
+    // ";
+    // 
+    //             var story = CompileString(storyStr);
+    //             Assert.AreEqual("Should be 1 not 0: 1.\n", story.Continue());
+    //         }
     #[test]
     fn TestFallbackChoiceOnThread() {
         run_in_both_modes(|suite| {
@@ -3713,6 +6141,23 @@ x = {x}, y = {y}
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestFloorCeilingAndCasts()
+    //         {
+    //             var storyStr =
+    //         @"
+    // {FLOOR(1.2)}
+    // {INT(1.2)}
+    // {CEILING(1.2)}
+    // {CEILING(1.2) / 3}
+    // {INT(CEILING(1.2)) / 3}
+    // {FLOOR(1)}
+    // ";
+    // 
+    //             var story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("1\n1\n2\n0.6666667\n0\n1\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestFloorCeilingAndCasts() {
         run_in_both_modes(|suite| {
@@ -3734,6 +6179,44 @@ x = {x}, y = {y}
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestGameInkBackAndForth ()
+    //         {
+    //         	var storyStr =
+    //             @"
+    // EXTERNAL gameInc(x)
+    // 
+    // == function topExternal(x)
+    // In top external
+    // ~ return gameInc(x)
+    // 
+    // == function inkInc(x)
+    // ~ return x + 1
+    // 
+    //             ";
+    // 
+    //         	var story = CompileString (storyStr);
+    // 
+    //             // Crazy game/ink callstack:
+    //             // - Game calls "topExternal(5)" (Game -> ink)
+    //             // - topExternal calls gameInc(5) (ink -> Game)
+    //             // - gameInk increments to 6
+    //             // - gameInk calls inkInc(6) (Game -> ink)
+    //             // - inkInc just increments to 7 (ink)
+    //             // And the whole thing unwinds again back to game.
+    // 
+    //             story.BindExternalFunction("gameInc", (int x) => {
+    //                 x++;
+    //                 x = (int) story.EvaluateFunction ("inkInc", x);
+    //                 return x;
+    //             });
+    // 
+    //             string strResult;
+    //             var finalResult = (int) story.EvaluateFunction ("topExternal", out strResult, 5);
+    // 
+    //             Assert.AreEqual (7, finalResult);
+    //             Assert.AreEqual ("In top external\n", strResult);
+    //         }
     #[test]
     fn TestGameInkBackAndForth() {
         run_in_both_modes(|suite| {
@@ -3777,6 +6260,21 @@ In top external
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestGatherChoiceSameLine()
+    //         {
+    //             var storyStr = "- * hello\n- * world";
+    // 
+    //             Story story = CompileString(storyStr);
+    //             story.Continue();
+    // 
+    //             Assert.AreEqual("hello", story.currentChoices[0].text);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             story.Continue();
+    // 
+    //             Assert.AreEqual("world", story.currentChoices[0].text);
+    //         }
     #[test]
     fn TestGatherChoiceSameLine() {
         run_in_both_modes(|suite| {
@@ -3791,6 +6289,18 @@ In top external
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestGatherReadCountWithInitialSequence()
+    //         {
+    //             var story = CompileString(@"
+    // - (opts)
+    // {test:seen test}
+    // - (test)
+    // { -> opts |}
+    // ");
+    // 
+    //             Assert.AreEqual("seen test\n", story.Continue());
+    //         }
     #[test]
     fn TestGatherReadCountWithInitialSequence() {
         run_in_both_modes(|suite| {
@@ -3810,6 +6320,24 @@ In top external
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestHasReadOnChoice()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // * { not test } visible choice
+    // * { test } visible choice
+    // 
+    // == test ==
+    // -> END
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    //             story.ContinueMaximally();
+    // 
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    //             Assert.AreEqual("visible choice", story.currentChoices[0].text);
+    //         }
     #[test]
     fn TestHasReadOnChoice() {
         run_in_both_modes(|suite| {
@@ -3832,6 +6360,21 @@ In top external
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestIdentifersCanStartWithNumbers()
+    //         {
+    //             var story = CompileString(@"
+    // -> 2tests
+    // == 2tests ==
+    // ~ temp 512x2 = 512 * 2
+    // ~ temp 512x2p2 = 512x2 + 2
+    // 512x2 = {512x2}
+    // 512x2p2 = {512x2p2}
+    // -> DONE
+    // ");
+    // 
+    //             Assert.AreEqual("512x2 = 1024\n512x2p2 = 1026\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestIdentifersCanStartWithNumbers() {
         run_in_both_modes(|suite| {
@@ -3854,6 +6397,21 @@ In top external
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestImplicitInlineGlue()
+    //         {
+    //             var story = CompileString(@"
+    // I have {five()} eggs.
+    // 
+    // == function five ==
+    // {false:
+    //     Don't print this
+    // }
+    // five
+    // ");
+    // 
+    //             Assert.AreEqual("I have five eggs.\n", story.Continue());
+    //         }
     #[test]
     fn TestImplicitInlineGlue() {
         run_in_both_modes(|suite| {
@@ -3876,6 +6434,21 @@ five
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestImplicitInlineGlueB ()
+    //         {
+    //             var story = CompileString (@"
+    // A {f():B}
+    // X
+    // 
+    // === function f() ===
+    // {true:
+    //     ~ return false
+    // }
+    // ");
+    // 
+    //             Assert.AreEqual ("A\nX\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestImplicitInlineGlueB() {
         run_in_both_modes(|suite| {
@@ -3898,6 +6471,22 @@ X
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestImplicitInlineGlueC ()
+    //         {
+    //             var story = CompileString (@"
+    // A
+    // {f():X}
+    // C
+    // 
+    // === function f()
+    // { true:
+    //     ~ return false
+    // }
+    // ");
+    // 
+    //             Assert.AreEqual ("A\nC\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestImplicitInlineGlueC() {
         run_in_both_modes(|suite| {
@@ -3921,6 +6510,20 @@ C
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestInclude()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // INCLUDE test_included_file.ink
+    //   INCLUDE test_included_file2.ink
+    // 
+    // This is the main file.
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    //             Assert.AreEqual("This is include 1.\nThis is include 2.\nThis is the main file.\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestInclude() {
         run_in_both_modes(|suite| {
@@ -3943,6 +6546,20 @@ This is the main file.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestIncrement()
+    //         {
+    //             Story story = CompileString(@"
+    // VAR x = 5
+    // ~ x++
+    // {x}
+    // 
+    // ~ x--
+    // {x}
+    // ");
+    // 
+    //             Assert.AreEqual("6\n5\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestIncrement() {
         run_in_both_modes(|suite| {
@@ -3964,6 +6581,18 @@ VAR x = 5
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestKnotDotGather()
+    //         {
+    //             var story = CompileString(@"
+    // -> knot
+    // === knot
+    // -> knot.gather
+    // - (gather) g
+    // -> DONE");
+    // 
+    //             Assert.AreEqual("g\n", story.Continue());
+    //         }
     #[test]
     fn TestKnotDotGather() {
         run_in_both_modes(|suite| {
@@ -3983,6 +6612,74 @@ VAR x = 5
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestKnotStitchGatherCounts()
+    //         {
+    //             var storyStr =
+    //         @"
+    // VAR knotCount = 0
+    // VAR stitchCount = 0
+    // 
+    // -> gather_count_test ->
+    // 
+    // ~ knotCount = 0
+    // -> knot_count_test ->
+    // 
+    // ~ knotCount = 0
+    // -> knot_count_test ->
+    // 
+    // -> stitch_count_test ->
+    // 
+    // == gather_count_test ==
+    // VAR gatherCount = 0
+    // - (loop)
+    // ~ gatherCount++
+    // {gatherCount} {loop}
+    // {gatherCount<3:->loop}
+    // ->->
+    // 
+    // == knot_count_test ==
+    // ~ knotCount++
+    // {knotCount} {knot_count_test}
+    // {knotCount<3:->knot_count_test}
+    // ->->
+    // 
+    // 
+    // == stitch_count_test ==
+    // ~ stitchCount = 0
+    // -> stitch ->
+    // ~ stitchCount = 0
+    // -> stitch ->
+    // ->->
+    // 
+    // = stitch
+    // ~ stitchCount++
+    // {stitchCount} {stitch}
+    // {stitchCount<3:->stitch}
+    // ->->
+    // ";
+    // 
+    //             // Ensure it just compiles
+    //             var story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual(
+    // @"1 1
+    // 2 2
+    // 3 3
+    // 1 1
+    // 2 1
+    // 3 1
+    // 1 2
+    // 2 2
+    // 3 2
+    // 1 1
+    // 2 1
+    // 3 1
+    // 1 2
+    // 2 2
+    // 3 2
+    // ".Replace(Environment.NewLine, "\n"), story.ContinueMaximally());
+    //         }
     #[test]
     fn TestKnotStitchGatherCounts() {
         run_in_both_modes(|suite| {
@@ -4041,6 +6738,19 @@ VAR gatherCount = 0
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestKnotTerminationSkipsGlobalObjects()
+    //         {
+    //             CompileStringWithoutRuntime(@"
+    // === stuff ===
+    // -> END
+    // 
+    // VAR X = 1
+    // CONST Y = 2
+    // ", testingErrors: true);
+    // 
+    //             Assert.IsTrue(_warningMessages.Count == 0);
+    //         }
     #[test]
     fn TestKnotTerminationSkipsGlobalObjects() {
         let mut suite = CSharpHarness::new(TestMode::Normal);
@@ -4057,6 +6767,38 @@ CONST Y = 2
         assert!(suite.warning_messages().is_empty());
     }
 
+    // C#:         [Test()]
+    //         public void TestKnotThreadInteraction()
+    //         {
+    //             Story story = CompileString(@"
+    // -> knot
+    // === knot
+    //     <- threadB
+    //     -> tunnel ->
+    //     THE END
+    //     -> END
+    // 
+    // === tunnel
+    //     - blah blah
+    //     * wigwag
+    //     - ->->
+    // 
+    // === threadB
+    //     *   option
+    //     -   something
+    //         -> DONE
+    // ");
+    // 
+    //             Assert.AreEqual("blah blah\n", story.ContinueMaximally());
+    // 
+    //             Assert.AreEqual(2, story.currentChoices.Count);
+    //             Assert.IsTrue(story.currentChoices[0].text.Contains("option"));
+    //             Assert.IsTrue(story.currentChoices[1].text.Contains("wigwag"));
+    // 
+    //             story.ChooseChoiceIndex(1);
+    //             Assert.AreEqual("wigwag\n", story.Continue());
+    //             Assert.AreEqual("THE END\n", story.Continue());
+    //         }
     #[test]
     fn TestKnotThreadInteraction() {
         run_in_both_modes(|suite| {
@@ -4094,6 +6836,35 @@ CONST Y = 2
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestKnotThreadInteraction2()
+    //         {
+    //             Story story = CompileString(@"
+    // -> knot
+    // === knot
+    //     <- threadA
+    //     When should this get printed?
+    //     -> DONE
+    // 
+    // === threadA
+    //     -> tunnel ->
+    //     Finishing thread.
+    //     -> DONE
+    // 
+    // === tunnel
+    //     -   I’m in a tunnel
+    //     *   I’m an option
+    //     -   ->->
+    // 
+    // ");
+    // 
+    //             Assert.AreEqual("I’m in a tunnel\nWhen should this get printed?\n", story.ContinueMaximally());
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    //             Assert.AreEqual(story.currentChoices[0].text, "I’m an option");
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("I’m an option\nFinishing thread.\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestKnotThreadInteraction2() {
         run_in_both_modes(|suite| {
@@ -4135,6 +6906,19 @@ CONST Y = 2
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestLeadingNewlineMultilineSequence()
+    //         {
+    //             var story = CompileString(@"
+    // {stopping:
+    // 
+    // - a line after an empty line
+    // - blah
+    // }
+    // ");
+    // 
+    //             Assert.AreEqual("a line after an empty line\n", story.Continue());
+    //         }
     #[test]
     fn TestLeadingNewlineMultilineSequence() {
         run_in_both_modes(|suite| {
@@ -4155,6 +6939,25 @@ CONST Y = 2
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestLeftRightGlueMatching ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // A line.
+    // { f():
+    //     Another line.
+    // }
+    // 
+    // == function f ==
+    // {false:nothing}
+    // ~ return true
+    // 
+    // ";
+    //             var story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual ("A line.\nAnother line.\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestLeftRightGlueMatching() {
         run_in_both_modes(|suite| {
@@ -4178,6 +6981,23 @@ A line.
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestListBasicOperations ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // LIST list = a, (b), c, (d), e
+    // {list}
+    // {(a, c) + (b, e)}
+    // {(a, b, c) ^ (c, b, e)}
+    // {list ? (b, d, e)}
+    // {list ? (d, b)}
+    // {list !? (c)}
+    // ";
+    //             var story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual ("b, d\na, b, c, e\nb, c\nfalse\ntrue\ntrue\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestListBasicOperations() {
         run_in_both_modes(|suite| {
@@ -4203,6 +7023,19 @@ LIST list = a, (b), c, (d), e
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestListMixedItems ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // LIST list = (a), b, (c), d, e
+    // LIST list2 = x, (y), z
+    // {list + list2}
+    // ";
+    //             var story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual ("a, y, c\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestListMixedItems() {
         run_in_both_modes(|suite| {
@@ -4221,6 +7054,31 @@ LIST list2 = x, (y), z
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestListRandom ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // LIST l = A, (B), (C), (D), E
+    // {LIST_RANDOM(l)}
+    // {LIST_RANDOM (l)}
+    // {LIST_RANDOM (l)}
+    // {LIST_RANDOM (l)}
+    // {LIST_RANDOM (l)}
+    // {LIST_RANDOM (l)}
+    // {LIST_RANDOM (l)}
+    // {LIST_RANDOM (l)}
+    // {LIST_RANDOM (l)}
+    // {LIST_RANDOM (l)}
+    //                     ";
+    // 
+    //             var story = CompileString (storyStr);
+    // 
+    //             while (story.canContinue) {
+    //                 var result = story.Continue ();
+    //                 Assert.IsTrue (result == "B\n" || result == "C\n" || result == "D\n");
+    //             }
+    //         }
     #[test]
     fn TestListRandom() {
         run_in_both_modes(|suite| {
@@ -4259,6 +7117,34 @@ LIST l = A, (B), (C), (D), E
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestListRange()
+    //         {
+    //             var storyStr =
+    //         @"
+    // LIST Food = Pizza, Pasta, Curry, Paella
+    // LIST Currency = Pound, Euro, Dollar
+    // LIST Numbers = One, Two, Three, Four, Five, Six, Seven
+    // 
+    // VAR all = ()
+    // ~ all = LIST_ALL(Food) + LIST_ALL(Currency)
+    // {all}
+    // {LIST_RANGE(all, 2, 3)}
+    // {LIST_RANGE(LIST_ALL(Numbers), Two, Six)}
+    // {LIST_RANGE(LIST_ALL(Numbers), Currency, Three)}
+    // {LIST_RANGE((Pizza, Pasta), -1, 100)} // allow out of range
+    // ";
+    // 
+    //             var story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual(
+    // @"Pound, Pizza, Euro, Pasta, Dollar, Curry, Paella
+    // Euro, Pasta, Dollar, Curry
+    // Two, Three, Four, Five, Six
+    // One, Two, Three
+    // Pizza, Pasta
+    // ".Replace(Environment.NewLine, "\n"), story.ContinueMaximally());
+    //         }
     #[test]
     fn TestListRange() {
         run_in_both_modes(|suite| {
@@ -4288,6 +7174,20 @@ VAR all = ()
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestLiteralUnary()
+    //         {
+    //             var story = CompileString(@"
+    // VAR negativeLiteral = -1
+    // VAR negativeLiteral2 = not not false
+    // VAR negativeLiteral3 = !(0)
+    // 
+    // {negativeLiteral}
+    // {negativeLiteral2}
+    // {negativeLiteral3}
+    // ");
+    //             Assert.AreEqual("-1\nfalse\ntrue\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestLiteralUnary() {
         run_in_both_modes(|suite| {
@@ -4310,6 +7210,24 @@ VAR negativeLiteral3 = !(0)
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestLogicInChoices()
+    //         {
+    //             var story = CompileString(@"
+    // * 'Hello {name()}[, your name is {name()}.'],' I said, knowing full well that his name was {name()}.
+    // -> DONE
+    // 
+    // == function name ==
+    // Joe
+    // ");
+    // 
+    //             story.ContinueMaximally();
+    // 
+    //             Assert.AreEqual("'Hello Joe, your name is Joe.'", story.currentChoices[0].text);
+    //             story.ChooseChoiceIndex(0);
+    // 
+    //             Assert.AreEqual("'Hello Joe,' I said, knowing full well that his name was Joe.\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestLogicInChoices() {
         run_in_both_modes(|suite| {
@@ -4339,6 +7257,28 @@ Joe
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestLogicLinesWithNewlines ()
+    //         {
+    //             // Both "~" lines should be followed by newlines
+    //             // since func() has a text output side effect.
+    //             var storyStr =
+    //         @"
+    // ~ func ()
+    // text 2
+    // 
+    // ~temp tempVar = func ()
+    // text 2
+    // 
+    // == function func ()
+    // 	text1
+    // 	~ return true
+    // ";
+    // 
+    //             var story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual("text1\ntext 2\ntext1\ntext 2\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestLogicLinesWithNewlines() {
         run_in_both_modes(|suite| {
@@ -4363,6 +7303,41 @@ text 2
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestLooseEnds ()
+    //         {
+    //         	CompileStringWithoutRuntime (
+    // @"No loose ends in main content.
+    // 
+    // == knot1 ==
+    // * loose end choice
+    // * loose end
+    // 	on second line of choice
+    // 
+    // == knot2 ==
+    // * A
+    // * B
+    // TODO: Fix loose ends but don't warn
+    // 
+    // == knot3 ==
+    // Loose end when there's no weave
+    // 
+    // == knot4 ==
+    // {true:
+    //     {false:
+    //         Ignore loose end when there's a divert
+    //         in a conditional.
+    //         -> knot4
+    // 	}
+    // }
+    //         ", testingErrors: true);
+    // 
+    //             Assert.IsTrue (_warningMessages.Count == 3);
+    //             Assert.IsTrue (HadWarning ("line 4: Apparent loose end"));
+    //             Assert.IsTrue (HadWarning ("line 6: Apparent loose end"));
+    //             Assert.IsTrue (HadWarning ("line 14: Apparent loose end"));
+    //             Assert.IsTrue (_authorMessages.Count == 1);
+    //         }
     #[test]
     fn TestLooseEnds() {
         let mut suite = CSharpHarness::new(TestMode::Normal);
@@ -4399,6 +7374,29 @@ Loose end when there's no weave
         assert_eq!(1, suite.author_messages().len());
     }
 
+    // C#:         [Test ()]
+    //         public void TestMoreListOperations ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // LIST list = l, m = 5, n
+    // {LIST_VALUE(l)}
+    // 
+    // {list(1)}
+    // 
+    // ~ temp t = list()
+    // ~ t += n
+    // {t}
+    // ~ t = LIST_ALL(t)
+    // ~ t -= n
+    // {t}
+    // ~ t = LIST_INVERT(t)
+    // {t}
+    // ";
+    //             var story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual ("1\nl\nn\nl, m\nn\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestMoreListOperations() {
         run_in_both_modes(|suite| {
@@ -4427,6 +7425,36 @@ LIST list = l, m = 5, n
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestMultiThread()
+    //         {
+    //             Story story = CompileString(@"
+    // -> start
+    // == start ==
+    // -> tunnel ->
+    // The end
+    // -> END
+    // 
+    // == tunnel ==
+    // <- place1
+    // <- place2
+    // -> DONE
+    // 
+    // == place1 ==
+    // This is place 1.
+    // * choice in place 1
+    // - ->->
+    // 
+    // == place2 ==
+    // This is place 2.
+    // * choice in place 2
+    // - ->->
+    // ");
+    //             Assert.AreEqual("This is place 1.\nThis is place 2.\n", story.ContinueMaximally());
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("choice in place 1\nThe end\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestMultiThread() {
         run_in_both_modes(|suite| {
@@ -4464,6 +7492,26 @@ This is place 2.
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestMultilineLogicWithGlue ()
+    //         {
+    //         	var storyStr =
+    // @"
+    // {true:
+    //     a
+    // } <> b
+    // 
+    // 
+    // {true:
+    //     a
+    // } <> { true:
+    //     b
+    // }
+    // ";
+    //         	var story = CompileString (storyStr);
+    // 
+    //         	Assert.AreEqual ("a b\na b\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestMultilineLogicWithGlue() {
         run_in_both_modes(|suite| {
@@ -4489,6 +7537,17 @@ This is place 2.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestMultipleConstantReferences()
+    //         {
+    //             var story = CompileString(@"
+    // CONST CONST_STR = ""ConstantString""
+    // VAR varStr = CONST_STR
+    // {varStr == CONST_STR:success}
+    // ");
+    // 
+    //             Assert.AreEqual("success\n", story.Continue());
+    //         }
     #[test]
     fn TestMultipleConstantReferences() {
         run_in_both_modes(|suite| {
@@ -4507,6 +7566,21 @@ VAR varStr = CONST_STR
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestNestedInclude()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // INCLUDE test_included_file3.ink
+    // 
+    // This is the main file
+    // 
+    // -> knot_in_2
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    //             Assert.AreEqual("The value of a variable in test file 2 is 5.\nThis is the main file\nThe value when accessed from knot_in_2 is 5.\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestNestedInclude() {
         run_in_both_modes(|suite| {
@@ -4530,6 +7604,32 @@ This is the main file
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestNestedPassByReference()
+    //         {
+    //             var storyStr = @"
+    // VAR globalVal = 5
+    // 
+    // {globalVal}
+    // 
+    // ~ squaresquare(globalVal)
+    // 
+    // {globalVal}
+    // 
+    // == function squaresquare(ref x) ==
+    //  {square(x)} {square(x)}
+    //  ~ return
+    // 
+    // == function square(ref x) ==
+    //  ~ x = x * x
+    //  ~ return
+    // ";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             // Bloody whitespace
+    //             Assert.AreEqual("5\n625\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestNestedPassByReference() {
         run_in_both_modes(|suite| {
@@ -4560,6 +7660,22 @@ VAR globalVal = 5
         });
     }
 
+    // C#: public void TestNewlineAtStartOfMultilineConditional()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:     @"
+    // C#: {isTrue():
+    // C#:     x
+    // C#: }
+    // C#:
+    // C#: === function isTrue()
+    // C#:     X
+    // C#:     ~ return true
+    // C#:         ";
+    // C#:     var story = CompileString(storyStr);
+    // C#:
+    // C#:     Assert.AreEqual("X\nx\n", story.ContinueMaximally());
+    // C#: }
     #[test]
     fn TestNewlineAtStartOfMultilineConditional() {
         run_in_both_modes(|suite| {
@@ -4582,6 +7698,44 @@ VAR globalVal = 5
         });
     }
 
+    // C#: public void TestNewlineConsistency()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:         @"
+    // C#: hello -> world
+    // C#: == world
+    // C#: world
+    // C#: -> END";
+    // C#:
+    // C#:     var story = CompileString(storyStr);
+    // C#:     Assert.AreEqual("hello world\n", story.ContinueMaximally());
+    // C#:
+    // C#:     storyStr =
+    // C#: @"
+    // C#: * hello -> world
+    // C#: == world
+    // C#: world
+    // C#: -> END";
+    // C#:     story = CompileString(storyStr);
+    // C#:
+    // C#:     story.Continue();
+    // C#:     story.ChooseChoiceIndex(0);
+    // C#:     Assert.AreEqual("hello world\n", story.ContinueMaximally());
+    // C#:
+    // C#:
+    // C#:     storyStr =
+    // C#:     @"
+    // C#: * hello
+    // C#:     -> world
+    // C#: == world
+    // C#: world
+    // C#: -> END";
+    // C#:     story = CompileString(storyStr);
+    // C#:
+    // C#:     story.Continue();
+    // C#:     story.ChooseChoiceIndex(0);
+    // C#:     Assert.AreEqual("hello\nworld\n", story.ContinueMaximally());
+    // C#: }
     #[test]
     fn TestNewlineConsistency() {
         run_in_both_modes(|suite| {
@@ -4634,6 +7788,28 @@ world
         });
     }
 
+    // C#: public void TestNewlinesTrimmingWithFuncExternalFallback()
+    // C#: {
+    // C#:     var storyStr =
+    // C#: @"
+    // C#: EXTERNAL TRUE ()
+    // C#:
+    // C#: Phrase 1
+    // C#: { TRUE ():
+    // C#:
+    // C#:     Phrase 2
+    // C#: }
+    // C#: -> END
+    // C#:
+    // C#: === function TRUE ()
+    // C#:     ~ return true
+    // C#: ";
+    // C#:
+    // C#:     var story = CompileString(storyStr);
+    // C#:     story.allowExternalFunctionFallbacks = true;
+    // C#:
+    // C#:     Assert.AreEqual("Phrase 1\nPhrase 2\n", story.ContinueMaximally());
+    // C#: }
     #[test]
     fn TestNewlinesTrimmingWithFuncExternalFallback() {
         run_in_both_modes(|suite| {
@@ -4661,6 +7837,27 @@ Phrase 1
         });
     }
 
+    // C#: public void TestNewlinesWithStringEval()
+    // C#: {
+    // C#:     var storyStr =
+    // C#: @"
+    // C#: A
+    // C#: ~temp someTemp = string()
+    // C#: B
+    // C#:
+    // C#: A
+    // C#: {string()}
+    // C#: B
+    // C#:
+    // C#: === function string()
+    // C#:     ~ return ""{3}""
+    // C#: }
+    // C#: ";
+    // C#:
+    // C#:     var story = CompileString(storyStr);
+    // C#:
+    // C#:     Assert.AreEqual("A\nB\nA\n3\nB\n", story.ContinueMaximally());
+    // C#: }
     #[test]
     fn TestNewlinesWithStringEval() {
         run_in_both_modes(|suite| {
@@ -4687,6 +7884,26 @@ B
         });
     }
 
+    // C#: public void TestNonTextInChoiceInnerContent()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:         @"
+    // C#: -> knot
+    // C#: == knot
+    // C#:    *   option text[]. {true: Conditional bit.} -> next
+    // C#:    -> DONE
+    // C#:
+    // C#: == next
+    // C#:     Next.
+    // C#:     -> DONE
+    // C#:                 ";
+    // C#:
+    // C#:     Story story = CompileString(storyStr);
+    // C#:     story.Continue();
+    // C#:
+    // C#:     story.ChooseChoiceIndex(0);
+    // C#:     Assert.AreEqual("option text. Conditional bit. Next.\n", story.Continue());
+    // C#: }
     #[test]
     fn TestNonTextInChoiceInnerContent() {
         run_in_both_modes(|suite| {
@@ -4712,6 +7929,35 @@ B
         });
     }
 
+    // C#: public void TestOnceOnlyChoicesCanLinkBackToSelf()
+    // C#: {
+    // C#:     var story = CompileString(@"
+    // C#: -> opts
+    // C#: = opts
+    // C#: *   (firstOpt) [First choice]   ->  opts
+    // C#: *   {firstOpt} [Second choice]  ->  opts
+    // C#: * -> end
+    // C#:
+    // C#: - (end)
+    // C#:     -> END
+    // C#: ");
+    // C#:
+    // C#:     story.ContinueMaximally();
+    // C#:
+    // C#:     Assert.AreEqual(1, story.currentChoices.Count);
+    // C#:     Assert.AreEqual("First choice", story.currentChoices[0].text);
+    // C#:
+    // C#:     story.ChooseChoiceIndex(0);
+    // C#:     story.ContinueMaximally();
+    // C#:
+    // C#:     Assert.AreEqual(1, story.currentChoices.Count);
+    // C#:     Assert.AreEqual("Second choice", story.currentChoices[0].text);
+    // C#:
+    // C#:     story.ChooseChoiceIndex(0);
+    // C#:     story.ContinueMaximally();
+    // C#:
+    // C#:     Assert.AreEqual(null, story.currentErrors);
+    // C#: }
     #[test]
     fn TestOnceOnlyChoicesCanLinkBackToSelf() {
         run_in_both_modes(|suite| {
@@ -4744,6 +7990,46 @@ B
         });
     }
 
+    // C#: public void TestOnceOnlyChoicesWithOwnContent()
+    // C#: {
+    // C#:     Story story = CompileString(@"
+    // C#: VAR times = 3
+    // C#: -> home
+    // C#:
+    // C#: == home ==
+    // C#: ~ times = times - 1
+    // C#: {times >= 0:-> eat}
+    // C#: I've finished eating now.
+    // C#: -> END
+    // C#:
+    // C#: == eat ==
+    // C#: This is the {first|second|third} time.
+    // C#:  * Eat ice-cream[]
+    // C#:  * Drink coke[]
+    // C#:  * Munch cookies[]
+    // C#: -
+    // C#: -> home
+    // C#: ");
+    // C#:
+    // C#:     story.ContinueMaximally();
+    // C#:
+    // C#:     Assert.AreEqual(3, story.currentChoices.Count);
+    // C#:
+    // C#:     story.ChooseChoiceIndex(0);
+    // C#:     story.ContinueMaximally();
+    // C#:
+    // C#:     Assert.AreEqual(2, story.currentChoices.Count);
+    // C#:
+    // C#:     story.ChooseChoiceIndex(0);
+    // C#:     story.ContinueMaximally();
+    // C#:
+    // C#:     Assert.AreEqual(1, story.currentChoices.Count);
+    // C#:
+    // C#:     story.ChooseChoiceIndex(0);
+    // C#:     story.ContinueMaximally();
+    // C#:
+    // C#:     Assert.AreEqual(0, story.currentChoices.Count);
+    // C#: }
     #[test]
     fn TestOnceOnlyChoicesWithOwnContent() {
         run_in_both_modes(|suite| {
@@ -4785,6 +8071,20 @@ This is the {first|second|third} time.
         });
     }
 
+    // C#: public void TestRequireVariableTargetsTyped()
+    // C#: {
+    // C#:     CompileStringWithoutRuntime(@"
+    // C#: -> test(-> elsewhere)
+    // C#:
+    // C#: == test(varTarget) ==
+    // C#: -> varTarget ->
+    // C#: -> DONE
+    // C#:
+    // C#: == elsewhere ==
+    // C#: ->->
+    // C#: ", testingErrors: true);
+    // C#:     Assert.IsTrue(HadError("it should be marked as: ->"));
+    // C#: }
     #[test]
     fn TestRequireVariableTargetsTyped() {
         let mut suite = CSharpHarness::new(TestMode::Normal);
@@ -4804,6 +8104,21 @@ This is the {first|second|third} time.
         assert!(suite.had_error(Some("it should be marked as: ->")));
     }
 
+    // C#: public void TestSetNonExistantVariable()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:         @"
+    // C#: VAR x = ""world""
+    // C#: Hello {x}.
+    // C#: ";
+    // C#:     var story = CompileString(storyStr);
+    // C#:
+    // C#:     Assert.AreEqual("Hello world.\n", story.Continue());
+    // C#:
+    // C#:     Assert.Throws<StoryException>(() => {
+    // C#:         story.variablesState["y"] = "earth";
+    // C#:     });
+    // C#: }
     #[test]
     fn TestSetNonExistantVariable() {
         run_in_both_modes(|suite| {
@@ -4824,6 +8139,28 @@ Hello {x}.
         });
     }
 
+    // C#: public void TestShuffleStackMuddying()
+    // C#: {
+    // C#:     var story = CompileString(@"
+    // C#: * {condFunc()} [choice 1]
+    // C#: * {condFunc()} [choice 2]
+    // C#: * {condFunc()} [choice 3]
+    // C#: * {condFunc()} [choice 4]
+    // C#:
+    // C#:
+    // C#: === function condFunc() ===
+    // C#: {shuffle:
+    // C#:     - ~ return false
+    // C#:     - ~ return true
+    // C#:     - ~ return true
+    // C#:     - ~ return false
+    // C#: }
+    // C#: ");
+    // C#:
+    // C#:     story.Continue();
+    // C#:
+    // C#:     Assert.AreEqual(2, story.currentChoices.Count);
+    // C#: }
     #[test]
     fn TestShuffleStackMuddying() {
         run_in_both_modes(|suite| {
@@ -4853,6 +8190,24 @@ Hello {x}.
         });
     }
 
+    // C#: public void TestStateRollbackOverDefaultChoice()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:     @"
+    // C#: <- make_default_choice
+    // C#: Text.
+    // C#:
+    // C#: === make_default_choice
+    // C#:     *   ->
+    // C#:         {5}
+    // C#:         -> END
+    // C#: ";
+    // C#:
+    // C#:     var story = CompileString(storyStr);
+    // C#:
+    // C#:     Assert.AreEqual("Text.\n", story.Continue());
+    // C#:     Assert.AreEqual("5\n", story.Continue());
+    // C#: }
     #[test]
     fn TestStateRollbackOverDefaultChoice() {
         run_in_both_modes(|suite| {
@@ -4876,6 +8231,22 @@ Text.
         });
     }
 
+    // C#: public void TestStringContains()
+    // C#: {
+    // C#:     var storyStr =
+    // C#: @"
+    // C#: {""hello world"" ? ""o wo""}
+    // C#: {""hello world"" ? ""something else""}
+    // C#: {""hello"" ? """"}
+    // C#: {"""" ? """"}
+    // C#: ";
+    // C#:
+    // C#:     var story = CompileString(storyStr);
+    // C#:
+    // C#:     var result = story.ContinueMaximally();
+    // C#:
+    // C#:     Assert.AreEqual("true\nfalse\ntrue\ntrue\n", result);
+    // C#: }
     #[test]
     fn TestStringContains() {
         run_in_both_modes(|suite| {
@@ -4895,6 +8266,55 @@ Text.
         });
     }
 
+    // C#: public void TestTags()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:         @"
+    // C#: VAR x = 2
+    // C#: # author: Joe
+    // C#: # title: My Great Story
+    // C#: This is the content
+    // C#:
+    // C#: == knot ==
+    // C#: # knot tag
+    // C#: Knot content
+    // C#: # end of knot tag
+    // C#: -> END
+    // C#:
+    // C#: = stitch
+    // C#: # stitch tag
+    // C#: Stitch content
+    // C#: # this tag is below some content so isn't included in the static tags for the stitch
+    // C#: -> END
+    // C#: ";
+    // C#:     var story = CompileString(storyStr);
+    // C#:
+    // C#:     var globalTags = new List<string>();
+    // C#:     globalTags.Add("author: Joe");
+    // C#:     globalTags.Add("title: My Great Story");
+    // C#:
+    // C#:     var knotTags = new List<string>();
+    // C#:     knotTags.Add("knot tag");
+    // C#:
+    // C#:     var knotTagWhenContinuedTwice = new List<string>();
+    // C#:     knotTagWhenContinuedTwice.Add("end of knot tag");
+    // C#:
+    // C#:     var stitchTags = new List<string>();
+    // C#:     stitchTags.Add("stitch tag");
+    // C#:
+    // C#:     Assert.AreEqual(globalTags, story.globalTags);
+    // C#:     Assert.AreEqual("This is the content\n", story.Continue());
+    // C#:     Assert.AreEqual(globalTags, story.currentTags);
+    // C#:
+    // C#:     Assert.AreEqual(knotTags, story.TagsForContentAtPath("knot"));
+    // C#:     Assert.AreEqual(stitchTags, story.TagsForContentAtPath("knot.stitch"));
+    // C#:
+    // C#:     story.ChoosePathString("knot");
+    // C#:     Assert.AreEqual("Knot content\n", story.Continue());
+    // C#:     Assert.AreEqual(knotTags, story.currentTags);
+    // C#:     Assert.AreEqual("", story.Continue());
+    // C#:     Assert.AreEqual(knotTagWhenContinuedTwice, story.currentTags);
+    // C#: }
     #[test]
     fn TestTags() {
         run_in_both_modes(|suite| {
@@ -4939,6 +8359,14 @@ Stitch content
         });
     }
 
+    // C#: public void TestTagsDynamicContent()
+    // C#: {
+    // C#:     var storyStr = @"tag # pic{5+3}{red|blue}.jpg";
+    // C#:     var story = CompileString(storyStr);
+    // C#:
+    // C#:     Assert.AreEqual("tag\n", story.Continue());
+    // C#:     Assert.AreEqual(new List<string> {"pic8red.jpg"}, story.currentTags);
+    // C#: }
     #[test]
     fn TestTagsDynamicContent() {
         run_in_both_modes(|suite| {
@@ -4954,6 +8382,21 @@ Stitch content
         });
     }
 
+    // C#: public void TestTagsInChoice()
+    // C#: {
+    // C#:     var storyStr = @"+ one #one [two #two] three #three -> END";
+    // C#:     var story = CompileString(storyStr);
+    // C#:
+    // C#:     story.Continue();
+    // C#:     Assert.AreEqual(0, story.currentTags.Count);
+    // C#:     Assert.AreEqual(1, story.currentChoices.Count);
+    // C#:     Assert.AreEqual(new List<string> {"one", "two"}, story.currentChoices[0].tags);
+    // C#:
+    // C#:     story.ChooseChoiceIndex(0);
+    // C#:
+    // C#:     Assert.AreEqual("one three", story.Continue());
+    // C#:     Assert.AreEqual(new List<string> {"one", "three"}, story.currentTags);
+    // C#: }
     #[test]
     fn TestTagsInChoice() {
         run_in_both_modes(|suite| {
@@ -4977,6 +8420,23 @@ Stitch content
         });
     }
 
+    // C#: public void TestTagsInSeq()
+    // C#: {
+    // C#:     var storyStr =
+    // C#: @"
+    // C#: -> knot -> knot ->
+    // C#: == knot
+    // C#: A {red #red|white #white|blue #blue|green #green} sequence.
+    // C#: ->->
+    // C#: ";
+    // C#:     var story = CompileString(storyStr);
+    // C#:
+    // C#:     Assert.AreEqual("A red sequence.\n", story.Continue());
+    // C#:     Assert.AreEqual(new List<string> {"red"}, story.currentTags);
+    // C#:
+    // C#:     Assert.AreEqual("A white sequence.\n", story.Continue());
+    // C#:     Assert.AreEqual(new List<string> {"white"}, story.currentTags);
+    // C#: }
     #[test]
     fn TestTagsInSeq() {
         run_in_both_modes(|suite| {
@@ -4999,6 +8459,30 @@ A {red #red|white #white|blue #blue|green #green} sequence.
         });
     }
 
+    // C#: public void TestTempGlobalConflict()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:         @"
+    // C#: -> outer
+    // C#: === outer
+    // C#: ~ temp x = 0
+    // C#: ~ f(x)
+    // C#: {x}
+    // C#: -> DONE
+    // C#:
+    // C#: === function f(ref x)
+    // C#: ~temp local = 0
+    // C#: ~x=x
+    // C#: {setTo3(local)}
+    // C#:
+    // C#: === function setTo3(ref x)
+    // C#: ~x = 3
+    // C#: ";
+    // C#:
+    // C#:     Story story = CompileString(storyStr);
+    // C#:
+    // C#:     Assert.AreEqual("0\n", story.Continue());
+    // C#: }
     #[test]
     fn TestTempGlobalConflict() {
         run_in_both_modes(|suite| {
@@ -5028,6 +8512,26 @@ A {red #red|white #white|blue #blue|green #green} sequence.
         });
     }
 
+    // C#: public void TestTempNotAllowedCrossStitch()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:             @"
+    // C#: -> knot.stitch
+    // C#:
+    // C#: == knot (y) ==
+    // C#: ~temp x = 5
+    // C#: -> END
+    // C#:
+    // C#: = stitch
+    // C#: {x} {y}
+    // C#: -> END
+    // C#:             ";
+    // C#:
+    // C#:     CompileStringWithoutRuntime(storyStr, testingErrors:true);
+    // C#:
+    // C#:     Assert.IsTrue(HadError("Unresolved variable: x"));
+    // C#:     Assert.IsTrue(HadError("Unresolved variable: y"));
+    // C#: }
     #[test]
     fn TestTempNotAllowedCrossStitch() {
         let mut suite = CSharpHarness::new(TestMode::Normal);
@@ -5049,6 +8553,20 @@ A {red #red|white #white|blue #blue|green #green} sequence.
         assert!(suite.had_error(Some("Unresolved variable: y")));
     }
 
+    // C#: public void TestTempNotFound()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:     @"
+    // C#: {x}
+    // C#: ~temp x = 5
+    // C#: hello
+    // C#:                 ";
+    // C#:     var story = CompileString(storyStr, testingErrors:true);
+    // C#:
+    // C#:     Assert.AreEqual("0\nhello\n", story.ContinueMaximally());
+    // C#:
+    // C#:     Assert.IsTrue(HadWarning());
+    // C#: }
     #[test]
     fn TestTempNotFound() {
         let mut suite = CSharpHarness::new(TestMode::Normal);
@@ -5077,6 +8595,29 @@ hello
         assert!(suite.had_warning(None));
     }
 
+    // C#: public void TestTempUsageInOptions()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:         @"
+    // C#: ~ temp one = 1
+    // C#: * \ {one}
+    // C#: - End of choice
+    // C#:     -> another
+    // C#: * (another) this [is] another
+    // C#:  -> DONE
+    // C#: ";
+    // C#:
+    // C#:     Story story = CompileString(storyStr);
+    // C#:     story.Continue();
+    // C#:
+    // C#:     Assert.AreEqual(1, story.currentChoices.Count);
+    // C#:     Assert.AreEqual("1", story.currentChoices[0].text);
+    // C#:     story.ChooseChoiceIndex(0);
+    // C#:
+    // C#:     Assert.AreEqual("1\nEnd of choice\nthis another\n", story.ContinueMaximally());
+    // C#:
+    // C#:     Assert.AreEqual(0, story.currentChoices.Count);
+    // C#: }
     #[test]
     fn TestTempUsageInOptions() {
         run_in_both_modes(|suite| {
@@ -5106,6 +8647,26 @@ hello
         });
     }
 
+    // C#: public void TestThreadInLogic()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:         @"
+    // C#: -> once ->
+    // C#: -> once ->
+    // C#:
+    // C#: == once ==
+    // C#: {<- content|}
+    // C#: ->->
+    // C#:
+    // C#: == content ==
+    // C#: Content
+    // C#: -> DONE
+    // C#: ";
+    // C#:
+    // C#:     Story story = CompileString(storyStr);
+    // C#:
+    // C#:     Assert.AreEqual("Content\n", story.Continue());
+    // C#: }
     #[test]
     fn TestThreadInLogic() {
         run_in_both_modes(|suite| {
@@ -5131,6 +8692,23 @@ Content
         });
     }
 
+    // C#: public void TestTopFlowTerminatorShouldntKillThreadChoices()
+    // C#: {
+    // C#:     var storyStr =
+    // C#:         @"
+    // C#: <- move
+    // C#: Limes
+    // C#:
+    // C#: === move
+    // C#:     * boop
+    // C#:         -> END
+    // C#:                     ";
+    // C#:
+    // C#:     var story = CompileString(storyStr);
+    // C#:
+    // C#:     Assert.AreEqual("Limes\n", story.Continue());
+    // C#:     Assert.IsTrue(story.currentChoices.Count == 1);
+    // C#: }
     #[test]
     fn TestTopFlowTerminatorShouldntKillThreadChoices() {
         run_in_both_modes(|suite| {
@@ -5172,6 +8750,25 @@ Limes
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestTunnelOnwardsDivertAfterWithArg ()
+    //         {
+    //             var storyStr =
+    // @"
+    // -> a ->
+    // 
+    // === a ===
+    // ->-> b (5 + 3)
+    // 
+    // === b (x) ===
+    // {x}
+    // -> END
+    // ";
+    // 
+    //             var story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual ("8\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestTunnelOnwardsDivertAfterWithArg() {
         run_in_both_modes(|suite| {
@@ -5195,6 +8792,26 @@ Limes
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestTunnelOnwardsDivertOverride ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // -> A ->
+    // We will never return to here!
+    // 
+    // == A ==
+    // This is A
+    // ->-> B
+    // 
+    // == B ==
+    // Now in B.
+    // -> END
+    // ";
+    //             var story = CompileString (storyStr);
+    // 
+    //             Assert.AreEqual ("This is A\nNow in B.\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestTunnelOnwardsDivertOverride() {
         run_in_both_modes(|suite| {
@@ -5220,6 +8837,25 @@ Now in B.
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestTurns ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // -> c
+    // - (top)
+    // + (c) [choice]
+    //     {TURNS ()}
+    //     -> top
+    //                     ";
+    // 
+    //             var story = CompileString (storyStr);
+    // 
+    //             for (int i = 0; i < 10; i++) {
+    //                 Assert.AreEqual(i + "\n", story.Continue ());
+    //                 story.ChooseChoiceIndex (0);
+    //             }
+    //         }
     #[test]
     fn TestTurns() {
         run_in_both_modes(|suite| {
@@ -5243,6 +8879,21 @@ Now in B.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestUsingFunctionAndIncrementTogether()
+    //         {
+    //             var storyStr =
+    //         @"
+    // VAR x = 5
+    // ~ x += one()
+    // 
+    // === function one()
+    // ~ return 1
+    // ";
+    // 
+    //             // Ensure it just compiles
+    //             CompileStringWithoutRuntime(storyStr);
+    //         }
     #[test]
     fn TestUsingFunctionAndIncrementTogether() {
         let mut suite = CSharpHarness::new(TestMode::Normal);
@@ -5258,6 +8909,23 @@ VAR x = 5
         );
     }
 
+    // C#:         [Test()]
+    //         public void TestVariableDivertTarget()
+    //         {
+    //             var story = CompileString(@"
+    // VAR x = -> here
+    // 
+    // -> there
+    // 
+    // == there ==
+    // -> x
+    // 
+    // == here ==
+    // Here.
+    // -> DONE
+    // ");
+    //             Assert.AreEqual("Here.\n", story.Continue());
+    //         }
     #[test]
     fn TestVariableDivertTarget() {
         run_in_both_modes(|suite| {
@@ -5283,6 +8951,22 @@ Here.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestVisitCountBugDueToNestedContainers()
+    //         {
+    //             var storyStr = @"
+    //                 - (gather) {gather}
+    //                 * choice
+    //                 - {gather}
+    //             ";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             Assert.AreEqual("1\n", story.Continue());
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("choice\n1\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestVisitCountBugDueToNestedContainers() {
         run_in_both_modes(|suite| {
@@ -5303,6 +8987,48 @@ Here.
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestVisitCountsWhenChoosing()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // == TestKnot ==
+    // this is a test
+    // + [Next] -> TestKnot2
+    // 
+    // == TestKnot2 ==
+    // this is the end
+    // -> END
+    // ";
+    // 
+    //             Story story = CompileString(storyStr, countAllVisits:true);
+    // 
+    //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot"));
+    //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot2"));
+    // 
+    //             story.ChoosePathString ("TestKnot");
+    // 
+    //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot"));
+    //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot2"));
+    // 
+    //             story.Continue ();
+    // 
+    //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot"));
+    //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot2"));
+    // 
+    //             story.ChooseChoiceIndex (0);
+    // 
+    //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot"));
+    // 
+    //             // At this point, we have made the choice, but the divert *within* the choice
+    //             // won't yet have been evaluated.
+    //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot2"));
+    // 
+    //             story.Continue ();
+    // 
+    //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot"));
+    //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot2"));
+    //         }
     #[test]
     fn TestVisitCountsWhenChoosing() {
         run_in_both_modes(|suite| {
@@ -5368,6 +9094,37 @@ this is the end
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestWeaveGathers()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // -
+    //  * one
+    //     * * two
+    //    - - three
+    //  *  four
+    //    - - five
+    // - six
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    // 
+    //             story.ContinueMaximally();
+    // 
+    //             Assert.AreEqual(2, story.currentChoices.Count);
+    //             Assert.AreEqual("one", story.currentChoices[0].text);
+    //             Assert.AreEqual("four", story.currentChoices[1].text);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             story.ContinueMaximally();
+    // 
+    //             Assert.AreEqual(1, story.currentChoices.Count);
+    //             Assert.AreEqual("two", story.currentChoices[0].text);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("two\nthree\nsix\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestWeaveGathers() {
         run_in_both_modes(|suite| {
@@ -5399,6 +9156,25 @@ this is the end
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestWeaveOptions()
+    //         {
+    //             var storyStr =
+    //                 @"
+    //                     -> test
+    //                     === test
+    //                         * Hello[.], world.
+    //                         -> END
+    //                 ";
+    // 
+    //             Story story = CompileString(storyStr);
+    //             story.Continue();
+    // 
+    //             Assert.AreEqual("Hello.", story.currentChoices[0].text);
+    // 
+    //             story.ChooseChoiceIndex(0);
+    //             Assert.AreEqual("Hello, world.\n", story.Continue());
+    //         }
     #[test]
     fn TestWeaveOptions() {
         run_in_both_modes(|suite| {
@@ -5421,6 +9197,27 @@ this is the end
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestWeaveWithinSequence ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // { shuffle:
+    // -   * choice
+    //     nextline
+    //     -> END
+    // }
+    // ";
+    //             var story = CompileString (storyStr);
+    // 
+    //             story.Continue ();
+    // 
+    //             Assert.IsTrue (story.currentChoices.Count == 1);
+    // 
+    //             story.ChooseChoiceIndex (0);
+    // 
+    //             Assert.AreEqual ("choice\nnextline\n", story.ContinueMaximally ());
+    //         }
     #[test]
     fn TestWeaveWithinSequence() {
         run_in_both_modes(|suite| {
@@ -5444,6 +9241,24 @@ this is the end
         });
     }
 
+    // C#:         [Test()]
+    //         public void TestWhitespace()
+    //         {
+    //             var storyStr =
+    // @"
+    // -> firstKnot
+    // === firstKnot
+    //     Hello!
+    //     -> anotherKnot
+    // 
+    // === anotherKnot
+    //     World.
+    //     -> END
+    // ";
+    // 
+    //             Story story = CompileString(storyStr);
+    //             Assert.AreEqual("Hello!\nWorld.\n", story.ContinueMaximally());
+    //         }
     #[test]
     fn TestWhitespace() {
         run_in_both_modes(|suite| {
@@ -5467,6 +9282,27 @@ this is the end
         });
     }
 
+    // C#:         [Test ()]
+    //         public void TestWrongVariableDivertTargetReference ()
+    //         {
+    //             var storyStr =
+    //                 @"
+    // -> go_to_broken(-> SOMEWHERE)
+    // 
+    // == go_to_broken(-> b)
+    //  -> go_to(-> b) // INSTEAD OF: -> go_to(b)
+    // 
+    // == go_to(-> a)
+    //   -> a
+    // 
+    // == SOMEWHERE ==
+    // Should be able to get here!
+    // -> DONE
+    // ";
+    //             CompileStringWithoutRuntime (storyStr, testingErrors:true);
+    // 
+    //             Assert.IsTrue (HadError ("it shouldn't be preceded by '->'"));
+    //         }
     #[test]
     fn TestWrongVariableDivertTargetReference() {
         let mut suite = CSharpHarness::new(TestMode::Normal);
