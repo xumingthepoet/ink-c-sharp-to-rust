@@ -1,5 +1,6 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/ConditionalSingleBranch.cs
 
+use crate::ParsedHierarchy::ContentList::ContentListItem;
 use crate::ParsedHierarchy::Expression::Expression;
 use crate::ParsedHierarchy::Object::{Object, ObjectKind, ObjectPayload};
 use crate::ParsedHierarchy::Story::Story;
@@ -52,21 +53,12 @@ impl ConditionalSingleBranch {
     pub fn GenerateRuntimeObject(&mut self) -> RuntimeContainer {
         if let Some(inner_weave) = &self.innerWeave {
             for obj in &inner_weave.base.content {
-                if let Some(runtime) = obj.get_runtimeObject() {
-                    let saw_else_text = runtime.get_content().iter().any(|item| match item {
-                        ContentItem::Value(ink_runtime::Value::Value::String(value)) => {
-                            value.value.starts_with("else:")
-                        }
-                        _ => false,
-                    });
-
-                    if saw_else_text {
-                        self.base.Warning(
-                            "Saw the text 'else:' which is being treated as content. Did you mean '- else:'?"
-                                .to_string(),
-                            Some(obj.clone()),
-                        );
-                    }
+                if Self::object_starts_with_else_text(obj) {
+                    self.base.Warning(
+                        "Saw the text 'else:' which is being treated as content. Did you mean '- else:'?"
+                            .to_string(),
+                        Some(obj.clone()),
+                    );
                 }
             }
         }
@@ -224,11 +216,29 @@ impl ConditionalSingleBranch {
     pub fn get_base(&self) -> &Object {
         &self.base
     }
+
+    fn object_starts_with_else_text(obj: &Object) -> bool {
+        match obj.payload.as_ref() {
+            Some(ObjectPayload::ContentList(content_list)) => {
+                Self::content_list_starts_with_else_text(content_list.as_ref())
+            }
+            _ => false,
+        }
+    }
+
+    fn content_list_starts_with_else_text(
+        content_list: &crate::ParsedHierarchy::ContentList::ContentList,
+    ) -> bool {
+        content_list.get_content().first().is_some_and(
+            |item| matches!(item, ContentListItem::Text(text) if text.text.starts_with("else:")),
+        )
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::ConditionalSingleBranch;
+    use crate::ParsedHierarchy::ContentList::ContentListItem;
     use crate::ParsedHierarchy::Expression::{Expression, ExpressionKind};
     use crate::ParsedHierarchy::Identifier::Identifier;
     use crate::ParsedHierarchy::Story::Story;
@@ -258,5 +268,17 @@ mod tests {
             .unwrap_or(false);
 
         assert!(resolved);
+    }
+
+    #[test]
+    fn content_list_helper_detects_else_prefix_text() {
+        let content_list =
+            crate::ParsedHierarchy::ContentList::ContentList::new(vec![ContentListItem::from(
+                crate::ParsedHierarchy::Text::Text::new("else: content".to_string()),
+            )]);
+
+        assert!(ConditionalSingleBranch::content_list_starts_with_else_text(
+            &content_list
+        ));
     }
 }

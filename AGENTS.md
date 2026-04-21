@@ -199,6 +199,7 @@ After any phase-level change, run `make -C ink-rust gate`. If it passes, the pha
 - Keep the note actionable for future agents. The goal is to avoid re-discovering the same dead ends and to reduce token spent on repeated search.
 - Update this section when a diagnosis changes the preferred workflow for a subsystem, especially for parser, runtime, or testbed issues.
 - For `ParsedHierarchy/Weave`, the C# termination check is not just "content exists"; it must scan backward for non-returning divert-like flow exits and then inspect following flow content. `BadNestedTerminationHandler` also needs to walk ancestor chains and special-case the one-choice conditional tutorial message, so any future weave cleanup should preserve that ancestor-sensitive path before refactoring the flow tree.
+- For `ParsedHierarchy/ConditionalSingleBranch`, the "Saw the text 'else:'" warning should inspect parsed `ContentList` text nodes, not runtime container strings. The warning is a parse-tree check on `_innerWeave.content`, so container-based checks can silently miss the warning until after code generation has already reshaped the branch.
 - `ParsedHierarchy/VariableAssignment` ownership is easiest to verify through `Object::from_variable_assignment(...).content` payloads. Runtime output alone can miss tree-wiring regressions for list-backed declarations.
 
 ## Git And Workspace Hygiene
