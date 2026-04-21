@@ -100,7 +100,21 @@ impl InkParser {
 
         self.Whitespace();
 
-        let mut divert = self.DivertIdentifierWithArguments()?;
+        let mut divert = if let Some(divert) = self.DivertIdentifierWithArguments() {
+            divert
+        } else {
+            let line_remainder = self.LineRemainder();
+            let but_saw = if line_remainder.is_empty() {
+                "end of line".to_string()
+            } else {
+                format!("'{}'", line_remainder)
+            };
+            self.Error(format!(
+                "Expected target for new thread but saw {}",
+                but_saw
+            ));
+            Divert::default()
+        };
         divert.isThread = true;
         Some(divert)
     }
@@ -188,6 +202,7 @@ impl InkParser {
 #[cfg(test)]
 mod tests {
     use super::{DivertPiece, InkParser};
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn parses_tunnel_onwards_with_target() {
@@ -215,5 +230,24 @@ mod tests {
             DivertPiece::TunnelOnwards(divert) => assert!(divert.get_isEmpty()),
             other => panic!("unexpected piece: {:?}", other),
         }
+    }
+
+    #[test]
+    fn reports_missing_thread_target_and_recovers_with_empty_divert() {
+        let captured = Arc::new(Mutex::new(Vec::<String>::new()));
+        let handler = {
+            let captured = captured.clone();
+            Arc::new(
+                move |message: String, _index: i32, _line: i32, _is_warning: bool| {
+                    captured.lock().unwrap().push(message);
+                },
+            )
+        };
+        let mut parser = InkParser::new(" <-".to_string(), None, Some(handler), None);
+
+        let divert = parser.StartThread().expect("thread divert should recover");
+        assert!(divert.get_isThread());
+        assert!(divert.get_target().is_none());
+        assert!(!captured.lock().unwrap().is_empty());
     }
 }
