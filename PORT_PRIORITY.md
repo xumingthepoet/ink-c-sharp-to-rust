@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 43 | 18 | 3 |
-| Total | 98 | 77 | 18 | 3 |
+| Compiler | 64 | 44 | 17 | 3 |
+| Total | 98 | 78 | 17 | 3 |
 
 ## Continuation Plan For Future Agents
 
@@ -101,7 +101,7 @@ Source area: `ink-c-sharp/compiler/`
 30. `ParsedHierarchy/Divert.cs` (`deps=10`) [partial: reason=runtime divert generation, stack/argument packaging, and basic story-level target path resolution are real, but ancestry-sensitive target lookup remains incomplete; missing=full ResolveTargetContent parity, variable divert targets, and argument validity checks; next=finish ParsedHierarchy/Object/FlowBase ancestry and route path resolution through it]
 31. `ParsedHierarchy/DivertTarget.cs` (`deps=10`) [partial: reason=divert-target generation and equality are now real, but the ancestry-based usage checks and exact target counting still depend on the unported ParsedHierarchy.Object tree; missing=full usage-context validation and complete parent-chain counting parity; next=port ParsedHierarchy/Object and FlowBase or the remaining ancestry helpers]
 32. `ParsedHierarchy/Expression.cs` (`deps=10`) [partial: reason=the wrapper now covers literal generation plus function-call, divert-target, and variable-reference expression forms, but the upstream parser still needs the remaining entry points and parse-tree wiring; missing=InkParser expression integration and the rest of the expression grammar surface; next=port InkParser/InkParser_Expressions and the remaining parser rules]
-33. `ParsedHierarchy/Choice.cs` (`deps=11`) [partial: choice runtime generation and reference resolution are real, but the full parsed-object ownership chain, count-all-visits hookup, and flow-tree integration are still not modeled; missing=base-object content propagation and owning-story visit-count wiring; next=port ParsedHierarchy/Object and ParsedHierarchy/FlowBase]
+33. `ParsedHierarchy/Choice.cs` (`deps=11`) [ported]
 34. `ParsedHierarchy/FlowBase.cs` (`deps=16`) [partial: reason=the flow base now separates root weave content from sub-flows, preserves typed knot/stitch subflows, lazily exports runtime containers, recurses through nested subflow lookup, and now wires direct parent-flow links for variable lookup; missing=exact nested termination/naming-collision parity and full story-root ancestry resolution parity; next=finish the remaining flow-tree wrappers and tighten parent-chain handling]
 35. `ParsedHierarchy/Story.cs` (`deps=16`) [partial: reason=the parser-side story now owns top-level content, include preprocessing, typed declaration collection, external registration, global variable initialisation export, named-only top-level flow export, list-item ambiguity reporting, and source-aware error formatting; missing=FlowBase-backed root generation and full weave-processing parity; next=finish ParsedHierarchy/FlowBase and route story export through the shared flow tree]
 36. `ParsedHierarchy/Weave.cs` (`deps=16`) [partial: reason=the weave helper now owns indentation hierarchy, weavepoint naming, nested weave runtime emission, ancestor naming-collision checks, and a first-pass termination path; missing=exact loose-end propagation, choice/gather container mutation, and full nested termination validation; next=finish flow-tree ownership and nested sequence/conditional weaving]
