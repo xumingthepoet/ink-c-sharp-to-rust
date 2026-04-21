@@ -14,7 +14,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    Arc, Mutex,
 };
 
 #[derive(Clone)]
@@ -95,9 +95,12 @@ impl Compiler {
         self.hadParseError = false;
         let source_filename = self.options.sourceFilename.clone();
         let had_parse_error = Arc::new(AtomicBool::new(false));
+        let parse_errors: Arc<Mutex<Vec<(String, ErrorType)>>> = Arc::new(Mutex::new(Vec::new()));
+        let has_error_handler = self.options.errorHandler.is_some();
         let parse_error_handler = {
             let had_parse_error = Arc::clone(&had_parse_error);
             let source_filename = source_filename.clone();
+            let parse_errors = Arc::clone(&parse_errors);
             Arc::new(
                 move |message: String, line: i32, _character: i32, is_warning: bool| {
                     let full_message = if let Some(filename) = &source_filename {
@@ -120,7 +123,20 @@ impl Compiler {
                     if !is_warning {
                         had_parse_error.store(true, Ordering::SeqCst);
                     }
-                    panic!("{}", full_message);
+
+                    if has_error_handler {
+                        let error_type = if is_warning {
+                            ErrorType::Warning
+                        } else {
+                            ErrorType::Error
+                        };
+                        parse_errors
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                            .push((full_message, error_type));
+                    } else {
+                        panic!("{}", full_message);
+                    }
                 },
             )
         };
@@ -135,6 +151,18 @@ impl Compiler {
         self.hadParseError = had_parse_error.load(Ordering::SeqCst);
         self.parser = Some(parser);
         self.parsedStory = Some(parsed_story.clone());
+
+        if let Some(handler) = &self.options.errorHandler {
+            let mut handler = handler.borrow_mut();
+            for (message, error_type) in parse_errors
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .drain(..)
+            {
+                handler(&message, error_type);
+            }
+        }
+
         parsed_story
     }
 
@@ -357,11 +385,41 @@ impl Compiler {
 #[cfg(test)]
 mod tests {
     use super::{Compiler, Options};
+    use ink_runtime::Error::ErrorType;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     #[test]
     fn compiler_defaults_and_parses() {
         let mut compiler = Compiler::new("Hello world".to_string(), Options::default());
         let parsed = compiler.Parse();
         assert_eq!(parsed.content.len(), 1);
+    }
+
+    #[test]
+    fn compiler_parse_errors_are_forwarded_to_handler() {
+        let captured: Rc<RefCell<Vec<(String, ErrorType)>>> = Rc::new(RefCell::new(Vec::new()));
+        let handler_capture = Rc::clone(&captured);
+        let error_handler = Rc::new(RefCell::new(Box::new(
+            move |message: &str, error_type: ErrorType| {
+                handler_capture
+                    .borrow_mut()
+                    .push((message.to_string(), error_type));
+            },
+        ) as ink_runtime::Error::ErrorHandler));
+
+        let mut options = Options::default();
+        options.errorHandler = Some(error_handler);
+
+        let mut compiler = Compiler::new("~ return 5\n".to_string(), options);
+        let compiled = compiler.Compile();
+
+        assert!(compiled.is_none());
+        let captured = captured.borrow();
+        assert!(!captured.is_empty());
+        assert!(captured
+            .iter()
+            .any(|(message, error_type)| *error_type == ErrorType::Error
+                && message.contains("should not have return statement outside of a knot")));
     }
 }
