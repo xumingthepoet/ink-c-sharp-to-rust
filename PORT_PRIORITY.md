@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 41 | 20 | 3 |
-| Total | 98 | 75 | 20 | 3 |
+| Compiler | 64 | 42 | 19 | 3 |
+| Total | 98 | 76 | 19 | 3 |
 
 ## Continuation Plan For Future Agents
 
@@ -123,7 +123,7 @@ Source area: `ink-c-sharp/compiler/`
 13. `InkParser/InkParser.cs` (`deps=9`) [partial: reason=the parser wrapper now delegates comment elimination, whitespace, include, debug metadata, and top-level Parse construction into typed statements, but full story export still depends on the ParsedHierarchy flow tree; missing=exact source/error recovery and complete flow-tree handoff; next=finish ParsedHierarchy/Story/FlowBase]
 14. `InkParser/InkParser_Statements.cs` (`deps=10`) [partial: reason=the parser helper now dispatches knots, stitches, choices, gathers, declarations, externals, divert lines, text lines, and logic lines as typed objects, with divert lines consuming their terminating newline; missing=sequence/conditional branch ownership and exact story export integration; next=finish ParsedHierarchy/Weave/FlowBase and then tighten remaining statement branch parity such as top-level return diagnostics]
 15. `InkParser/InkParser_Tags.cs` (`deps=10`) [ported]
-16. `InkParser/InkParser_Knot.cs` (`deps=11`) [partial: knot, stitch, and EXTERNAL declarations now parse into typed payloads without eager runtime wrapping, but full recovery, statement ownership, and story-root integration still depend on the remaining parser/story tree]
+16. `InkParser/InkParser_Knot.cs` (`deps=11`) [ported]
 17. `InkParser/InkParser_Expressions.cs` (`deps=15`) [ported]
 
 ### Outer Files
