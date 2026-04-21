@@ -74,3 +74,6 @@ mod tests {
         assert!(story.get_currentChoices().is_empty());
     }
 }
+
+#[cfg(test)]
+mod csharp_tests;
