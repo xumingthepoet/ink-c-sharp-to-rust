@@ -87,39 +87,48 @@ impl DivertTarget {
             }
         }
 
-        if let Some(target_content) = self.divert.get_targetContent() {
-            if let Some(target_flow) = match target_content.kind {
-                crate::ParsedHierarchy::Object::ObjectKind::Knot
-                | crate::ParsedHierarchy::Object::ObjectKind::Stitch
-                | crate::ParsedHierarchy::Object::ObjectKind::Story => {
-                    Some(FlowBase::from_object(target_content))
+        if let Some(target_content) = self.divert.targetContent.as_mut() {
+            if let Some(mut target_container) = target_content.get_containerForCounting() {
+                if let Some(target_flow) = match target_content.kind {
+                    crate::ParsedHierarchy::Object::ObjectKind::Knot
+                    | crate::ParsedHierarchy::Object::ObjectKind::Stitch
+                    | crate::ParsedHierarchy::Object::ObjectKind::Story => {
+                        Some(FlowBase::from_object(target_content))
+                    }
+                    _ => None,
+                } {
+                    if target_flow
+                        .get_arguments()
+                        .iter()
+                        .any(|argument| argument.isByReference)
+                    {
+                        context.Error(
+                            format!(
+                                "Can't store a divert target to a knot or function that has by-reference arguments ('{}' has 'ref {}').",
+                                target_flow
+                                    .get_identifier()
+                                    .and_then(|identifier| identifier.name.as_deref())
+                                    .unwrap_or_default(),
+                                target_flow
+                                    .get_arguments()
+                                    .iter()
+                                    .find(|argument| argument.isByReference)
+                                    .and_then(|argument| argument.identifier.as_ref())
+                                    .and_then(|identifier| identifier.name.as_deref())
+                                    .unwrap_or_default()
+                            ),
+                            Default::default(),
+                            false,
+                        );
+                    }
                 }
-                _ => None,
-            } {
-                if target_flow
-                    .get_arguments()
-                    .iter()
-                    .any(|argument| argument.isByReference)
-                {
-                    context.Error(
-                        format!(
-                            "Can't store a divert target to a knot or function that has by-reference arguments ('{}' has 'ref {}').",
-                            target_flow
-                                .get_identifier()
-                                .and_then(|identifier| identifier.name.as_deref())
-                                .unwrap_or_default(),
-                            target_flow
-                                .get_arguments()
-                                .iter()
-                                .find(|argument| argument.isByReference)
-                                .and_then(|argument| argument.identifier.as_ref())
-                                .and_then(|identifier| identifier.name.as_deref())
-                                .unwrap_or_default()
-                        ),
-                        Default::default(),
-                        false,
-                    );
-                }
+
+                target_container.set_countFlags(
+                    target_container.get_countFlags()
+                        | ink_runtime::Container::CountFlags::Visits as i32
+                        | ink_runtime::Container::CountFlags::Turns as i32,
+                );
+                target_content.set_runtimeObject(Some(target_container));
             }
         }
     }
@@ -239,5 +248,36 @@ mod tests {
             }
             other => panic!("unexpected content: {other:?}"),
         }
+    }
+
+    #[test]
+    fn resolve_marks_target_container_for_counting() {
+        use crate::ParsedHierarchy::Identifier::Identifier;
+        use crate::ParsedHierarchy::Knot::Knot;
+        use crate::ParsedHierarchy::Object::Object;
+        use crate::ParsedHierarchy::Story::Story;
+
+        let mut target_content = Object::from_knot(Knot::new(
+            Identifier {
+                name: Some("intro".to_string()),
+                debugMetadata: None,
+            },
+            vec![],
+            vec![],
+            false,
+        ));
+        let _ = target_content.EnsureRuntimeObject();
+        let divert = Divert::new_overload_2(target_content);
+        let mut target = DivertTarget::new(divert);
+        let mut story = Story::new(vec![], false);
+
+        target.ResolveReferences(&mut story);
+
+        let flags = target
+            .divert
+            .get_targetContent()
+            .and_then(|content| content.get_runtimeObject())
+            .map(|container| container.get_countFlags());
+        assert_eq!(flags, Some(3));
     }
 }
