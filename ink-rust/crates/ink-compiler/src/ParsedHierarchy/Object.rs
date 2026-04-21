@@ -174,7 +174,10 @@ impl Object {
 
     pub fn from_included_file(included: IncludedFile) -> Self {
         let mut object = Object::with_kind(ObjectKind::Plain);
-        object.content = included.get_includedStory().content.clone();
+        object.content = included
+            .get_includedStory()
+            .map(|story| story.content.clone())
+            .unwrap_or_default();
         object.payload = Some(ObjectPayload::IncludedFile(Box::new(included)));
         object
     }

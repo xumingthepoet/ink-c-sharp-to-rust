@@ -7,6 +7,7 @@ use crate::ParsedHierarchy::Object::{Object, ObjectKind};
 use crate::ParsedHierarchy::Story::Story as ParsedStory;
 use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
 use crate::Plugins::PluginManager::PluginManager;
+use ink_runtime::Container::ContentItem;
 use ink_runtime::Error::{ErrorHandler, ErrorType};
 use ink_runtime::Path::Path as RuntimePath;
 use ink_runtime::Story::Story as RuntimeStory;
@@ -234,12 +235,10 @@ impl Compiler {
             let path = RuntimePath::new_overload_4(debug_path.clone());
             if let Some(runtime_story) = self.runtimeStory.as_mut() {
                 let content_result = runtime_story.ContentAtPath(path);
-                if let Some(container) = content_result.get_container() {
-                    if let Some(metadata) = container.get_debugMetadata() {
-                        result.output = Some(format!("DebugSource: {}", metadata.ToString()));
-                    } else {
-                        result.output = Some("DebugSource: Unknown source".to_string());
-                    }
+                if let Some(metadata) =
+                    Self::debug_metadata_from_content_item(content_result.obj.as_ref())
+                {
+                    result.output = Some(format!("DebugSource: {}", metadata.ToString()));
                 } else {
                     result.output = Some("DebugSource: Unknown source".to_string());
                 }
@@ -269,7 +268,6 @@ impl Compiler {
 
     // C# signature: public void RetrieveDebugSourceForLatestContent ()
     pub fn RetrieveDebugSourceForLatestContent(&mut self) {
-        self._debugSourceRanges.clear();
         if let Some(runtime_story) = self.runtimeStory.as_mut() {
             for output_obj in runtime_story.get_state().get_outputStream() {
                 if let ink_runtime::Container::ContentItem::Value(Value::String(textContent)) =
@@ -315,6 +313,16 @@ fn _debug_metadata_from_offset(
 }
 
 impl Compiler {
+    fn debug_metadata_from_content_item(
+        content_item: Option<&ContentItem>,
+    ) -> Option<ink_runtime::DebugMetadata::DebugMetadata> {
+        match content_item? {
+            ContentItem::Container(container) => container.get_debugMetadata().cloned(),
+            ContentItem::Value(Value::String(value)) => value.get_debugMetadata().cloned(),
+            _ => None,
+        }
+    }
+
     fn DebugMetadataForContentAtOffset(
         &self,
         offset: i32,
@@ -402,7 +410,10 @@ impl Compiler {
 #[cfg(test)]
 mod tests {
     use super::{Compiler, Options};
+    use ink_runtime::Container::{Container, ContentItem};
+    use ink_runtime::DebugMetadata::DebugMetadata;
     use ink_runtime::Error::ErrorType;
+    use ink_runtime::Value::{StringValue, Value};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -446,5 +457,34 @@ mod tests {
         assert!(compiler
             .HandleInput(crate::CommandLineInput::CommandLineInput::default())
             .is_none());
+    }
+
+    #[test]
+    fn compiler_debug_path_lookup_reads_non_container_debug_metadata() {
+        let mut compiler = Compiler::new(String::new(), Options::default());
+        let mut string_value = StringValue::new("hello".to_string());
+        string_value.set_debugMetadata(Some(DebugMetadata {
+            startLineNumber: 7,
+            endLineNumber: 7,
+            startCharacterNumber: 0,
+            endCharacterNumber: 5,
+            fileName: Some("story.ink".to_string()),
+            sourceName: None,
+        }));
+
+        let mut container = Container::new();
+        container.AddContent(ContentItem::Value(Value::String(string_value)));
+        compiler.runtimeStory = Some(ink_runtime::Story::Story::new(container, vec![]));
+
+        let mut input = crate::CommandLineInput::CommandLineInput::default();
+        input.debugPathLookup = Some("0".to_string());
+
+        let result = compiler
+            .HandleInput(input)
+            .expect("debug path should be handled");
+        assert_eq!(
+            result.output.as_deref(),
+            Some("DebugSource: line 7 of story.ink")
+        );
     }
 }

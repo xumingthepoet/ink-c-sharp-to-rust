@@ -25,7 +25,7 @@ impl InkParser {
                 fullFilename
             ));
             let _ = self.ParseUntilCharactersFromString("\r\n".to_string());
-            return Some(IncludedFile::new(ParsedStory::default()));
+            return Some(IncludedFile::new(None));
         }
 
         self.AddOpenFilenameShared(fullFilename.clone());
@@ -53,6 +53,6 @@ impl InkParser {
 
         self.RemoveOpenFilenameShared(fullFilename);
 
-        Some(IncludedFile::new(includedStory.unwrap_or_default()))
+        Some(IncludedFile::new(includedStory))
     }
 }

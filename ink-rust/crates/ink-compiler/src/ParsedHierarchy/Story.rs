@@ -87,16 +87,19 @@ impl Story {
         for obj in topLevelContent {
             if let Some(ObjectPayload::IncludedFile(_)) = obj.payload.as_ref() {
                 let mut included_content = Vec::<Object>::new();
-                for sub_obj in obj.content.into_iter() {
-                    if matches!(sub_obj.kind, ObjectKind::Knot | ObjectKind::Stitch) {
-                        flowsFromOtherFiles.push(sub_obj);
-                    } else {
-                        included_content.push(sub_obj);
+                if let Some(ObjectPayload::IncludedFile(included_file)) = obj.payload.as_ref() {
+                    if let Some(sub_story) = included_file.get_includedStory() {
+                        for sub_obj in sub_story.content.iter().cloned() {
+                            if matches!(sub_obj.kind, ObjectKind::Knot | ObjectKind::Stitch) {
+                                flowsFromOtherFiles.push(sub_obj);
+                            } else {
+                                included_content.push(sub_obj);
+                            }
+                        }
+
+                        processed.extend(included_content);
+                        processed.push(Self::newline_object());
                     }
-                }
-                if !included_content.is_empty() {
-                    processed.extend(included_content);
-                    processed.push(Self::newline_object());
                 }
                 continue;
             }
@@ -743,12 +746,15 @@ mod tests {
     use crate::ParsedHierarchy::Expression::{Expression, ExpressionKind};
     use crate::ParsedHierarchy::ExternalDeclaration::ExternalDeclaration;
     use crate::ParsedHierarchy::Identifier::Identifier;
+    use crate::ParsedHierarchy::IncludedFile::IncludedFile;
     use crate::ParsedHierarchy::ListDefinition::{ListDefinition, ListElementDefinition};
     use crate::ParsedHierarchy::Number::{Number, NumberValue};
     use crate::ParsedHierarchy::Object::{Object, ObjectKind};
     use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
+    use ink_runtime::Container::ContentItem;
     use ink_runtime::DebugMetadata::DebugMetadata;
     use ink_runtime::Error::ErrorType;
+    use ink_runtime::Value::Value;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -911,6 +917,31 @@ mod tests {
                 message.contains("Ambiguous item name 'apple'") && *error_type == ErrorType::Error
             })
             .unwrap_or(false));
+    }
+
+    #[test]
+    fn flow_only_includes_leave_a_newline_at_the_include_site() {
+        let mut included_story = Story::default();
+        included_story
+            .content
+            .push(Object::with_kind(ObjectKind::Knot));
+
+        let include = Object::from_included_file(IncludedFile::new(Some(included_story)));
+        let mut story = Story::new(vec![include], false);
+
+        let content = story.content.clone();
+        story.PreProcessTopLevelObjects(content);
+
+        assert_eq!(story.content.len(), 2);
+        assert_eq!(story.content[1].kind, ObjectKind::Knot);
+
+        let newline_container = story.content[0]
+            .get_runtimeObject()
+            .expect("newline object should carry a runtime container");
+        match newline_container.get_content().first() {
+            Some(ContentItem::Value(Value::String(text))) => assert_eq!(text.value, "\n"),
+            other => panic!("expected newline string content, got {:?}", other),
+        }
     }
 
     #[test]
