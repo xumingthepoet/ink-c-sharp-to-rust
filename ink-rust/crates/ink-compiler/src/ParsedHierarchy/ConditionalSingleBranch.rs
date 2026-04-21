@@ -1,7 +1,7 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/ConditionalSingleBranch.cs
 
 use crate::ParsedHierarchy::Expression::Expression;
-use crate::ParsedHierarchy::Object::Object;
+use crate::ParsedHierarchy::Object::{Object, ObjectKind, ObjectPayload};
 use crate::ParsedHierarchy::Story::Story;
 use crate::ParsedHierarchy::Weave::Weave;
 use ink_runtime::Container::{Container as RuntimeContainer, ContentItem};
@@ -22,37 +22,54 @@ pub struct ConditionalSingleBranch {
     returnDivert: Option<RuntimeDivert>,
     contentContainer: Option<RuntimeContainer>,
     conditionalDivert: Option<RuntimeDivert>,
+    innerWeave: Option<Weave>,
 }
 
 impl ConditionalSingleBranch {
     // C# signature: public ConditionalSingleBranch (List<Parsed.Object> content)
     pub fn new(content: Vec<Object>) -> Self {
         let mut base = Object::new();
-        base.content = content;
+        let innerWeave = if content.is_empty() {
+            None
+        } else {
+            let weave = Weave::new(content, -1);
+            let mut weave_object = Object::with_kind(ObjectKind::Weave);
+            weave_object.content = weave.base.content.clone();
+            weave_object.set_identifier(weave.base.identifier.clone());
+            weave_object.set_indentationDepth(weave.base.indentationDepth);
+            weave_object.set_debugMetadata(weave.base.get_debugMetadata().cloned());
+            weave_object.payload = Some(ObjectPayload::Weave(Box::new(weave.clone())));
+            base.AddContent(weave_object);
+            Some(weave)
+        };
+
         Self {
             base,
+            innerWeave,
             ..Default::default()
         }
     }
 
     // C# signature: public override Runtime.Object GenerateRuntimeObject ()
     pub fn GenerateRuntimeObject(&mut self) -> RuntimeContainer {
-        if let Some(inner_text) = self.base.content.iter().find_map(|obj| {
-            obj.get_runtimeObject().and_then(|runtime| {
-                runtime.get_content().iter().find_map(|item| match item {
-                    ContentItem::Value(ink_runtime::Value::Value::String(value)) => {
-                        Some(value.clone())
+        if let Some(inner_weave) = &self.innerWeave {
+            for obj in &inner_weave.base.content {
+                if let Some(runtime) = obj.get_runtimeObject() {
+                    let saw_else_text = runtime.get_content().iter().any(|item| match item {
+                        ContentItem::Value(ink_runtime::Value::Value::String(value)) => {
+                            value.value.starts_with("else:")
+                        }
+                        _ => false,
+                    });
+
+                    if saw_else_text {
+                        self.base.Warning(
+                            "Saw the text 'else:' which is being treated as content. Did you mean '- else:'?"
+                                .to_string(),
+                            Some(obj.clone()),
+                        );
                     }
-                    _ => None,
-                })
-            })
-        }) {
-            if inner_text.value.starts_with("else:") {
-                self.base.Warning(
-                    "Saw the text 'else:' which is being treated as content. Did you mean '- else:'?"
-                        .to_string(),
-                    None,
-                );
+                }
             }
         }
 
@@ -120,13 +137,9 @@ impl ConditionalSingleBranch {
     }
 
     fn GenerateRuntimeForContent(&mut self) -> RuntimeContainer {
-        if self.base.content.is_empty() {
-            return RuntimeContainer::new();
-        }
-
-        let mut weave = Weave::new(self.base.content.clone(), -1);
-        weave
-            .get_rootContainer()
+        self.innerWeave
+            .as_mut()
+            .and_then(|weave| weave.get_rootContainer())
             .unwrap_or_else(RuntimeContainer::new)
     }
 
@@ -134,6 +147,10 @@ impl ConditionalSingleBranch {
     pub fn ResolveReferences(&mut self, context: &mut Story) {
         if let Some(own_expression) = &mut self.ownExpression {
             own_expression.ResolveReferences(context);
+        }
+
+        if let Some(inner_weave) = &mut self.innerWeave {
+            inner_weave.ResolveReferences(context);
         }
 
         if let Some(content_container) = &self.contentContainer {
@@ -162,6 +179,10 @@ impl ConditionalSingleBranch {
 
     pub fn set_ownExpression(&mut self, value: Option<Expression>) {
         self.ownExpression = value;
+        if let Some(own_expression) = self.ownExpression.clone() {
+            self.base
+                .AddContent(Object::from_expression(own_expression));
+        }
     }
 
     // C# signature: bool matchingEquality { get; }

@@ -6,21 +6,30 @@ use crate::ParsedHierarchy::Object::Object;
 use crate::ParsedHierarchy::Story::Story;
 use ink_runtime::Container::Container as RuntimeContainer;
 use ink_runtime::ControlCommand::ControlCommand;
-use ink_runtime::Path::Component;
+use ink_runtime::Path::{Component, Path};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Conditional {
     base: Object,
     initialCondition: Option<Expression>,
     branches: Vec<ConditionalSingleBranch>,
-    reJoinTarget: Option<RuntimeContainer>,
+    reJoinTarget: Option<Path>,
 }
 
 impl Conditional {
     // C# signature: public Conditional (Expression condition, List<ConditionalSingleBranch> branches)
     pub fn new(condition: Option<Expression>, branches: Vec<ConditionalSingleBranch>) -> Self {
+        let mut base = Object::new();
+        if let Some(condition) = condition.as_ref() {
+            base.AddContent(Object::from_expression(condition.clone()));
+        }
+
+        for branch in &branches {
+            base.AddContent(branch.get_base().clone());
+        }
+
         Self {
-            base: Object::new(),
+            base,
             initialCondition: condition,
             branches,
             reJoinTarget: None,
@@ -55,25 +64,18 @@ impl Conditional {
             container.AddContent(ControlCommand::PopEvaluatedValue());
         }
 
-        let mut rejoin = RuntimeContainer::new();
-        rejoin.set_name(Some("rejoin".to_string()));
-        let rejoin_path = rejoin
+        container.AddContent(ControlCommand::NoOp());
+        let rejoin_path = container
             .get_path()
-            .clone()
-            .PathByAppendingComponent(Component::new_overload_2(rejoin.get_name().to_string()));
-        rejoin.set_path(rejoin_path);
-        container.AddContent(rejoin.clone());
-        self.reJoinTarget = Some(rejoin);
+            .PathByAppendingComponent(Component::new((container.get_content().len() - 1) as i32));
+        self.reJoinTarget = Some(rejoin_path);
 
         container
     }
 
     // C# signature: public override void ResolveReferences (Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
-        let rejoin_path = self
-            .reJoinTarget
-            .as_ref()
-            .map(|container| container.get_path().clone());
+        let rejoin_path = self.reJoinTarget.clone();
 
         for branch in &mut self.branches {
             branch.set_returnDivertTargetPath(rejoin_path.clone());
