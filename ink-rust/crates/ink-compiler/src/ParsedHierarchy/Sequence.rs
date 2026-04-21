@@ -159,13 +159,12 @@ impl Sequence {
             container.AddContent(ControlCommand::SequenceShuffleIndex());
 
             // Sequence shuffle needs a place to continue after the chosen index is emitted.
-            let shuffle_exit = Container::new();
-            container.AddContent(shuffle_exit);
-
-            let shuffle_exit_path = match container.get_content().last() {
-                Some(ContentItem::Container(exit_container)) => exit_container.get_path().clone(),
-                _ => Path::new(),
-            };
+            container.AddContent(ControlCommand::NoOp());
+            let shuffle_exit_path = container
+                .get_path()
+                .PathByAppendingComponent(Component::new(
+                    (container.get_content().len() - 1) as i32,
+                ));
 
             if once || stopping {
                 if let Some(divert) = skip_shuffle_divert.take() {
@@ -179,7 +178,10 @@ impl Sequence {
 
         container.AddContent(ControlCommand::EvalEnd());
 
-        let postSequenceNoOp = Container::new();
+        container.AddContent(ControlCommand::NoOp());
+        let post_sequence_no_op_path = container
+            .get_path()
+            .PathByAppendingComponent(Component::new((container.get_content().len() - 1) as i32));
 
         for (el_index, element) in self.sequenceElements.iter_mut().enumerate() {
             container.AddContent(ControlCommand::EvalStart());
@@ -214,13 +216,6 @@ impl Sequence {
             });
             branch_complete_diverts.push(seq_branch_complete_divert);
         }
-
-        container.AddContent(postSequenceNoOp);
-
-        let post_sequence_no_op_path = match container.get_content().last() {
-            Some(ContentItem::Container(end_container)) => end_container.get_path().clone(),
-            _ => Path::new(),
-        };
 
         for divert in branch_complete_diverts {
             self.sequenceDivertsToResolve.push(SequenceDivertToResolve {
