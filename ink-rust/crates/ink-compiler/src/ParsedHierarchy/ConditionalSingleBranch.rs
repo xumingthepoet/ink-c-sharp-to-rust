@@ -29,9 +29,7 @@ impl ConditionalSingleBranch {
     // C# signature: public ConditionalSingleBranch (List<Parsed.Object> content)
     pub fn new(content: Vec<Object>) -> Self {
         let mut base = Object::new();
-        let innerWeave = if content.is_empty() {
-            None
-        } else {
+        let innerWeave = {
             let weave = Weave::new(content, -1);
             let mut weave_object = Object::with_kind(ObjectKind::Weave);
             weave_object.content = weave.base.content.clone();
