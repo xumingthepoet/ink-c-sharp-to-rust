@@ -201,23 +201,23 @@ impl Compiler {
     pub fn HandleInput(
         &mut self,
         inputResult: crate::CommandLineInput::CommandLineInput,
-    ) -> CommandLineInputResult {
+    ) -> Option<CommandLineInputResult> {
         let mut result = CommandLineInputResult::default();
         result.choiceIdx = -1;
 
         if inputResult.isHelp {
             result.output = Some("help".to_string());
-            return result;
+            return Some(result);
         }
 
         if inputResult.isExit {
             result.requestsExit = true;
-            return result;
+            return Some(result);
         }
 
         if let Some(choice_idx) = inputResult.choiceInput {
             result.choiceIdx = choice_idx;
-            return result;
+            return Some(result);
         }
 
         if let Some(debug_source) = inputResult.debugSource {
@@ -227,7 +227,7 @@ impl Compiler {
                 Some(metadata) => format!("DebugSource: {}", metadata.ToString()),
                 None => "DebugSource: Unknown source".to_string(),
             });
-            return result;
+            return Some(result);
         }
 
         if let Some(debug_path) = inputResult.debugPathLookup {
@@ -246,25 +246,25 @@ impl Compiler {
             } else {
                 result.output = Some("DebugSource: Unknown source".to_string());
             }
-            return result;
+            return Some(result);
         }
 
         if let Some(statement) = inputResult.userImmediateModeStatement.as_ref() {
             if let Some(runtime_story) = self.runtimeStory.as_mut() {
                 let parsed_statement = Self::downcast_immediate_statement(statement.as_ref());
                 if let Some(parsed_statement) = parsed_statement {
-                    return Self::execute_immediate_statement(
+                    return Some(Self::execute_immediate_statement(
                         self.parsedStory
                             .as_mut()
                             .unwrap_or_else(|| panic!("immediate mode requires a parsed story")),
                         runtime_story,
                         parsed_statement,
-                    );
+                    ));
                 }
             }
         }
 
-        result
+        None
     }
 
     // C# signature: public void RetrieveDebugSourceForLatestContent ()
@@ -438,5 +438,13 @@ mod tests {
             .iter()
             .any(|(message, error_type)| *error_type == ErrorType::Error
                 && message.contains("should not have return statement outside of a knot")));
+    }
+
+    #[test]
+    fn compiler_handle_input_returns_none_for_unhandled_input() {
+        let mut compiler = Compiler::new(String::new(), Options::default());
+        assert!(compiler
+            .HandleInput(crate::CommandLineInput::CommandLineInput::default())
+            .is_none());
     }
 }

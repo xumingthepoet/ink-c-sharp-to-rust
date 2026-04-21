@@ -138,7 +138,7 @@ Source area: `ink-c-sharp/compiler/`
 8. `Plugins/PluginManager.cs` (`deps=4`) [partial: reason=reflection-driven DLL loading is not yet modeled; missing=plugin discovery/loading and invoke-member dispatch; next=finish or replace plugin system integration]
 9. `StringParser/StringParser.cs` (`deps=5`) [ported]
 10. `Stats.cs` (`deps=7`) [ported]
-11. `Compiler.cs` (`deps=11`) [partial: source compilation now reaches Parsed.Story and Runtime.Story for simple stories, and parser errors are now buffered and replayed through the compiler handler; remaining gaps are plugin processing, full command-line handling, and debug-source recovery; missing=plugin directories, immediate-mode commands, and complete debug range recovery; next=finish the remaining compiler front-end helpers]
+11. `Compiler.cs` (`deps=11`) [partial: source compilation now reaches Parsed.Story and Runtime.Story for simple stories, parser errors are buffered and replayed through the compiler handler, and command-line input now returns null on unhandled input like C#; remaining gaps are plugin processing and some debug-source recovery edge cases; missing=plugin directories and complete debug range recovery; next=finish the remaining compiler front-end helpers]
 
 ## Tool Projects
 
