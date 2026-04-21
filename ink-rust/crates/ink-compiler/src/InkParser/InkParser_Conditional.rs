@@ -7,8 +7,8 @@ use crate::ParsedHierarchy::ContentList::{ContentList, ContentListItem};
 use crate::ParsedHierarchy::Expression::Expression;
 use crate::ParsedHierarchy::Object::Object;
 use crate::ParsedHierarchy::Object::ObjectKind;
+use crate::ParsedHierarchy::Text::Text;
 use ink_runtime::Container::Container as RuntimeContainer;
-use ink_runtime::Value::StringValue;
 
 impl InkParser {
     // C# signature: protected Conditional InnerConditionalContent()
@@ -230,11 +230,9 @@ impl InkParser {
 
         if expr.is_none() && content.is_empty() {
             self.Error("expected content for the conditional branch following '-'".to_string());
-            let mut placeholder = Object::with_kind(ObjectKind::Plain);
-            let mut runtime = RuntimeContainer::new();
-            runtime.AddContent(StringValue::new("".to_string()));
-            placeholder.set_runtimeObject(Some(runtime));
-            content.push(placeholder);
+            content.push(Object::from(ContentList::new(vec![Text::new(
+                String::new(),
+            )])));
         }
 
         self.MultilineWhitespace();
