@@ -1,6 +1,7 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/Sequence.cs
 
 use crate::ParsedHierarchy::ContentList::ContentList;
+use crate::ParsedHierarchy::Object::{Object, ObjectKind};
 use crate::ParsedHierarchy::Story::Story;
 use ink_runtime::Container::{Container, ContentItem};
 use ink_runtime::ControlCommand::ControlCommand;
@@ -92,6 +93,7 @@ pub struct SequenceDivertToResolve {
 
 #[derive(Clone, Debug, Default)]
 pub struct Sequence {
+    base: Object,
     sequenceElements: Vec<ContentList>,
     sequenceType: SequenceType,
     sequenceDivertsToResolve: Vec<SequenceDivertToResolve>,
@@ -100,8 +102,17 @@ pub struct Sequence {
 impl Sequence {
     // C# signature: public Sequence (List<ContentList> elementContentLists, SequenceType sequenceType)
     pub fn new(elementContentLists: Vec<ContentList>, sequenceType: SequenceType) -> Self {
+        let mut base = Object::with_kind(ObjectKind::Sequence);
+        let mut sequenceElements = Vec::new();
+
+        for elementContentList in elementContentLists {
+            base.AddContent(Object::from(elementContentList.clone()));
+            sequenceElements.push(elementContentList);
+        }
+
         Self {
-            sequenceElements: elementContentLists,
+            base,
+            sequenceElements,
             sequenceType,
             sequenceDivertsToResolve: Vec::new(),
         }
@@ -229,9 +240,7 @@ impl Sequence {
 
     // C# signature: public override void ResolveReferences(Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
-        for content_list in &mut self.sequenceElements {
-            content_list.ResolveReferences(context);
-        }
+        self.base.ResolveReferences(context);
 
         for to_resolve in &mut self.sequenceDivertsToResolve {
             to_resolve
@@ -243,7 +252,7 @@ impl Sequence {
 
 #[cfg(test)]
 mod tests {
-    use super::{Sequence, SequenceType};
+    use super::{ObjectKind, Sequence, SequenceType};
     use crate::ParsedHierarchy::ContentList::{ContentList, ContentListItem};
     use crate::ParsedHierarchy::Text::Text;
     use ink_runtime::Container::ContentItem;
@@ -261,5 +270,26 @@ mod tests {
         let runtime = sequence.GenerateRuntimeObject();
         assert!(matches!(runtime, ContentItem::Container(_)));
         assert!(sequence.sequenceType.contains(SequenceType::STOPPING));
+        assert_eq!(sequence.base.get_content().len(), 2);
+        assert!(matches!(
+            sequence.base.get_content()[0].kind,
+            ObjectKind::Plain
+        ));
+    }
+
+    #[test]
+    fn empty_sequence_branch_stays_as_content_list_object() {
+        let sequence = Sequence::new(
+            vec![ContentList::new_overload_2(), ContentList::new_overload_2()],
+            SequenceType::default(),
+        );
+
+        assert_eq!(sequence.base.get_content().len(), 2);
+        assert!(matches!(
+            sequence.base.get_content()[0].payload.as_ref(),
+            Some(crate::ParsedHierarchy::Object::ObjectPayload::ContentList(
+                _
+            ))
+        ));
     }
 }
