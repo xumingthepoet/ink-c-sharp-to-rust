@@ -49,6 +49,10 @@ impl InkParser {
 
         let has_weave_style_inline_brackets = self.ParseString("[".to_string()).is_some();
         if has_weave_style_inline_brackets {
+            if let Some(start_content) = start_content.as_mut() {
+                self.EndTagIfNecessary_overload_2(start_content);
+            }
+
             let option_only_text_and_logic = self.MixedTextAndLogic();
             if let Some(option_only_text_and_logic) = option_only_text_and_logic {
                 option_only_content = Some(ContentList::new(option_only_text_and_logic));
