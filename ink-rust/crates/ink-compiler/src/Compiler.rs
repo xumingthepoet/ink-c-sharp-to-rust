@@ -296,13 +296,16 @@ impl Compiler {
         result.choiceIdx = -1;
 
         match parsed_statement {
-            ImmediateStatement::Divert(divert) => {
+            ImmediateStatement::Divert(mut divert) => {
+                divert.ResolveReferences(parsed_story);
                 result.divertedPath = divert
-                    .get_target()
+                    .get_runtimeDivert()
+                    .and_then(|runtime_divert| runtime_divert.get_targetPath())
                     .map(|target| target.ToString())
                     .or_else(|| Some(String::new()));
             }
-            ImmediateStatement::Expression(expression) => {
+            ImmediateStatement::Expression(mut expression) => {
+                expression.ResolveReferences(parsed_story);
                 let runtime_obj = expression.GenerateRuntimeObject();
                 if let Some(value) = runtime_story.EvaluateExpression(runtime_obj) {
                     result.output = Some(value.ToString());
@@ -312,6 +315,8 @@ impl Compiler {
                 if assignment.get_isNewTemporaryDeclaration() {
                     parsed_story.TryAddNewVariableDeclaration(assignment.clone());
                 }
+
+                assignment.ResolveReferences(parsed_story);
 
                 if let Some(runtime_object) = assignment.GenerateRuntimeObject() {
                     if let ink_runtime::Container::ContentItem::Container(container) =
