@@ -1,7 +1,7 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/Weave.cs
 
 use crate::ParsedHierarchy::Choice::Choice;
-use crate::ParsedHierarchy::ContentList::ContentListItem;
+use crate::ParsedHierarchy::ContentList::{ContentList, ContentListItem};
 use crate::ParsedHierarchy::FlowBase::FlowBase;
 use crate::ParsedHierarchy::Gather::Gather;
 use crate::ParsedHierarchy::Object::{Object, ObjectKind, ObjectPayload};
@@ -231,7 +231,7 @@ impl Weave {
     }
 
     // C# signature: public void ValidateTermination (BadTerminationHandler badTerminationHandler)
-    pub fn ValidateTermination(&mut self, _badTerminationHandler: fn(&mut Object)) {
+    pub fn ValidateTermination(&mut self, badTerminationHandler: fn(&mut Object)) {
         if let Some(last_object) = self.get_lastParsedSignificantObject() {
             if matches!(
                 last_object.payload.as_ref(),
@@ -240,6 +240,33 @@ impl Weave {
                 return;
             }
         }
+
+        if !self.looseEnds.is_empty() {
+            for loose_end in self.looseEnds.clone() {
+                let loose_end_flow = self.ContentThatFollowsWeavePoint(&loose_end);
+                self.ValidateFlowOfObjectsTerminates(
+                    &loose_end_flow,
+                    &loose_end,
+                    badTerminationHandler,
+                );
+            }
+            return;
+        }
+
+        if self
+            .base
+            .content
+            .iter()
+            .any(|obj| matches!(obj.kind, ObjectKind::WeavePoint))
+        {
+            return;
+        }
+
+        self.ValidateFlowOfObjectsTerminates(
+            &self.base.content.clone(),
+            &self.base,
+            badTerminationHandler,
+        );
     }
 
     // C# signature: Runtime.Container rootContainer { get; }
@@ -412,7 +439,17 @@ impl Weave {
     }
 
     fn WeavePointHasLooseEnd(weavePoint: &Object) -> bool {
-        weavePoint.content.is_empty()
+        if weavePoint.content.is_empty() {
+            return true;
+        }
+
+        for content_obj in weavePoint.content.iter().rev() {
+            if Self::object_contains_terminating_divert(content_obj) {
+                return false;
+            }
+        }
+
+        true
     }
 
     fn ContentThatFollowsWeavePoint(&self, weavePoint: &Object) -> Vec<Object> {
@@ -460,12 +497,37 @@ impl Weave {
         &self,
         objFlow: &[Object],
         defaultObj: &Object,
+        badTerminationHandler: fn(&mut Object),
     ) -> Option<Object> {
-        if objFlow.is_empty() {
-            None
-        } else {
-            Some(defaultObj.clone())
+        let mut terminated = false;
+        let mut terminating_obj = defaultObj.clone();
+
+        for flow_obj in objFlow {
+            if Self::object_contains_terminating_divert(flow_obj)
+                || Self::object_contains_tunnel_onwards(flow_obj)
+            {
+                terminated = true;
+                if Self::object_contains_tunnel_onwards(flow_obj) {
+                    terminating_obj = flow_obj.clone();
+                    break;
+                }
+            }
+
+            terminating_obj = flow_obj.clone();
         }
+
+        if !terminated {
+            if matches!(
+                terminating_obj.payload.as_ref(),
+                Some(ObjectPayload::AuthorWarning(_))
+            ) {
+                return None;
+            }
+
+            badTerminationHandler(&mut terminating_obj);
+        }
+
+        Some(terminating_obj)
     }
 
     fn BadNestedTerminationHandler(terminatingObj: &mut Object) {
@@ -515,15 +577,70 @@ impl Weave {
             }
         }
     }
+
+    fn object_contains_terminating_divert(obj: &Object) -> bool {
+        if let Some(payload) = obj.payload.as_ref() {
+            if let ObjectPayload::ContentList(content_list) = payload {
+                if Self::content_list_contains_terminating_divert(content_list) {
+                    return true;
+                }
+            }
+        }
+
+        obj.content
+            .iter()
+            .any(|child| Self::object_contains_terminating_divert(child))
+    }
+
+    fn content_list_contains_terminating_divert(content_list: &ContentList) -> bool {
+        content_list.get_content().iter().any(|item| match item {
+            ContentListItem::Divert(divert) => {
+                !divert.get_isThread() && !divert.get_isTunnel() && !divert.get_isFunctionCall()
+            }
+            ContentListItem::ContentList(nested) => {
+                Self::content_list_contains_terminating_divert(nested)
+            }
+            ContentListItem::Object(object) => Self::object_contains_terminating_divert(object),
+            _ => false,
+        })
+    }
+
+    fn object_contains_tunnel_onwards(obj: &Object) -> bool {
+        if let Some(payload) = obj.payload.as_ref() {
+            if let ObjectPayload::ContentList(content_list) = payload {
+                if Self::content_list_contains_tunnel_onwards(content_list) {
+                    return true;
+                }
+            }
+        }
+
+        obj.content
+            .iter()
+            .any(|child| Self::object_contains_tunnel_onwards(child))
+    }
+
+    fn content_list_contains_tunnel_onwards(content_list: &ContentList) -> bool {
+        content_list.get_content().iter().any(|item| match item {
+            ContentListItem::TunnelOnwards(_) => true,
+            ContentListItem::ContentList(nested) => {
+                Self::content_list_contains_tunnel_onwards(nested)
+            }
+            ContentListItem::Object(object) => Self::object_contains_tunnel_onwards(object),
+            _ => false,
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::Weave;
+    use crate::ParsedHierarchy::ContentList::{ContentList, ContentListItem};
+    use crate::ParsedHierarchy::Divert::Divert;
     use crate::ParsedHierarchy::Expression::{Expression, ExpressionKind};
     use crate::ParsedHierarchy::Identifier::Identifier;
     use crate::ParsedHierarchy::Number::{Number, NumberValue};
     use crate::ParsedHierarchy::Object::{Object, ObjectKind};
+    use crate::ParsedHierarchy::Path::Path;
     use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
     use ink_runtime::Container::Container;
     use ink_runtime::Value::StringValue;
@@ -616,5 +733,21 @@ mod tests {
                 .map(|obj| obj.get_typeName()),
             Some(normal.get_typeName())
         );
+    }
+
+    #[test]
+    fn weave_point_with_terminal_divert_is_not_a_loose_end() {
+        let divert = Divert::new(
+            Path::new_overload_3(Identifier {
+                name: Some("knot".to_string()),
+                debugMetadata: None,
+            }),
+            vec![],
+        );
+        let content_list = ContentList::new(vec![ContentListItem::from(divert)]);
+        let mut weave_point = Object::with_kind(ObjectKind::WeavePoint);
+        weave_point.content = vec![Object::from(content_list)];
+
+        assert!(!Weave::WeavePointHasLooseEnd(&weave_point));
     }
 }
