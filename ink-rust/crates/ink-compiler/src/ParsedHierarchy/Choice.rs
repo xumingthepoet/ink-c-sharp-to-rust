@@ -145,7 +145,7 @@ impl Choice {
                 self.divertToStartContentOuter.as_mut(),
                 Some(&start_container),
             ) {
-                divert.set_targetPathString(Some(start_container.get_path().ToString()));
+                divert.set_targetPath(Some(start_container.get_path()));
             }
 
             outer.AddContent(self.divertToStartContentOuter.clone().unwrap());
@@ -226,7 +226,7 @@ impl Choice {
                 self.divertToStartContentInner.as_mut(),
                 self.startContentRuntimeContainer.as_ref(),
             ) {
-                divert.set_targetPathString(Some(start_container.get_path().ToString()));
+                divert.set_targetPath(Some(start_container.get_path()));
             }
             inner.AddContent(self.divertToStartContentInner.clone().unwrap());
 

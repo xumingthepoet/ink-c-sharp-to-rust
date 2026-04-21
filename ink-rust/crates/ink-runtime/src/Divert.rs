@@ -291,6 +291,10 @@ impl Divert {
         self.targetPath = value.map(Path::new_overload_4);
     }
 
+    pub fn set_targetPath(&mut self, value: Option<Path>) {
+        self.targetPath = value;
+    }
+
     // C# signature: string variableDivertName { get; }
     pub fn get_variableDivertName(&self) -> Option<&str> {
         self.variableDivertName.as_deref()

@@ -116,7 +116,7 @@ impl ConditionalSingleBranch {
         container.AddToNamedContentOnly(content_container.clone());
 
         let mut return_divert = RuntimeDivert::new();
-        return_divert.set_targetPathString(Some(content_path.ToString()));
+        return_divert.set_targetPath(Some(content_path.clone()));
         content_container.AddContent(return_divert.clone());
 
         self.returnDivert = Some(return_divert);
@@ -145,8 +145,7 @@ impl ConditionalSingleBranch {
 
         if let Some(content_container) = &self.contentContainer {
             if let Some(conditional_divert) = &mut self.conditionalDivert {
-                conditional_divert
-                    .set_targetPathString(Some(content_container.get_path().ToString()));
+                conditional_divert.set_targetPath(Some(content_container.get_path()));
             }
         }
 
@@ -209,7 +208,7 @@ impl ConditionalSingleBranch {
 
     pub fn set_returnDivertTargetPath(&mut self, path: Option<ink_runtime::Path::Path>) {
         if let Some(return_divert) = &mut self.returnDivert {
-            return_divert.set_targetPathString(path.map(|p| p.ToString()));
+            return_divert.set_targetPath(path);
         }
     }
 

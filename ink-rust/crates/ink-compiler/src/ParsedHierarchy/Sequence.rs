@@ -245,7 +245,7 @@ impl Sequence {
         for to_resolve in &mut self.sequenceDivertsToResolve {
             to_resolve
                 .divert
-                .set_targetPathString(Some(to_resolve.targetPath.ToString()));
+                .set_targetPath(Some(to_resolve.targetPath.clone()));
         }
     }
 }
