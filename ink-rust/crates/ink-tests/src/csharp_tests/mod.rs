@@ -1,0 +1,3441 @@
+#![allow(
+    dead_code,
+    unused_imports,
+    unused_variables,
+    non_snake_case,
+    non_camel_case_types,
+    non_upper_case_globals
+)]
+
+use crate::conformance::api::{
+    story::ExternalFunction, story::VariableObserver, value_type::ValueType,
+};
+use ink_compiler::CharacterRange::CharacterRange;
+use ink_compiler::FileHandler::IFileHandler;
+use ink_compiler::InkParser::CommentEliminator::CommentEliminator;
+use ink_compiler::InkParser::InkParser::InkParser as InkParserType;
+use ink_compiler::InkParser::InkParser_CharacterRanges::InkParser as CharacterRangeParser;
+use ink_compiler::ParsedHierarchy::Story::Story as ParsedStory;
+use ink_compiler::StringParser::StringParser::StringParser;
+use ink_runtime::Choice::Choice;
+use ink_runtime::Error::{ErrorHandler, ErrorType};
+use ink_runtime::Story::Story as RuntimeStory;
+use ink_runtime::Value::{Value, ValueInput};
+use std::cell::RefCell;
+use std::io;
+use std::path::PathBuf;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+
+fn value_type_into_runtime_value(value: ValueType) -> ValueInput {
+    match value {
+        ValueType::Bool(value) => ValueInput::Bool(value),
+        ValueType::Int(value) => ValueInput::Int(value),
+        ValueType::Float(value) => ValueInput::Float(value),
+        ValueType::String(value) => ValueInput::String(value),
+    }
+}
+
+fn value_from_runtime_value(value: Value) -> ValueType {
+    match value {
+        Value::Bool(value) => ValueType::Bool(value.value),
+        Value::Int(value) => ValueType::Int(value.value),
+        Value::Float(value) => ValueType::Float(value.value),
+        Value::String(value) => ValueType::String(value.value),
+        other => ValueType::String(other.to_string()),
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TestMode {
+    Normal,
+    JsonRoundTrip,
+}
+
+#[derive(Default)]
+struct MessageBuckets {
+    errors: Vec<String>,
+    warnings: Vec<String>,
+    authors: Vec<String>,
+}
+
+pub struct CSharpHarness {
+    mode: TestMode,
+    testing_errors: bool,
+    buckets: Arc<Mutex<MessageBuckets>>,
+    file_handler: Arc<dyn IFileHandler + Send + Sync>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct CSharpTestsFileHandler;
+
+impl IFileHandler for CSharpTestsFileHandler {
+    fn ResolveInkFilename(&self, includeName: &str) -> io::Result<String> {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let tests_dir = manifest_dir.join("fixtures/csharp_tests/includes");
+        let candidate = tests_dir.join(includeName);
+        if candidate.exists() {
+            return Ok(candidate.to_string_lossy().into_owned());
+        }
+
+        let current_dir = std::env::current_dir()?;
+        Ok(current_dir.join(includeName).to_string_lossy().into_owned())
+    }
+
+    fn LoadInkFileContents(&self, fullFilename: &str) -> io::Result<String> {
+        std::fs::read_to_string(fullFilename)
+    }
+}
+
+trait RuntimeStoryExt {
+    fn cont(&mut self) -> String;
+    fn cont_maximally(&mut self) -> String;
+    fn continue_maximally(&mut self) -> String;
+    fn choose_choice_index(&mut self, idx: usize);
+    fn choose_path_string_simple(&mut self, path: &str);
+    fn choose_path_string_with_args(
+        &mut self,
+        path: &str,
+        reset_callstack: bool,
+        arguments: Option<Vec<ValueType>>,
+    );
+    fn get_current_choices(&mut self) -> Vec<Choice>;
+    fn current_choices(&mut self) -> Vec<Choice>;
+    fn get_current_choices_len(&mut self) -> usize;
+    fn current_choices_len(&mut self) -> usize;
+    fn get_current_tags(&mut self) -> Vec<String>;
+    fn current_tags(&mut self) -> Vec<String>;
+    fn get_current_text(&mut self) -> String;
+    fn current_text(&mut self) -> String;
+    fn get_global_tags(&mut self) -> Vec<String>;
+    fn global_tags(&mut self) -> Vec<String>;
+    fn can_continue(&mut self) -> bool;
+    fn set_allow_external_function_fallbacks(&mut self, value: bool);
+    fn evaluate_function(
+        &mut self,
+        function_name: &str,
+        arguments: Option<Vec<ValueType>>,
+        text_output: &mut String,
+    ) -> Option<ValueType>;
+    fn save_state(&mut self) -> String;
+    fn load_state(&mut self, json: &str);
+    fn to_json(&mut self) -> String;
+    fn switch_flow(&mut self, flow_name: &str);
+    fn remove_flow(&mut self, flow_name: &str);
+    fn get_state(&mut self) -> ink_runtime::StoryState::StoryState;
+    fn set_state(&mut self, state: ink_runtime::StoryState::StoryState);
+    fn get_variable(&mut self, name: &str) -> Option<ValueType>;
+    fn set_variable(&mut self, name: &str, value: &ValueType) -> Result<(), String>;
+    fn bind_external_function(
+        &mut self,
+        func_name: &str,
+        func: Arc<Mutex<dyn ExternalFunction>>,
+        lookahead_safe: bool,
+    );
+    fn observe_variable(&mut self, variable_name: &str, observer: Arc<Mutex<dyn VariableObserver>>);
+}
+
+impl CSharpHarness {
+    pub fn new(mode: TestMode) -> Self {
+        Self {
+            mode,
+            testing_errors: false,
+            buckets: Arc::new(Mutex::new(MessageBuckets::default())),
+            file_handler: Arc::new(CSharpTestsFileHandler),
+        }
+    }
+
+    fn clear(&mut self) {
+        let mut buckets = self.buckets.lock().unwrap();
+        buckets.errors.clear();
+        buckets.warnings.clear();
+        buckets.authors.clear();
+    }
+
+    fn push_runtime_message(&self, message: &str, error_type: ErrorType) {
+        let mut buckets = self.buckets.lock().unwrap();
+        match error_type {
+            ErrorType::Error => buckets.errors.push(message.to_string()),
+            ErrorType::Warning => buckets.warnings.push(message.to_string()),
+            ErrorType::Author => buckets.authors.push(message.to_string()),
+        }
+    }
+
+    fn push_parse_message(&self, message: String, line: i32, _character: i32, is_warning: bool) {
+        let prefix = if is_warning { "WARNING" } else { "ERROR" };
+        let full_message = format!("{}: line {}: {}", prefix, line + 1, message);
+        let mut buckets = self.buckets.lock().unwrap();
+        if is_warning {
+            buckets.warnings.push(full_message);
+        } else {
+            buckets.errors.push(full_message);
+        }
+    }
+
+    pub fn compile_string(
+        &mut self,
+        source: &str,
+        count_all_visits: bool,
+        testing_errors: bool,
+    ) -> Option<RuntimeStory> {
+        self.testing_errors = testing_errors;
+        self.clear();
+
+        let parse_handler = {
+            let this = self.clone_shared();
+            Arc::new(
+                move |message: String, line: i32, character: i32, is_warning: bool| {
+                    if !this.testing_errors {
+                        let prefix = if is_warning { "WARNING" } else { "ERROR" };
+                        panic!("{}: line {}: {}", prefix, line + 1, message);
+                    }
+                    this.push_parse_message(message, line, character, is_warning);
+                },
+            )
+        };
+
+        let mut parser = InkParserType::new(
+            source.to_string(),
+            None,
+            Some(parse_handler),
+            Some(Arc::clone(&self.file_handler)),
+        );
+        let mut parsed_story = parser.Parse();
+        parsed_story.countAllVisits = count_all_visits;
+
+        let runtime_handler = {
+            let this = self.clone_shared();
+            Rc::new(RefCell::new(
+                Box::new(move |message: &str, error_type: ErrorType| {
+                    if !this.testing_errors {
+                        panic!("{}", message);
+                    }
+                    this.push_runtime_message(message, error_type);
+                }) as ErrorHandler,
+            ))
+        };
+
+        let runtime_story = parsed_story.ExportRuntime(Some(runtime_handler))?;
+        let mut story = runtime_story;
+
+        if self.mode == TestMode::JsonRoundTrip {
+            let json = story.to_json();
+            story = RuntimeStory::new_overload_2(json);
+        }
+
+        Some(story)
+    }
+
+    pub fn compile_string_without_runtime(
+        &mut self,
+        source: &str,
+        testing_errors: bool,
+    ) -> Option<ParsedStory> {
+        self.testing_errors = testing_errors;
+        self.clear();
+
+        let parse_handler = {
+            let this = self.clone_shared();
+            Arc::new(
+                move |message: String, line: i32, character: i32, is_warning: bool| {
+                    if !this.testing_errors {
+                        let prefix = if is_warning { "WARNING" } else { "ERROR" };
+                        panic!("{}: line {}: {}", prefix, line + 1, message);
+                    }
+                    this.push_parse_message(message, line, character, is_warning);
+                },
+            )
+        };
+
+        let mut parser = InkParserType::new(
+            source.to_string(),
+            None,
+            Some(parse_handler),
+            Some(Arc::clone(&self.file_handler)),
+        );
+        let mut parsed_story = parser.Parse();
+
+        if !testing_errors {
+            // Keep parity with the C# helper: parse must succeed in normal mode.
+        }
+
+        if self.error_messages().is_empty() {
+            let runtime_handler = {
+                let this = self.clone_shared();
+                Rc::new(RefCell::new(
+                    Box::new(move |message: &str, error_type: ErrorType| {
+                        if !this.testing_errors {
+                            panic!("{}", message);
+                        }
+                        this.push_runtime_message(message, error_type);
+                    }) as ErrorHandler,
+                ))
+            };
+            let _ = parsed_story.ExportRuntime(Some(runtime_handler));
+        }
+
+        Some(parsed_story)
+    }
+
+    fn clone_shared(&self) -> Self {
+        Self {
+            mode: self.mode,
+            testing_errors: self.testing_errors,
+            buckets: Arc::clone(&self.buckets),
+            file_handler: Arc::clone(&self.file_handler),
+        }
+    }
+
+    pub fn error_messages(&self) -> Vec<String> {
+        self.buckets.lock().unwrap().errors.clone()
+    }
+
+    pub fn warning_messages(&self) -> Vec<String> {
+        self.buckets.lock().unwrap().warnings.clone()
+    }
+
+    pub fn author_messages(&self) -> Vec<String> {
+        self.buckets.lock().unwrap().authors.clone()
+    }
+
+    pub fn had_error(&self, match_str: Option<&str>) -> bool {
+        self.has_message(match_str, &self.error_messages())
+    }
+
+    pub fn had_warning(&self, match_str: Option<&str>) -> bool {
+        self.has_message(match_str, &self.warning_messages())
+    }
+
+    fn has_message(&self, match_str: Option<&str>, list: &[String]) -> bool {
+        match match_str {
+            Some(query) => list.iter().any(|msg| msg.contains(query)),
+            None => !list.is_empty(),
+        }
+    }
+}
+
+impl RuntimeStoryExt for RuntimeStory {
+    fn cont(&mut self) -> String {
+        self.Continue()
+    }
+
+    fn cont_maximally(&mut self) -> String {
+        self.ContinueMaximally()
+    }
+
+    fn continue_maximally(&mut self) -> String {
+        self.cont_maximally()
+    }
+
+    fn choose_choice_index(&mut self, idx: usize) {
+        self.ChooseChoiceIndex(idx as i32);
+    }
+
+    fn choose_path_string_simple(&mut self, path: &str) {
+        self.ChoosePathString(path.to_string(), false, Vec::new());
+    }
+
+    fn choose_path_string_with_args(
+        &mut self,
+        path: &str,
+        reset_callstack: bool,
+        arguments: Option<Vec<ValueType>>,
+    ) {
+        let args = arguments
+            .unwrap_or_default()
+            .into_iter()
+            .map(value_type_into_runtime_value)
+            .collect::<Vec<_>>();
+        self.ChoosePathString(path.to_string(), reset_callstack, args);
+    }
+
+    fn get_current_choices(&mut self) -> Vec<Choice> {
+        self.get_currentChoices()
+    }
+
+    fn current_choices(&mut self) -> Vec<Choice> {
+        self.get_current_choices()
+    }
+
+    fn get_current_choices_len(&mut self) -> usize {
+        self.get_currentChoices().len()
+    }
+
+    fn current_choices_len(&mut self) -> usize {
+        self.get_current_choices_len()
+    }
+
+    fn get_current_tags(&mut self) -> Vec<String> {
+        self.get_currentTags()
+    }
+
+    fn current_tags(&mut self) -> Vec<String> {
+        self.get_current_tags()
+    }
+
+    fn get_current_text(&mut self) -> String {
+        self.get_currentText()
+    }
+
+    fn current_text(&mut self) -> String {
+        self.get_current_text()
+    }
+
+    fn get_global_tags(&mut self) -> Vec<String> {
+        self.get_globalTags()
+    }
+
+    fn global_tags(&mut self) -> Vec<String> {
+        self.get_global_tags()
+    }
+
+    fn can_continue(&mut self) -> bool {
+        self.get_canContinue()
+    }
+
+    fn set_allow_external_function_fallbacks(&mut self, value: bool) {
+        self.set_allowExternalFunctionFallbacks(value);
+    }
+
+    fn evaluate_function(
+        &mut self,
+        function_name: &str,
+        arguments: Option<Vec<ValueType>>,
+        text_output: &mut String,
+    ) -> Option<ValueType> {
+        let args = arguments
+            .unwrap_or_default()
+            .into_iter()
+            .map(value_type_into_runtime_value)
+            .collect::<Vec<_>>();
+        self.EvaluateFunction_overload_2(function_name.to_string(), text_output, args)
+            .map(value_from_runtime_value)
+    }
+
+    fn save_state(&mut self) -> String {
+        self.get_state().ToJson()
+    }
+
+    fn load_state(&mut self, json: &str) {
+        let mut state = self.get_state();
+        state.LoadJson(json.to_string());
+        self.set_state(state);
+    }
+
+    fn to_json(&mut self) -> String {
+        self.ToJson()
+    }
+
+    fn switch_flow(&mut self, flow_name: &str) {
+        self.SwitchFlow(flow_name.to_string());
+    }
+
+    fn remove_flow(&mut self, flow_name: &str) {
+        self.RemoveFlow(flow_name.to_string());
+    }
+
+    fn get_state(&mut self) -> ink_runtime::StoryState::StoryState {
+        self.get_state()
+    }
+
+    fn set_state(&mut self, state: ink_runtime::StoryState::StoryState) {
+        self.set_state(state);
+    }
+
+    fn get_variable(&mut self, name: &str) -> Option<ValueType> {
+        self.get_variablesState()
+            .GetVariableWithName(name.to_string())
+            .map(value_from_runtime_value)
+    }
+
+    fn set_variable(&mut self, name: &str, value: &ValueType) -> Result<(), String> {
+        self.get_variablesState_mut().SetIndexedValue(
+            name.to_string(),
+            Some(value_type_into_runtime_value(value.clone())),
+        );
+        Ok(())
+    }
+
+    fn bind_external_function(
+        &mut self,
+        func_name: &str,
+        func: Arc<Mutex<dyn ExternalFunction>>,
+        lookahead_safe: bool,
+    ) {
+        let func_name = func_name.to_string();
+        let func_name_for_callback = func_name.clone();
+        let callback = {
+            let func = func.clone();
+            Arc::new(move |args: &[ValueInput]| {
+                let args = args
+                    .iter()
+                    .cloned()
+                    .filter_map(Value::Create)
+                    .map(value_from_runtime_value)
+                    .collect::<Vec<_>>();
+                let mut func = func.lock().unwrap();
+                func.call(&func_name_for_callback, args)
+                    .map(|value| match value {
+                        ValueType::Bool(v) => Value::new_bool(v),
+                        ValueType::Int(v) => Value::new_int(v),
+                        ValueType::Float(v) => Value::new_float(v),
+                        ValueType::String(v) => Value::new_string(v),
+                    })
+            })
+        };
+
+        self.BindExternalFunctionGeneral(func_name, callback, lookahead_safe);
+    }
+
+    fn observe_variable(
+        &mut self,
+        variable_name: &str,
+        observer: Arc<Mutex<dyn VariableObserver>>,
+    ) {
+        let variable_name = variable_name.to_string();
+        let callback = {
+            let observer = observer.clone();
+            Arc::new(move |name: String, value: Value| {
+                let converted = value_from_runtime_value(value);
+                observer.lock().unwrap().changed(&name, &converted);
+            })
+        };
+
+        self.ObserveVariable(variable_name, callback);
+    }
+}
+
+fn run_in_both_modes(mut f: impl FnMut(&mut CSharpHarness)) {
+    let mut modes = vec![TestMode::Normal];
+    if std::env::var_os("INK_CSHARP_RUN_JSON_ROUNDTRIP").is_some() {
+        modes.push(TestMode::JsonRoundTrip);
+    }
+    for mode in modes {
+        let mut harness = CSharpHarness::new(mode);
+        f(&mut harness);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    #[derive(Default)]
+    struct TestVariableObserverState {
+        current_var_value: i32,
+        observer_call_count: usize,
+    }
+
+    struct TestVariableObserverImpl {
+        state: Arc<Mutex<TestVariableObserverState>>,
+    }
+
+    impl VariableObserver for TestVariableObserverImpl {
+        fn changed(&mut self, _variable_name: &str, new_value: &ValueType) {
+            let mut state = self.state.lock().unwrap();
+            state.current_var_value = new_value.get::<i32>().unwrap_or_default();
+            state.observer_call_count += 1;
+        }
+    }
+
+    struct TestExternalFunction<F>(F);
+
+    impl<F> ExternalFunction for TestExternalFunction<F>
+    where
+        F: FnMut(&str, Vec<ValueType>) -> Option<ValueType> + Send,
+    {
+        fn call(&mut self, func_name: &str, args: Vec<ValueType>) -> Option<ValueType> {
+            (self.0)(func_name, args)
+        }
+    }
+
+    fn boxed_external_function<F>(func: F) -> Arc<Mutex<dyn ExternalFunction>>
+    where
+        F: FnMut(&str, Vec<ValueType>) -> Option<ValueType> + Send + 'static,
+    {
+        Arc::new(Mutex::new(TestExternalFunction(func)))
+    }
+
+    fn generate_identifier_from_character_range(
+        range: &mut CharacterRange,
+        var_name_unique_part: Option<&str>,
+    ) -> String {
+        let mut identifier = String::new();
+        if let Some(prefix) = var_name_unique_part {
+            if !prefix.is_empty() {
+                identifier.push_str(prefix);
+            }
+        }
+
+        let charset = range.ToCharacterSet();
+        let mut characters: Vec<_> = charset.characters.iter().copied().collect();
+        characters.sort_unstable();
+        for c in characters {
+            identifier.push(c);
+        }
+
+        identifier
+    }
+
+    fn rust_test_names() -> BTreeSet<String> {
+        let source = include_str!("mod.rs");
+        let mut names = BTreeSet::new();
+        for line in source.lines() {
+            let line = line.trim_start();
+            if let Some(rest) = line.strip_prefix("fn ") {
+                if let Some((name, _)) = rest.split_once('(') {
+                    if name.starts_with("Test") {
+                        names.insert(name.to_string());
+                    }
+                }
+            }
+        }
+        names
+    }
+
+    fn csharp_test_names() -> BTreeSet<String> {
+        let source = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/fixtures/csharp_tests/official_test_names.txt"
+        ));
+        let mut names = BTreeSet::new();
+        for line in source.lines() {
+            let line = line.trim_start();
+            if !line.is_empty() && !line.starts_with('#') {
+                names.insert(line.to_string());
+            }
+        }
+        names
+    }
+
+    #[test]
+    fn TestHelloWorld() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string("Hello world", false, false)
+                .expect("compile should succeed");
+            assert_eq!("Hello world\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestArithmetic() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+{ 2 * 3 + 5 * 6 }
+{8 mod 3}
+{13 % 5}
+{ 7 / 3 }
+{ 7 / 3.0 }
+{ 10 - 2 }
+{ 2 * (5-1) }
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            eprintln!(
+                "arith pre can_continue={} choices={} text='{}'",
+                story.can_continue(),
+                story.current_choices_len(),
+                story.current_text()
+            );
+            let first = story.cont();
+            eprintln!(
+                "arith first='{}' after choices={} can_continue={} text='{}'",
+                first,
+                story.current_choices_len(),
+                story.can_continue(),
+                story.current_text()
+            );
+            assert_eq!(
+                "36\n2\n3\n2\n2.3333333\n8\n8\n",
+                first + &story.cont_maximally()
+            );
+        });
+    }
+
+    #[test]
+    fn TestBools() {
+        run_in_both_modes(|suite| {
+            assert_eq!(
+                "true\n",
+                suite
+                    .compile_string("{true}", false, false)
+                    .expect("compile should succeed")
+                    .cont()
+            );
+            assert_eq!(
+                "2\n",
+                suite
+                    .compile_string("{true + 1}", false, false)
+                    .expect("compile should succeed")
+                    .cont()
+            );
+            assert_eq!(
+                "3\n",
+                suite
+                    .compile_string("{2 + true}", false, false)
+                    .expect("compile should succeed")
+                    .cont()
+            );
+            assert_eq!(
+                "0\n",
+                suite
+                    .compile_string("{false + false}", false, false)
+                    .expect("compile should succeed")
+                    .cont()
+            );
+            assert_eq!(
+                "2\n",
+                suite
+                    .compile_string("{true + true}", false, false)
+                    .expect("compile should succeed")
+                    .cont()
+            );
+            assert_eq!(
+                "true\n",
+                suite
+                    .compile_string("{true == 1}", false, false)
+                    .expect("compile should succeed")
+                    .cont()
+            );
+            assert_eq!(
+                "false\n",
+                suite
+                    .compile_string("{not 1}", false, false)
+                    .expect("compile should succeed")
+                    .cont()
+            );
+            assert_eq!(
+                "false\n",
+                suite
+                    .compile_string("{not true}", false, false)
+                    .expect("compile should succeed")
+                    .cont()
+            );
+            assert_eq!(
+                "true\n",
+                suite
+                    .compile_string("{3 > 1}", false, false)
+                    .expect("compile should succeed")
+                    .cont()
+            );
+            let list_hasnt_story = r#"
+                LIST list = a, (b), c, (d), e
+                {list !? (c)}
+            "#;
+            assert_eq!(
+                "true\n",
+                suite
+                    .compile_string(list_hasnt_story, false, false)
+                    .expect("compile should succeed")
+                    .cont()
+            );
+        });
+    }
+
+    #[test]
+    fn TestAllSwitchBranchesFailIsClean() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+{ 1:
+    - 2: x
+    - 3: y
+}
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            story.cont();
+            assert_eq!(0, story.get_state().get_evaluationStack().len());
+        });
+    }
+
+    #[test]
+    fn TestArgumentNameCollisions() {
+        run_in_both_modes(|suite| {
+            suite
+                .compile_string_without_runtime(
+                    r#"
+VAR global_var = 5
+
+~ pass_divert(-> knot_name)
+{variable_param_test(10)}
+
+=== function aTarget() ===
+   ~ return true
+
+=== function pass_divert(aTarget) ===
+    Should be a divert target, but is a read count:- {aTarget}
+
+=== function variable_param_test(global_var) ===
+    ~ return global_var
+
+=== knot_name ===
+    -> END
+"#,
+                    true,
+                )
+                .expect("parse should succeed");
+            assert_eq!(2, suite.error_messages().len());
+            assert!(suite.had_error(Some("name has already been used for a function")));
+            assert!(suite.had_error(Some("name has already been used for a var")));
+        });
+    }
+
+    #[test]
+    fn TestArgumentShouldntConflictWithGatherElsewhere() {
+        run_in_both_modes(|suite| {
+            suite
+                .compile_string_without_runtime(
+                    r#"
+== knot ==
+- (x) -> DONE
+
+== function f(x) ==
+Nothing
+"#,
+                    false,
+                )
+                .expect("parse should succeed");
+        });
+    }
+
+    #[test]
+    fn TestComplexTunnels() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> one (1) -> two (2) ->
+three (3)
+
+== one(num) ==
+one ({num})
+-> oneAndAHalf (1.5) ->
+->->
+
+== oneAndAHalf(num) ==
+one and a half ({num})
+->->
+
+== two (num) ==
+two ({num})
+->->
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!(
+                "one (1)\none and a half (1.5)\ntwo (2)\nthree (3)\n",
+                story.continue_maximally()
+            );
+        });
+    }
+
+    #[test]
+    fn TestElseBranches() {
+        run_in_both_modes(|suite| {
+            let story_str = r#"
+VAR x = 3
+
+{
+    - x == 1: one
+    - x == 2: two
+    - else: other
+}
+
+{
+    - x == 1: one
+    - x == 2: two
+    - other
+}
+
+{ x == 4:
+  - The main clause
+  - else: other
+}
+
+{ x == 4:
+  The main clause
+- else:
+  other
+}
+"#;
+            let mut story = suite
+                .compile_string(story_str, false, false)
+                .expect("compile should succeed");
+            assert_eq!("other\nother\nother\nother\n", story.current_text());
+        });
+    }
+
+    #[test]
+    fn TestEndOfContent() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string("Hello world", false, true)
+                .expect("compile should succeed");
+            story.continue_maximally();
+            assert!(!suite.had_error(None));
+
+            let mut story = suite
+                .compile_string("== test ==\nContent\n-> END", false, false)
+                .expect("compile should succeed");
+            story.continue_maximally();
+
+            let mut story = suite
+                .compile_string("== test ==\nContent", false, true)
+                .expect("compile should succeed");
+            story.continue_maximally();
+            assert!(suite.had_warning(None));
+
+            suite
+                .compile_string_without_runtime("== test ==\nContent", true)
+                .expect("parse should succeed");
+            assert!(!suite.had_error(None));
+            assert!(suite.had_warning(None));
+
+            suite
+                .compile_string_without_runtime("== test ==\n~return", true)
+                .expect("parse should succeed");
+            assert!(suite.had_error(Some(
+                "Return statements can only be used in knots that are declared as functions"
+            )));
+
+            suite
+                .compile_string_without_runtime("== function test ==\n-> END", true)
+                .expect("parse should succeed");
+            assert!(suite.had_error(Some("Functions may not contain diverts")));
+        });
+    }
+
+    #[test]
+    fn TestEscapeCharacter() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"{true:this is a '\|' character|this isn't}"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("this is a '|' character\n", story.continue_maximally());
+        });
+    }
+
+    #[test]
+    fn TestExternalBinding() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+EXTERNAL message(x)
+EXTERNAL multiply(x,y)
+EXTERNAL times(i,str)
+~ message("hello world")
+{multiply(5.0, 3)}
+{times(3, "knock ")}
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            let message = Arc::new(Mutex::new(None::<String>));
+            let message_clone = Arc::clone(&message);
+            story.bind_external_function(
+                "message",
+                boxed_external_function(move |_func, args| {
+                    if let Some(ValueType::String(arg)) = args.into_iter().next() {
+                        *message_clone.lock().unwrap() = Some(format!("MESSAGE: {}", arg));
+                    }
+                    None
+                }),
+                false,
+            );
+
+            story.bind_external_function(
+                "multiply",
+                boxed_external_function(|_func, args| match args.as_slice() {
+                    [ValueType::Float(a), ValueType::Int(b)] => {
+                        Some(ValueType::Float(a * (*b as f32)))
+                    }
+                    [ValueType::Float(a), ValueType::Float(b)] => Some(ValueType::Float(a * b)),
+                    _ => None,
+                }),
+                false,
+            );
+
+            story.bind_external_function(
+                "times",
+                boxed_external_function(|_func, args| match args.as_slice() {
+                    [ValueType::Int(number_of_times), ValueType::String(str)] => {
+                        Some(ValueType::String(str.repeat(*number_of_times as usize)))
+                    }
+                    _ => None,
+                }),
+                false,
+            );
+
+            assert_eq!("15\n", story.cont());
+            assert_eq!("knock knock knock\n", story.cont());
+            assert_eq!(
+                Some("MESSAGE: hello world".to_string()),
+                message.lock().unwrap().clone()
+            );
+        });
+    }
+
+    #[test]
+    fn TestLookupSafeOrNot() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+EXTERNAL myAction()
+
+One
+~ myAction()
+Two
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            let call_count = Arc::new(Mutex::new(0usize));
+            let safe_count = Arc::clone(&call_count);
+            story.bind_external_function(
+                "myAction",
+                boxed_external_function(move |_func, _args| {
+                    *safe_count.lock().unwrap() += 1;
+                    None
+                }),
+                true,
+            );
+
+            story.continue_maximally();
+            assert_eq!(2, *call_count.lock().unwrap());
+
+            *call_count.lock().unwrap() = 0;
+            story.ResetState();
+            story.UnbindExternalFunction("myAction".to_string());
+
+            let unsafe_count = Arc::clone(&call_count);
+            story.bind_external_function(
+                "myAction",
+                boxed_external_function(move |_func, _args| {
+                    *unsafe_count.lock().unwrap() += 1;
+                    None
+                }),
+                false,
+            );
+
+            story.continue_maximally();
+            assert_eq!(1, *call_count.lock().unwrap());
+
+            let mut story_with_post_glue = suite
+                .compile_string(
+                    r#"
+EXTERNAL myAction()
+
+One 
+~ myAction()
+<> Two
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            story_with_post_glue.bind_external_function(
+                "myAction",
+                boxed_external_function(|_func, _args| None),
+                true,
+            );
+            let result = story_with_post_glue.continue_maximally();
+            assert_eq!("One\nTwo\n", result);
+        });
+    }
+
+    #[test]
+    fn TestFactorialByReference() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+VAR result = 0
+~ factorialByRef(result, 5)
+{ result }
+
+== function factorialByRef(ref r, n) ==
+{ r == 0:
+    ~ r = 1
+}
+{ n > 1:
+    ~ r = r * n
+    ~ factorialByRef(r, n-1)
+}
+~ return
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("120\n", story.continue_maximally());
+        });
+    }
+
+    #[test]
+    fn TestFactorialRecursive() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+{ factorial(5) }
+
+== function factorial(n) ==
+ { n == 1:
+    ~ return 1
+ - else:
+    ~ return (n * factorial(n-1))
+ }
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("120\n", story.continue_maximally());
+        });
+    }
+
+    #[test]
+    fn TestFunctionCallRestrictions() {
+        run_in_both_modes(|suite| {
+            suite
+                .compile_string_without_runtime(
+                    r#"
+// Allowed to do this
+~ myFunc()
+
+// Not allowed to to this
+~ aKnot()
+
+// Not allowed to do this
+-> myFunc
+
+== function myFunc ==
+This is a function.
+~ return
+
+== aKnot ==
+This is a normal knot.
+-> END
+"#,
+                    true,
+                )
+                .expect("parse should succeed");
+            assert_eq!(2, suite.error_messages().len());
+            assert!(suite
+                .error_messages()
+                .iter()
+                .any(|m| m.contains("hasn't been marked as a function")));
+            assert!(suite
+                .error_messages()
+                .iter()
+                .any(|m| m.contains("can only be called as a function")));
+        });
+    }
+
+    #[test]
+    fn TestFunctionPurityChecks() {
+        run_in_both_modes(|suite| {
+            suite
+                .compile_string_without_runtime(
+                    r#"
+-> test
+
+== test ==
+~ myFunc()
+= function myBadInnerFunc
+Not allowed!
+~ return
+
+== function myFunc ==
+Hello world
+* a choice
+* another choice
+-
+-> myFunc
+= testStitch
+    This is a stitch
+~ return
+"#,
+                    true,
+                )
+                .expect("parse should succeed");
+            assert_eq!(7, suite.error_messages().len());
+            assert!(suite
+                .error_messages()
+                .iter()
+                .any(|m| m.contains("Return statements can only be used in knots that")));
+            assert!(suite
+                .error_messages()
+                .iter()
+                .any(|m| m.contains("Functions cannot be stitches")));
+            assert!(suite
+                .error_messages()
+                .iter()
+                .any(|m| m.contains("Functions may not contain stitches")));
+            assert!(suite
+                .error_messages()
+                .iter()
+                .any(|m| m.contains("Functions may not contain diverts")));
+            assert!(suite
+                .error_messages()
+                .iter()
+                .any(|m| m.contains("Functions may not contain choices")));
+        });
+    }
+
+    #[test]
+    fn TestDisallowEmptyDiverts() {
+        run_in_both_modes(|suite| {
+            suite
+                .compile_string_without_runtime("->", true)
+                .expect("parse should succeed");
+            assert!(suite.had_error(Some("Empty diverts (->) are only valid on choices")));
+        });
+    }
+
+    #[test]
+    fn TestDoneStopsThread() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> DONE
+This content is inaccessible.
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!(String::new(), story.continue_maximally());
+        });
+    }
+
+    #[test]
+    fn TestMultiFlowBasics() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+=== knot1
+knot 1 line 1
+knot 1 line 2
+-> END 
+
+=== knot2
+knot 2 line 1
+knot 2 line 2
+-> END 
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            story.switch_flow("First");
+            story.choose_path_string_simple("knot1");
+            assert_eq!("knot 1 line 1\n", story.cont());
+            story.switch_flow("Second");
+            story.choose_path_string_simple("knot2");
+            assert_eq!("knot 2 line 1\n", story.cont());
+            story.switch_flow("First");
+            assert_eq!("knot 1 line 2\n", story.cont());
+            story.switch_flow("Second");
+            assert_eq!("knot 2 line 2\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestMultiFlowSaveLoadThreads() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+Default line 1
+Default line 2
+
+== red ==
+Hello I'm red
+<- thread1("red")
+<- thread2("red")
+-> DONE
+
+== blue ==
+Hello I'm blue
+<- thread1("blue")
+<- thread2("blue")
+-> DONE
+
+== thread1(name) ==
++ Thread 1 {name} choice
+    -> thread1Choice(name)
+
+== thread2(name) ==
++ Thread 2 {name} choice
+    -> thread2Choice(name)
+
+== thread1Choice(name) ==
+After thread 1 choice ({name})
+-> END
+
+== thread2Choice(name) ==
+After thread 2 choice ({name})
+-> END
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("Default line 1\n", story.cont());
+            story.switch_flow("Blue Flow");
+            story.choose_path_string_simple("blue");
+            assert_eq!("Hello I'm blue\n", story.cont());
+            story.switch_flow("Red Flow");
+            story.choose_path_string_simple("red");
+            assert_eq!("Hello I'm red\n", story.cont());
+            story.switch_flow("Blue Flow");
+            assert_eq!("Hello I'm blue\n", story.current_text());
+            assert_eq!(
+                "Thread 1 blue choice",
+                story.current_choices()[0].text.clone()
+            );
+            story.switch_flow("Red Flow");
+            assert_eq!("Hello I'm red\n", story.current_text());
+            assert_eq!(
+                "Thread 1 red choice",
+                story.current_choices()[0].text.clone()
+            );
+            let saved = story.save_state();
+            story.choose_choice_index(0);
+            assert_eq!(
+                "Thread 1 red choice\nAfter thread 1 choice (red)\n",
+                story.continue_maximally()
+            );
+            story.load_state(&saved);
+            story.choose_choice_index(1);
+            assert_eq!(
+                "Thread 2 red choice\nAfter thread 2 choice (red)\n",
+                story.continue_maximally()
+            );
+            story.load_state(&saved);
+            story.switch_flow("Blue Flow");
+            story.choose_choice_index(0);
+            assert_eq!(
+                "Thread 1 blue choice\nAfter thread 1 choice (blue)\n",
+                story.continue_maximally()
+            );
+            story.load_state(&saved);
+            story.switch_flow("Blue Flow");
+            story.choose_choice_index(1);
+            assert_eq!(
+                "Thread 2 blue choice\nAfter thread 2 choice (blue)\n",
+                story.continue_maximally()
+            );
+            story.remove_flow("Blue Flow");
+            assert_eq!("Default line 2\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestCharacterRangeIdentifiersForConstNamesWithAsciiPrefix() {
+        run_in_both_modes(|suite| {
+            let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
+            for range in ranges.iter_mut() {
+                let identifier = generate_identifier_from_character_range(range, None);
+                let story_str = format!(
+                    "\nCONST pi{0} = 3.1415\nCONST a{0} = \"World\"\nCONST b{0} = 3\n",
+                    identifier
+                );
+                let compiled_story = suite
+                    .compile_string_without_runtime(&story_str, false)
+                    .expect("parse should succeed");
+                let _ = compiled_story;
+            }
+        });
+    }
+
+    #[test]
+    fn TestCharacterRangeIdentifiersForConstNamesWithAsciiSuffix() {
+        run_in_both_modes(|suite| {
+            let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
+            for range in ranges.iter_mut() {
+                let identifier = generate_identifier_from_character_range(range, None);
+                let story_str = format!(
+                    "\nCONST {0}pi = 3.1415\nCONST {0}a = \"World\"\nCONST {0}b = 3\n",
+                    identifier
+                );
+                let compiled_story = suite
+                    .compile_string_without_runtime(&story_str, false)
+                    .expect("parse should succeed");
+                let _ = compiled_story;
+            }
+        });
+    }
+
+    #[test]
+    fn TestCharacterRangeIdentifiersForSimpleVariableNamesWithAsciiPrefix() {
+        run_in_both_modes(|suite| {
+            let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
+            for range in ranges.iter_mut() {
+                let identifier = generate_identifier_from_character_range(range, None);
+                let story_str = format!(
+                    "\nVAR pi{0} = 3.1415\nVAR a{0} = \"World\"\nVAR b{0} = 3\n",
+                    identifier
+                );
+                let compiled_story = suite
+                    .compile_string_without_runtime(&story_str, false)
+                    .expect("parse should succeed");
+                let _ = compiled_story;
+            }
+        });
+    }
+
+    #[test]
+    fn TestCharacterRangeIdentifiersForSimpleVariableNamesWithAsciiSuffix() {
+        run_in_both_modes(|suite| {
+            let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
+            for range in ranges.iter_mut() {
+                let identifier = generate_identifier_from_character_range(range, None);
+                let story_str = format!(
+                    "\nVAR {0}pi = 3.1415\nVAR {0}a = \"World\"\nVAR {0}b = 3\n",
+                    identifier
+                );
+                let compiled_story = suite
+                    .compile_string_without_runtime(&story_str, false)
+                    .expect("parse should succeed");
+                let _ = compiled_story;
+            }
+        });
+    }
+
+    #[test]
+    fn TestCharacterRangeIdentifiersForDivertNamesWithAsciiPrefix() {
+        run_in_both_modes(|suite| {
+            let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
+            for range in ranges.iter_mut() {
+                let range_string = generate_identifier_from_character_range(range, None);
+                let story_str = format!(
+                    "\nVAR z{0} = -> divert{0}\n\n== divert{0} ==\n-> END\n",
+                    range_string
+                );
+                let compiled_story = suite
+                    .compile_string_without_runtime(&story_str, false)
+                    .expect("parse should succeed");
+                let _ = compiled_story;
+            }
+        });
+    }
+
+    #[test]
+    fn TestCharacterRangeIdentifiersForDivertNamesWithAsciiSuffix() {
+        run_in_both_modes(|suite| {
+            let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
+            for range in ranges.iter_mut() {
+                let range_string = generate_identifier_from_character_range(range, None);
+                let story_str = format!(
+                    "\nVAR {0}z = -> {0}divert\n\n== {0}divert ==\n-> END\n",
+                    range_string
+                );
+                let compiled_story = suite
+                    .compile_string_without_runtime(&story_str, false)
+                    .expect("parse should succeed");
+                let _ = compiled_story;
+            }
+        });
+    }
+
+    #[test]
+    fn TestBasicStringLiterals() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+VAR x = "Hello world 1"
+{x}
+Hello {"world"} 2.
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("Hello world 1\nHello world 2.\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestBasicTunnel() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> f ->
+<> world
+
+== f ==
+Hello
+->->
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("Hello world\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestChoiceCount() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+<- choices
+{ CHOICE_COUNT() }
+
+= end
+-> END
+
+= choices
+* one -> end
+* two -> end
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("2\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestChoiceDivertsToDone() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string("* choice -> DONE", false, false)
+                .expect("compile should succeed");
+            story.cont();
+            assert_eq!(1, story.get_current_choices_len());
+            story.choose_choice_index(0);
+            assert_eq!("choice", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestChoiceWithBracketsOnly() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string("*   [Option]\n    Text", false, false)
+                .expect("compile should succeed");
+            story.cont();
+            assert_eq!(1, story.get_current_choices_len());
+            assert_eq!("Option", story.current_choices()[0].text.clone());
+            story.choose_choice_index(0);
+            assert_eq!("Text\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestCompareDivertTargets() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+VAR to_one = -> one
+VAR to_two = -> two
+
+{to_one == to_two:same knot|different knot}
+{to_one == to_one:same knot|different knot}
+{to_two == to_two:same knot|different knot}
+{ -> one == -> two:same knot|different knot}
+{ -> one == to_one:same knot|different knot}
+{ to_one == -> one:same knot|different knot}
+
+== one
+    One
+    -> DONE
+
+=== two
+    Two
+    -> DONE
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!(
+                "different knot\nsame knot\nsame knot\ndifferent knot\nsame knot\nsame knot\n",
+                story.cont_maximally()
+            );
+        });
+    }
+
+    #[test]
+    fn TestBlanksInInlineSequences() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+1. -> seq1 ->
+2. -> seq1 ->
+3. -> seq1 ->
+4. -> seq1 ->
+\---
+1. -> seq2 ->
+2. -> seq2 ->
+3. -> seq2 ->
+\---
+1. -> seq3 ->
+2. -> seq3 ->
+3. -> seq3 ->
+\---
+1. -> seq4 ->
+2. -> seq4 ->
+3. -> seq4 ->
+
+== seq1 ==
+{a||b}
+->->
+
+== seq2 ==
+{|a}
+->->
+
+== seq3 ==
+{a|}
+->->
+
+== seq4 ==
+{|}
+->->"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            let expected = r#"1. a
+2.
+3. b
+4. b
+---
+1.
+2. a
+3. a
+---
+1. a
+2.
+3.
+---
+1.
+2.
+3.
+"#;
+            assert_eq!(
+                expected.replace("\r", ""),
+                story.cont_maximally().replace("\r", "")
+            );
+        });
+    }
+
+    #[test]
+    fn TestAllSequenceTypes() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+~ SEED_RANDOM(1)
+
+Once: {f_once()} {f_once()} {f_once()} {f_once()}
+Stopping: {f_stopping()} {f_stopping()} {f_stopping()} {f_stopping()}
+Default: {f_default()} {f_default()} {f_default()} {f_default()}
+Cycle: {f_cycle()} {f_cycle()} {f_cycle()} {f_cycle()}
+Shuffle: {f_shuffle()} {f_shuffle()} {f_shuffle()} {f_shuffle()}
+Shuffle stopping: {f_shuffle_stopping()} {f_shuffle_stopping()} {f_shuffle_stopping()} {f_shuffle_stopping()}
+Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()}
+
+== function f_once ==
+{once:
+    - one
+    - two
+}
+
+== function f_stopping ==
+{stopping:
+    - one
+    - two
+}
+
+== function f_default ==
+{one|two}
+
+== function f_cycle ==
+{cycle:
+    - one
+    - two
+}
+
+== function f_shuffle ==
+{shuffle:
+    - one
+    - two
+}
+
+== function f_shuffle_stopping ==
+{stopping shuffle:
+    - one
+    - two
+    - final
+}
+
+== function f_shuffle_once ==
+{shuffle once:
+    - one
+    - two
+}
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            assert_eq!(
+                "Once: one two\nStopping: one two two two\nDefault: one two two two\nCycle: one two one two\nShuffle: two one two one\nShuffle stopping: one two final final\nShuffle once: two one\n",
+                story.cont_maximally()
+            );
+        });
+    }
+
+    #[test]
+    fn TestCallStackEvaluation() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+                   { six() + two() }
+                    -> END
+
+                === function six
+                    ~ return four() + two()
+
+                === function four
+                    ~ return two() + two()
+
+                === function two
+                    ~ return 2
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("8\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestConditionalChoiceInWeave() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+- start
+ {
+    - true: * [go to a stitch] -> a_stitch
+ }
+- gather should be seen
+-> DONE
+
+= a_stitch
+    result
+    -> END
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            assert_eq!("start\ngather should be seen\n", story.cont_maximally());
+            assert_eq!(1, story.get_current_choices_len());
+            story.choose_choice_index(0);
+            assert_eq!("result\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestConditionalChoiceInWeave2() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+- first gather
+    * [option 1]
+    * [option 2]
+- the main gather
+{false:
+    * unreachable option -> END
+}
+- bottom gather"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            assert_eq!("first gather\n", story.cont());
+            assert_eq!(2, story.get_current_choices_len());
+            story.choose_choice_index(0);
+            assert_eq!("the main gather\nbottom gather\n", story.cont_maximally());
+            assert_eq!(0, story.get_current_choices_len());
+        });
+    }
+
+    #[test]
+    fn TestConditionalChoices() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+* { true } { false } not displayed
+* { true } { true }
+  { true and true }  one
+* { false } not displayed
+* (name) { true } two
+* { true }
+  { true }
+  three
+* { true }
+  four
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            story.cont_maximally();
+
+            assert_eq!(4, story.get_current_choices_len());
+            assert_eq!("one", story.current_choices()[0].text.clone());
+            assert_eq!("two", story.current_choices()[1].text.clone());
+            assert_eq!("three", story.current_choices()[2].text.clone());
+            assert_eq!("four", story.current_choices()[3].text.clone());
+        });
+    }
+
+    #[test]
+    fn TestConditionals() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+{false:not true|true}
+{
+   - 4 > 5: not true
+   - 5 > 4: true
+}
+{ 2*2 > 3:
+   - true
+   - not true
+}
+{
+   - 1 > 3: not true
+   - { 2+2 == 4:
+        - true
+        - not true
+   }
+}
+{ 2*3:
+   - 1+7: not true
+   - 9: not true
+   - 1+1+1+3: true
+   - 9-3: also true but not printed
+}
+{ true:
+    great
+    right?
+}
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            assert_eq!(
+                "true\ntrue\ntrue\ntrue\ntrue\ngreat\nright?\n",
+                story.cont_maximally()
+            );
+        });
+    }
+
+    #[test]
+    fn TestConst() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+VAR x = c
+
+CONST c = 5
+
+{x}
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("5\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestDefaultChoices() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+ - (start)
+ * [Choice 1]
+ * [Choice 2]
+ * {false} Impossible choice
+ * -> default
+ - After choice
+ -> start
+
+== default ==
+This is default.
+-> DONE
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            assert_eq!("", story.cont());
+            assert_eq!(2, story.get_current_choices_len());
+            story.choose_choice_index(0);
+            assert_eq!("After choice\n", story.cont());
+            assert_eq!(1, story.get_current_choices_len());
+            story.choose_choice_index(0);
+            assert_eq!("After choice\nThis is default.\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestDefaultSimpleGather() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+* ->
+- x
+-> DONE"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("x\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestDivertInConditional() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+=== intro
+= top
+    { main: -> done }
+    -> END
+= main
+    -> top
+= done
+    -> END"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestDivertNotFoundError() {
+        run_in_both_modes(|suite| {
+            let _ = suite.compile_string_without_runtime(
+                r#"
+-> knot
+
+== knot ==
+Knot.
+-> next"#,
+                true,
+            );
+
+            assert!(suite.had_error(Some("not found")));
+        });
+    }
+
+    #[test]
+    fn TestDivertToWeavePoints() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> knot.stitch.gather
+
+== knot ==
+= stitch
+- hello
+    * (choice) test
+        choice content
+- (gather)
+  gather
+
+  {stopping:
+    - -> knot.stitch.choice
+    - second time round
+  }
+
+-> END"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!(
+                "gather\ntest\nchoice content\ngather\nsecond time round\n",
+                story.cont_maximally()
+            );
+        });
+    }
+
+    #[test]
+    fn TestEmpty() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string("", false, false)
+                .expect("compile should succeed");
+            assert_eq!("", story.current_text());
+        });
+    }
+
+    #[test]
+    fn TestEmptyChoice() {
+        let warning_count = Arc::new(Mutex::new(0usize));
+        let warning_count_for_handler = warning_count.clone();
+        let mut parser = InkParserType::new(
+            "*".to_string(),
+            None,
+            Some(Arc::new(
+                move |message: String, _line: i32, _character: i32, is_warning: bool| {
+                    if is_warning {
+                        *warning_count_for_handler.lock().unwrap() += 1;
+                        assert!(message.contains("completely empty"));
+                    } else {
+                        panic!("Shouldn't have had any errors");
+                    }
+                },
+            )),
+            None,
+        );
+
+        parser.Parse();
+        assert_eq!(1, *warning_count.lock().unwrap());
+    }
+
+    #[test]
+    fn TestCommentEliminator() {
+        let test_content = "A// C\nA /* C */ A\n\nA * A * /* * C *// A/*\nC C C\n\n*/";
+        let processed = CommentEliminator::new(test_content.to_string())
+            .Process()
+            .unwrap();
+        let expected = "A\nA  A\n\nA * A * / A\n\n\n";
+        assert_eq!(expected.replace("\r", ""), processed.replace("\r", ""));
+    }
+
+    #[test]
+    fn TestCommentEliminatorMixedNewlines() {
+        let test_content =
+            "A B\nC D // comment\nA B\r\nC D // comment\r\n/* block comment\r\nsecond line\r\n */ ";
+        let processed = CommentEliminator::new(test_content.to_string())
+            .Process()
+            .unwrap();
+        let expected = "A B\nC D \nA B\nC D \n\n\n ";
+        assert_eq!(expected, processed);
+    }
+
+    #[test]
+    fn TestStringParserA() {
+        let mut p = StringParser::new("A".to_string());
+        let results = p.Interleave::<String, _, _>(
+            |p| p.ParseString("A".to_string()),
+            |p| p.ParseString("B".to_string()),
+            None,
+            true,
+        );
+        assert_eq!(Some(vec!["A".to_string()]), results);
+    }
+
+    #[test]
+    fn TestStringParserABAB() {
+        let mut p = StringParser::new("ABAB".to_string());
+        let results = p.Interleave::<String, _, _>(
+            |p| p.ParseString("A".to_string()),
+            |p| p.ParseString("B".to_string()),
+            None,
+            true,
+        );
+        assert_eq!(
+            Some(vec![
+                "A".to_string(),
+                "B".to_string(),
+                "A".to_string(),
+                "B".to_string()
+            ]),
+            results
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn TestStringParserABAOptional() {
+        let mut p = StringParser::new("ABAA".to_string());
+        let results = p.Interleave::<String, _, _>(
+            |p| p.ParseString("A".to_string()),
+            |p| p.ParseString("B".to_string()),
+            None,
+            true,
+        );
+        assert_eq!(
+            Some(vec![
+                "A".to_string(),
+                "B".to_string(),
+                "A".to_string(),
+                "A".to_string()
+            ]),
+            results
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn TestStringParserABAOptional2() {
+        let mut p = StringParser::new("BABB".to_string());
+        let results = p.Interleave::<String, _, _>(
+            |p| p.ParseString("A".to_string()),
+            |p| p.ParseString("B".to_string()),
+            None,
+            true,
+        );
+        assert_eq!(
+            Some(vec![
+                "B".to_string(),
+                "A".to_string(),
+                "B".to_string(),
+                "B".to_string()
+            ]),
+            results
+        );
+    }
+
+    #[test]
+    fn TestStringParserB() {
+        let mut p = StringParser::new("B".to_string());
+        let result = p.Interleave::<String, _, _>(
+            |p| p.ParseString("A".to_string()),
+            |p| p.ParseString("B".to_string()),
+            None,
+            true,
+        );
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn TestEmptyMultilineConditionalBranch() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+{ 3:
+    - 3:
+    - 4:
+        txt
+}
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            assert_eq!("", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestEmptySequenceContent() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> thing ->
+-> thing ->
+-> thing ->
+-> thing ->
+-> thing ->
+Done.
+
+== thing ==
+{once:
+  - Wait for it....
+  -
+  -
+  -  Surprise!
+}
+->->
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!(
+                "Wait for it....\nSurprise!\nDone.\n",
+                story.cont_maximally()
+            );
+        });
+    }
+
+    #[test]
+    fn TestEnd() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+hello
+-> END
+world
+-> END
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("hello\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestEnd2() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> test
+
+== test ==
+hello
+-> END
+world
+-> END
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("hello\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestPaths() {
+        let path1 = ink_runtime::Path::Path::new_overload_4("hello.1.world".to_string());
+        let path2 = ink_runtime::Path::Path::new_overload_4("hello.1.world".to_string());
+        let path3 = ink_runtime::Path::Path::new_overload_4(".hello.1.world".to_string());
+        let path4 = ink_runtime::Path::Path::new_overload_4(".hello.1.world".to_string());
+
+        assert_eq!(path1, path2);
+        assert_eq!(path3, path4);
+        assert_ne!(path1, path3);
+    }
+
+    #[test]
+    fn TestPathToSelf() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+- (dododo)
+-> tunnel ->
+-> dododo
+
+== tunnel
++ A
+->->
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            story.cont();
+            story.choose_choice_index(0);
+            story.cont();
+            story.choose_choice_index(0);
+        });
+    }
+
+    #[test]
+    fn TestPrintNum() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+. {print_num(4)} .
+. {print_num(15)} .
+. {print_num(37)} .
+. {print_num(101)} .
+. {print_num(222)} .
+. {print_num(1234)} .
+
+=== function print_num(x) ===
+{
+    - x >= 1000:
+        {print_num(x / 1000)} thousand { x mod 1000 > 0:{print_num(x mod 1000)}}
+    - x >= 100:
+        {print_num(x / 100)} hundred { x mod 100 > 0:and {print_num(x mod 100)}}
+    - x == 0:
+        zero
+    - else:
+        { x >= 20:
+            { x / 10:
+                - 2: twenty
+                - 3: thirty
+                - 4: forty
+                - 5: fifty
+                - 6: sixty
+                - 7: seventy
+                - 8: eighty
+                - 9: ninety
+            }
+            { x mod 10 > 0:<>-<>}
+        }
+        { x < 10 || x > 20:
+            { x mod 10:
+                - 1: one
+                - 2: two
+                - 3: three
+                - 4: four
+                - 5: five
+                - 6: six
+                - 7: seven
+                - 8: eight
+                - 9: nine
+            }
+        - else:
+            { x:
+                - 10: ten
+                - 11: eleven
+                - 12: twelve
+                - 13: thirteen
+                - 14: fourteen
+                - 15: fifteen
+                - 16: sixteen
+                - 17: seventeen
+                - 18: eighteen
+                - 19: nineteen
+            }
+        }
+}
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!(
+                ". four .\n. fifteen .\n. thirty-seven .\n. one hundred and one .\n. two hundred and twenty-two .\n. one thousand two hundred and thirty-four .\n",
+                story.cont_maximally()
+            );
+        });
+    }
+
+    #[test]
+    fn TestQuoteCharacterSignificance() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(r#"My name is ""{""J{""o""}e""}"""#, false, false)
+                .expect("compile should succeed");
+            assert_eq!("My name is \"Joe\"\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestReadCountAcrossCallstack() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> first
+
+== first ==
+1) Seen first {first} times.
+-> second ->
+2) Seen first {first} times.
+-> DONE
+
+== second ==
+In second.
+->->
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!(
+                "1) Seen first 1 times.\nIn second.\n2) Seen first 1 times.\n",
+                story.cont_maximally()
+            );
+        });
+    }
+
+    #[test]
+    fn TestReadCountAcrossThreads() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+    -> top
+
+= top
+    {top}
+    <- aside
+    {top}
+    -> DONE
+
+= aside
+    * {false} DONE
+	- -> DONE
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("1\n1\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestReadCountDotSeparatedPath() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> hi ->
+-> hi ->
+-> hi ->
+
+{ hi.stitch_to_count }
+
+== hi ==
+= stitch_to_count
+hi
+->->
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("hi\nhi\nhi\n3\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestReturnTextWarning() {
+        let warning = std::panic::catch_unwind(|| {
+            let mut parser = InkParserType::new(
+                "== test ==\n return something".to_string(),
+                None,
+                Some(Arc::new(
+                    |message: String, _line: i32, _character: i32, is_warning: bool| {
+                        if is_warning {
+                            panic!("{}", message);
+                        }
+                    },
+                )),
+                None,
+            );
+            let _ = parser.Parse();
+        });
+        assert!(warning.is_err());
+    }
+
+    #[test]
+    fn TestSameLineDivertIsInline() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> hurry_home
+=== hurry_home ===
+We hurried home to Savile Row -> as_fast_as_we_could
+
+=== as_fast_as_we_could ===
+as fast as we could.
+-> DONE
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!(
+                "We hurried home to Savile Row as fast as we could.\n",
+                story.cont()
+            );
+        });
+    }
+
+    #[test]
+    fn TestShouldntGatherDueToChoice() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+* opt
+    - - text
+    * * {false} impossible
+    * * -> END
+- gather"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            story.cont_maximally();
+            story.choose_choice_index(0);
+            assert_eq!("opt\ntext\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestSimpleGlue() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string("Some <> \ncontent<> with glue.\n", false, false)
+                .expect("compile should succeed");
+            assert_eq!("Some content with glue.\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestStickyChoicesStaySticky() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> test
+== test ==
+First line.
+Second line.
++ Choice 1
++ Choice 2
+- -> test
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            story.cont_maximally();
+            assert_eq!(2, story.current_choices_len());
+            story.choose_choice_index(0);
+            story.cont_maximally();
+            assert_eq!(2, story.current_choices_len());
+        });
+    }
+
+    #[test]
+    fn TestStringConstants() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+{x}
+VAR x = kX
+CONST kX = "hi"
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("hi\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestStringsInChoices() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+* \ {"test1"} ["test2 {"test3"}"] {"test4"}
+-> DONE
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            story.cont_maximally();
+            assert_eq!(1, story.current_choices_len());
+            assert_eq!(r#"test1 "test2 test3""#, story.current_choices()[0].text);
+            story.choose_choice_index(0);
+            assert_eq!("test1 test4\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestStringTypeCoersion() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+{"5" == 5:same|different}
+{"blah" == 5:same|different}
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("same\ndifferent\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestTemporariesAtGlobalScope() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+VAR x = 5
+~ temp y = 4
+{x}{y}
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("54\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestThreadDone() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+This is a thread example
+<- example_thread
+The example is now complete.
+
+== example_thread ==
+Hello.
+-> DONE
+World.
+-> DONE
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!(
+                "This is a thread example\nHello.\nThe example is now complete.\n",
+                story.cont_maximally()
+            );
+        });
+    }
+
+    #[test]
+    fn TestTunnelOnwardsAfterTunnel() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> tunnel1 ->
+The End.
+-> END
+
+== tunnel1 ==
+Hello...
+-> tunnel2 ->->
+
+== tunnel2 ==
+...world.
+->->
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("Hello...\n...world.\nThe End.\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestTunnelVsThreadBehaviour() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> knot_with_options ->
+Finished tunnel.
+
+Starting thread.
+<- thread_with_options
+* E
+-
+Done.
+
+== knot_with_options ==
+* A
+* B
+-
+->->
+
+== thread_with_options ==
+* C
+* D
+- -> DONE
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert!(!story.cont_maximally().contains("Finished tunnel"));
+            assert_eq!(2, story.current_choices_len());
+            story.choose_choice_index(0);
+            assert!(story.cont_maximally().contains("Finished tunnel"));
+            assert_eq!(3, story.current_choices_len());
+            story.choose_choice_index(2);
+            assert!(story.cont_maximally().contains("Done."));
+        });
+    }
+
+    #[test]
+    fn TestTurnsSince() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+{ TURNS_SINCE(-> test) }
+~ test()
+{ TURNS_SINCE(-> test) }
+* [choice 1]
+- { TURNS_SINCE(-> test) }
+* [choice 2]
+- { TURNS_SINCE(-> test) }
+
+== function test ==
+~ return
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("-1\n0\n", story.cont_maximally());
+            story.choose_choice_index(0);
+            assert_eq!("1\n", story.cont_maximally());
+            story.choose_choice_index(0);
+            assert_eq!("2\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestTurnsSinceNested() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> empty_world
+=== empty_world ===
+    {TURNS_SINCE(-> then)} = -1
+    * (then) stuff
+        {TURNS_SINCE(-> then)} = 0
+        * * (next) more stuff
+            {TURNS_SINCE(-> then)} = 1
+        -> DONE
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("-1 = -1\n", story.cont_maximally());
+            assert_eq!(1, story.current_choices_len());
+            story.choose_choice_index(0);
+            assert_eq!("stuff\n0 = 0\n", story.cont_maximally());
+            assert_eq!(1, story.current_choices_len());
+            story.choose_choice_index(0);
+            assert_eq!("more stuff\n1 = 1\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestTurnsSinceWithVariableTarget() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> start
+
+=== start ===
+    {beats(-> start)}
+    {beats(-> start)}
+    *   [Choice]  -> next
+= next
+    {beats(-> start)}
+    -> END
+
+=== function beats(x) ===
+    ~ return TURNS_SINCE(x)
+"#,
+                    true,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("0\n0\n", story.cont_maximally());
+            story.choose_choice_index(0);
+            assert_eq!("1\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestUnbalancedWeaveIndentation() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+* * * First
+* * * * Very indented
+- - End
+-> END
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            story.cont_maximally();
+            assert_eq!(1, story.current_choices_len());
+            assert_eq!("First", story.current_choices()[0].text);
+            story.choose_choice_index(0);
+            assert_eq!("First\n", story.cont_maximally());
+            assert_eq!(1, story.current_choices_len());
+            assert_eq!("Very indented", story.current_choices()[0].text);
+            story.choose_choice_index(0);
+            assert_eq!("Very indented\nEnd\n", story.cont_maximally());
+            assert_eq!(0, story.current_choices_len());
+        });
+    }
+
+    #[test]
+    fn TestVariableDeclarationInConditional() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+VAR x = 0
+{true:
+    - ~ x = 5
+}
+{x}
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("5\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestVariableGetSetAPI() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+VAR x = 5
+
+{x}
+
+* [choice]
+-
+{x}
+
+* [choice]
+-
+
+{x}
+
+* [choice]
+-
+
+{x}
+
+-> DONE
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            assert_eq!("5\n", story.cont_maximally());
+            assert_eq!(Some(ValueType::Int(5)), story.get_variable("x"));
+
+            story.set_variable("x", &ValueType::Int(10)).unwrap();
+            story.choose_choice_index(0);
+            assert_eq!("10\n", story.cont_maximally());
+            assert_eq!(Some(ValueType::Int(10)), story.get_variable("x"));
+
+            story.set_variable("x", &ValueType::Float(8.5)).unwrap();
+            story.choose_choice_index(0);
+            assert_eq!("8.5\n", story.cont_maximally());
+            assert_eq!(Some(ValueType::Float(8.5)), story.get_variable("x"));
+
+            story
+                .set_variable("x", &ValueType::String("a string".to_string()))
+                .unwrap();
+            story.choose_choice_index(0);
+            assert_eq!("a string\n", story.cont_maximally());
+            assert_eq!(
+                Some(ValueType::String("a string".to_string())),
+                story.get_variable("x")
+            );
+
+            assert_eq!(None, story.get_variable("z"));
+        });
+    }
+
+    #[test]
+    fn TestVariableObserver() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+VAR testVar = 5
+VAR testVar2 = 10
+
+Hello world!
+
+~ testVar = 15
+~ testVar2 = 100
+
+Hello world 2!
+
+* choice
+
+    ~ testVar = 25
+    ~ testVar2 = 200
+
+    -> END
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            let state = Arc::new(Mutex::new(TestVariableObserverState::default()));
+            story.observe_variable(
+                "testVar",
+                Arc::new(Mutex::new(TestVariableObserverImpl {
+                    state: Arc::clone(&state),
+                })),
+            );
+
+            story.cont_maximally();
+
+            let snapshot = state.lock().unwrap();
+            assert_eq!(15, snapshot.current_var_value);
+            assert_eq!(1, snapshot.observer_call_count);
+            drop(snapshot);
+
+            assert_eq!(1, story.current_choices_len());
+            story.choose_choice_index(0);
+            story.cont();
+
+            let snapshot = state.lock().unwrap();
+            assert_eq!(25, snapshot.current_var_value);
+            assert_eq!(2, snapshot.observer_call_count);
+        });
+    }
+
+    #[test]
+    fn TestVariablePointerRefFromKnot() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+VAR val = 5
+
+-> knot ->
+
+-> END
+
+== knot ==
+~ inc(val)
+{val}
+->->
+
+== function inc(ref x) ==
+    ~ x = x + 1
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            assert_eq!("6\n", story.cont());
+        });
+    }
+
+    #[test]
+    fn TestVariableSwapRecurse() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+~ f(1, 1)
+
+== function f(x, y) ==
+{ x == 1 and y == 1:
+  ~ x = 2
+  ~ f(y, x)
+- else:
+  {x} {y}
+}
+~ return
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            assert_eq!("1 2\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestVariableTunnel() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> one_then_tother(-> tunnel)
+
+=== one_then_tother(-> x) ===
+    -> x -> end
+
+=== tunnel ===
+    STUFF
+    ->->
+
+=== end ===
+    -> END
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+
+            assert_eq!("STUFF\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestEmptyListOrigin() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+LIST list = a, b
+{LIST_ALL(list)}
+
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("a, b\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestContainsEmptyListAlwaysFalse() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+LIST list = (a), b
+{list ? ()}
+{() ? ()}
+{() ? list}
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("false\nfalse\nfalse\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestEmptyListOriginAfterAssignment() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+LIST x = a, b, c
+~ x = ()
+{LIST_ALL(x)}
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("a, b, c\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestListSaveLoad() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+LIST l1 = (a), b, (c)
+LIST l2 = (x), y, z
+
+VAR t = ()
+~ t = l1 + l2
+{t}
+
+== elsewhere ==
+~ t += z
+{t}
+-> END
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("a, x, c\n", story.cont_maximally());
+            let saved_state = story.save_state();
+            let mut story = suite
+                .compile_string(
+                    r#"
+LIST l1 = (a), b, (c)
+LIST l2 = (x), y, z
+
+VAR t = ()
+~ t = l1 + l2
+{t}
+
+== elsewhere ==
+~ t += z
+{t}
+-> END
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            story.load_state(&saved_state);
+            story.choose_path_string_simple("elsewhere");
+            assert_eq!("a, x, c, z\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestEmptyThreadError() {
+        run_in_both_modes(|suite| {
+            suite
+                .compile_string_without_runtime("<-", true)
+                .expect("parse should succeed");
+            assert!(suite.had_error(Some("Expected target for new thread")));
+        });
+    }
+
+    #[test]
+    fn TestAuthorWarningsInsideContentListBug() {
+        run_in_both_modes(|suite| {
+            suite.compile_string(
+                r#"
+{ once:
+- a
+TODO: b
+}
+"#,
+                false,
+                true,
+            );
+            assert!(!suite.had_error(None));
+        });
+    }
+
+    #[test]
+    fn TestNestedChoiceError() {
+        run_in_both_modes(|suite| {
+            suite
+                .compile_string(
+                    r#"
+{ true:
+    * choice
+}
+"#,
+                    false,
+                    true,
+                )
+                .expect("compile should succeed");
+            assert!(suite.had_error(Some("need to explicitly divert")));
+        });
+    }
+
+    #[test]
+    fn TestStitchNamingCollision() {
+        run_in_both_modes(|suite| {
+            suite
+                .compile_string(
+                    r#"
+VAR stitch = 0
+
+== knot ==
+= stitch
+->DONE
+"#,
+                    false,
+                    true,
+                )
+                .expect("compile should succeed");
+            assert!(suite.had_error(Some("already been used for a var")));
+        });
+    }
+
+    #[test]
+    fn TestWeavePointNamingCollision() {
+        run_in_both_modes(|suite| {
+            suite
+                .compile_string(
+                    r#"
+-(opts)
+opts1
+-(opts)
+opts1
+-> END
+"#,
+                    false,
+                    true,
+                )
+                .expect("compile should succeed");
+            assert!(suite.had_error(Some("with the same label")));
+        });
+    }
+
+    #[test]
+    fn TestVariableNamingCollisionWithFlow() {
+        run_in_both_modes(|suite| {
+            suite
+                .compile_string(
+                    r#"
+LIST someList = A, B
+
+~temp heldItems = (A) 
+{LIST_COUNT (heldItems)}
+
+=== function heldItems ()
+~ return (A)
+        "#,
+                    false,
+                    true,
+                )
+                .expect("compile should succeed");
+            assert!(suite.had_error(Some("name has already been used for a function")));
+        });
+    }
+
+    #[test]
+    fn TestVariableNamingCollisionWithArg() {
+        run_in_both_modes(|suite| {
+            suite
+                .compile_string(
+                    r#"=== function knot (a)
+                    ~temp a = 1"#,
+                    false,
+                    true,
+                )
+                .expect("compile should succeed");
+            assert!(suite.had_error(Some("has already been used")));
+        });
+    }
+
+    #[test]
+    fn TestVariousDefaultChoices() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+* -> hello
+Unreachable
+- (hello) 1
+* ->
+   - - 2
+- 3
+-> END
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("1\n2\n3\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestVariousBlankChoiceWarning() {
+        run_in_both_modes(|suite| {
+            suite
+                .compile_string(
+                    r#"
+* [] blank
+        "#,
+                    false,
+                    true,
+                )
+                .expect("compile should succeed");
+            assert!(suite.had_warning(Some("Blank choice")));
+        });
+    }
+
+    #[test]
+    fn TestTunnelOnwardsWithParamDefaultChoice() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> tunnel ->
+
+== tunnel ==
+* ->-> elsewhere (8)
+
+== elsewhere (x) ==
+{x}
+-> END
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("8\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestTunnelOnwardsToVariableDivertTarget() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+-> outer ->
+
+== outer
+This is outer
+-> cut_to(-> the_esc)
+
+=== cut_to(-> escape) 
+    ->-> escape
+    
+== the_esc
+This is the_esc
+-> END
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("This is outer\nThis is the_esc\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestReadCountVariableTarget() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+VAR x = ->knot
+
+Count start: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
+
+-> x (1) ->
+-> x (2) ->
+-> x (3) ->
+
+Count end: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
+-> END
+
+
+== knot (a) ==
+{a}
+->->
+"#,
+                    true,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!(
+                "Count start: 0 0 0\n1\n2\n3\nCount end: 3 3 3\n",
+                story.cont_maximally()
+            );
+        });
+    }
+
+    #[test]
+    fn TestDivertTargetsWithParameters() {
+        run_in_both_modes(|suite| {
+            let mut story = suite
+                .compile_string(
+                    r#"
+VAR x = ->place
+
+->x (5)
+
+== place (a) ==
+{a}
+-> DONE
+"#,
+                    false,
+                    false,
+                )
+                .expect("compile should succeed");
+            assert_eq!("5\n", story.cont_maximally());
+        });
+    }
+
+    #[test]
+    fn TestOfficialCoverage() {
+        let rust = rust_test_names();
+        let csharp = csharp_test_names();
+        let missing: Vec<_> = csharp.difference(&rust).cloned().collect();
+        assert!(
+            missing.is_empty(),
+            "missing Rust csharp_tests coverage: {:?}",
+            missing
+        );
+    }
+}
