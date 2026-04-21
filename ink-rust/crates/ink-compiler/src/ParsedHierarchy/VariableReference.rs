@@ -98,14 +98,17 @@ impl VariableReference {
         }
 
         if self.path.len() > 1 {
-            context.Error(
-                format!(
-                    "Could not find target for read count: {}",
-                    parsedPath.ToString()
-                ),
-                Default::default(),
-                false,
+            let mut errorMsg = format!(
+                "Could not find target for read count: {}",
+                parsedPath.ToString()
             );
+            if self.path.len() <= 2 {
+                errorMsg.push_str(&format!(
+                    ", or couldn't find list item with the name {}",
+                    self.path.join(",")
+                ));
+            }
+            context.Error(errorMsg, Default::default(), false);
             return;
         }
 
@@ -226,5 +229,45 @@ mod tests {
             .expect("runtime variable reference");
         assert!(runtime_ref.get_pathForCount().is_some());
         assert!(runtime_ref.get_name().is_none());
+    }
+
+    #[test]
+    fn reports_list_item_hint_when_count_target_is_missing() {
+        let story = Story::new(vec![], false);
+        let captured = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+        let handler = {
+            let captured = captured.clone();
+            std::rc::Rc::new(std::cell::RefCell::new(Box::new(
+                move |message: &str, _error_type: ink_runtime::Error::ErrorType| {
+                    captured.borrow_mut().push(message.to_string());
+                },
+            )
+                as ink_runtime::Error::ErrorHandler))
+        };
+
+        let reference = VariableReference::new(vec![
+            Identifier {
+                name: Some("apple".to_string()),
+                debugMetadata: None,
+            },
+            Identifier {
+                name: Some("seed".to_string()),
+                debugMetadata: None,
+            },
+        ]);
+        let expr = crate::ParsedHierarchy::Expression::Expression::from_kind(
+            crate::ParsedHierarchy::Expression::ExpressionKind::VariableReference(Box::new(
+                reference,
+            )),
+        );
+        let obj = Object::from_expression(expr);
+        let mut exported_story = Story::new(vec![obj], false);
+
+        let _ = exported_story.ExportRuntime(Some(handler));
+
+        assert!(captured
+            .borrow()
+            .iter()
+            .any(|message| message.contains("couldn't find list item with the name apple,seed")));
     }
 }
