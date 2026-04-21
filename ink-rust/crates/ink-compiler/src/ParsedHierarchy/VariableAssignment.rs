@@ -237,6 +237,10 @@ impl VariableAssignment {
     pub fn get_base(&self) -> &Object {
         &self.base
     }
+
+    pub fn get_base_mut(&mut self) -> &mut Object {
+        &mut self.base
+    }
 }
 
 #[cfg(test)]

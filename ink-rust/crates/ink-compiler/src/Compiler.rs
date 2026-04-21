@@ -3,6 +3,7 @@
 use crate::InkParser::InkParser::InkParser;
 use crate::ParsedHierarchy::Divert::Divert;
 use crate::ParsedHierarchy::Expression::Expression;
+use crate::ParsedHierarchy::Object::{Object, ObjectKind};
 use crate::ParsedHierarchy::Story::Story as ParsedStory;
 use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
 use crate::Plugins::PluginManager::PluginManager;
@@ -239,7 +240,11 @@ impl Compiler {
                     } else {
                         result.output = Some("DebugSource: Unknown source".to_string());
                     }
+                } else {
+                    result.output = Some("DebugSource: Unknown source".to_string());
                 }
+            } else {
+                result.output = Some("DebugSource: Unknown source".to_string());
             }
             return result;
         }
@@ -343,6 +348,7 @@ impl Compiler {
 
         match parsed_statement {
             ImmediateStatement::Divert(mut divert) => {
+                let _ = divert.GenerateRuntimeObject();
                 divert.ResolveReferences(parsed_story);
                 result.divertedPath = divert
                     .get_runtimeDivert()
@@ -351,8 +357,8 @@ impl Compiler {
                     .or_else(|| Some(String::new()));
             }
             ImmediateStatement::Expression(mut expression) => {
-                expression.ResolveReferences(parsed_story);
                 let runtime_obj = expression.GenerateRuntimeObject();
+                expression.ResolveReferences(parsed_story);
                 if let Some(value) = runtime_story.EvaluateExpression(runtime_obj) {
                     result.output = Some(value.ToString());
                 }
@@ -362,9 +368,20 @@ impl Compiler {
                     parsed_story.TryAddNewVariableDeclaration(assignment.clone());
                 }
 
+                let mut parsed_story_parent = Object::with_kind(ObjectKind::Story);
+                parsed_story_parent.content = parsed_story.content.clone();
+                assignment
+                    .get_base_mut()
+                    .set_parent(Some(Box::new(parsed_story_parent)));
+                let runtime_object = assignment.GenerateRuntimeObject();
                 assignment.ResolveReferences(parsed_story);
 
-                if let Some(runtime_object) = assignment.GenerateRuntimeObject() {
+                if parsed_story.get_hadError() {
+                    parsed_story.ResetError();
+                    return result;
+                }
+
+                if let Some(runtime_object) = runtime_object {
                     if let ink_runtime::Container::ContentItem::Container(container) =
                         runtime_object
                     {
