@@ -1,13 +1,14 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/Divert.cs
 
-use crate::ParsedHierarchy::Expression::Expression;
+use crate::ParsedHierarchy::Expression::{Expression, ExpressionKind};
+use crate::ParsedHierarchy::FlowBase::{Argument, FlowBase};
 use crate::ParsedHierarchy::Object::{Object, ObjectKind};
 use crate::ParsedHierarchy::Path::Path;
 use ink_runtime::Container::{Container as RuntimeContainer, ContentItem};
 use ink_runtime::ControlCommand::ControlCommand;
 use ink_runtime::Divert::Divert as RuntimeDivert;
 use ink_runtime::PushPop::PushPopType;
-use ink_runtime::Value::VariablePointerValue;
+use ink_runtime::Value::Value;
 use std::rc::Rc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -72,13 +73,71 @@ impl Divert {
 
         let mut container = RuntimeContainer::new();
         let needs_arg_codegen = !self.arguments.is_empty();
+        let target_arguments = self.get_target_arguments();
 
         if needs_arg_codegen || self.isFunctionCall || self.isTunnel || self.isThread {
             if needs_arg_codegen && !self.isFunctionCall {
                 container.AddContent(ControlCommand::EvalStart());
             }
 
-            for arg in &mut self.arguments {
+            for index in 0..self.arguments.len() {
+                let arg = &self.arguments[index];
+                if let Some(expected_args) = target_arguments.as_ref() {
+                    if let Some(expected_arg) = expected_args.get(index) {
+                        if expected_arg.isByReference {
+                            match &arg.kind {
+                                ExpressionKind::VariableReference(variable_reference) => {
+                                    if variable_reference
+                                        .get_runtimeVarRef()
+                                        .and_then(|runtime_var_ref| {
+                                            runtime_var_ref.get_pathForCount().cloned()
+                                        })
+                                        .is_some()
+                                    {
+                                        self.Error(
+                                            format!(
+                                                "can't pass a read count by reference. '{}' is a knot/stitch/label, but '{}' requires the name of a VAR to be passed.",
+                                                variable_reference.get_name(),
+                                                self.target
+                                                    .as_ref()
+                                                    .map(|target| target.get_dotSeparatedComponents())
+                                                    .unwrap_or_default()
+                                            ),
+                                            Default::default(),
+                                            false,
+                                        );
+                                        break;
+                                    }
+
+                                    container.AddContent(ContentItem::Value(
+                                        Value::new_variable_pointer(
+                                            Some(variable_reference.get_name()),
+                                            -1,
+                                        ),
+                                    ));
+                                    continue;
+                                }
+                                _ => {
+                                    self.Error(
+                                        format!(
+                                            "Expected variable name to pass by reference to 'ref {}' but saw {}",
+                                            expected_arg
+                                                .identifier
+                                                .as_ref()
+                                                .and_then(|identifier| identifier.name.as_deref())
+                                                .unwrap_or_default(),
+                                            arg.ToString()
+                                        ),
+                                        Default::default(),
+                                        false,
+                                    );
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 arg.GenerateIntoContainer(&mut container);
             }
 
@@ -231,6 +290,19 @@ impl Divert {
         }
     }
 
+    fn get_target_arguments(&self) -> Option<Vec<Argument>> {
+        self.targetContent
+            .as_ref()
+            .and_then(|target_content| match &target_content.kind {
+                ObjectKind::Knot | ObjectKind::Stitch | ObjectKind::Story => Some(
+                    FlowBase::from_object(target_content)
+                        .get_arguments()
+                        .to_vec(),
+                ),
+                _ => None,
+            })
+    }
+
     // C# signature: public override string ToString ()
     pub fn ToString(&self) -> String {
         if let Some(target) = &self.target {
@@ -300,8 +372,15 @@ impl Divert {
 #[cfg(test)]
 mod tests {
     use super::Divert;
+    use crate::ParsedHierarchy::Expression::{Expression, ExpressionKind};
+    use crate::ParsedHierarchy::FlowBase::Argument;
     use crate::ParsedHierarchy::Identifier::Identifier;
+    use crate::ParsedHierarchy::Knot::Knot;
+    use crate::ParsedHierarchy::Object::Object;
     use crate::ParsedHierarchy::Path::Path;
+    use crate::ParsedHierarchy::VariableReference::VariableReference;
+    use ink_runtime::Container::ContentItem;
+    use ink_runtime::Value::Value;
 
     #[test]
     fn stringifies_variable_and_stack_diverts() {
@@ -316,5 +395,46 @@ mod tests {
         assert_eq!(divert.ToString(), "-> foo");
         assert!(!divert.get_isEnd());
         assert!(!divert.get_isDone());
+    }
+
+    #[test]
+    fn passes_by_reference_arguments_as_variable_pointers() {
+        let target = Object::from_knot(Knot::new(
+            Identifier {
+                name: Some("callee".to_string()),
+                debugMetadata: None,
+            },
+            vec![],
+            vec![Argument {
+                identifier: Some(Identifier {
+                    name: Some("refArg".to_string()),
+                    debugMetadata: None,
+                }),
+                isByReference: true,
+                isDivertTarget: false,
+            }],
+            true,
+        ));
+
+        let mut divert = Divert::new_overload_2(target);
+        divert.isFunctionCall = true;
+        divert.arguments = vec![Expression::from_kind(ExpressionKind::VariableReference(
+            Box::new(VariableReference::new(vec![Identifier {
+                name: Some("score".to_string()),
+                debugMetadata: None,
+            }])),
+        ))];
+
+        let runtime = divert.GenerateRuntimeObject();
+
+        match runtime {
+            ContentItem::Container(container) => {
+                assert!(matches!(
+                    container.get_content()[0],
+                    ContentItem::Value(Value::VariablePointer(_))
+                ));
+            }
+            other => panic!("unexpected runtime item: {:?}", other),
+        }
     }
 }
