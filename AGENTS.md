@@ -198,6 +198,7 @@ After any phase-level change, run `make -C ink-rust gate`. If it passes, the pha
 - Prefer concrete observations over general advice. Write down the exact symptom, the file or symbol involved, and the shortest reliable way to reproduce or inspect it.
 - Keep the note actionable for future agents. The goal is to avoid re-discovering the same dead ends and to reduce token spent on repeated search.
 - Update this section when a diagnosis changes the preferred workflow for a subsystem, especially for parser, runtime, or testbed issues.
+- `ParsedHierarchy/VariableAssignment` ownership is easiest to verify through `Object::from_variable_assignment(...).content` payloads. Runtime output alone can miss tree-wiring regressions for list-backed declarations.
 
 ## Git And Workspace Hygiene
 

@@ -2,6 +2,7 @@
 
 use crate::ParsedHierarchy::Expression::Expression;
 use crate::ParsedHierarchy::ListDefinition::ListDefinition;
+use crate::ParsedHierarchy::Object::Object;
 use crate::ParsedHierarchy::Story::Story;
 use crate::ParsedHierarchy::VariableReference::VariableReference;
 use ink_runtime::Container::{Container, ContentItem};
@@ -10,6 +11,7 @@ use std::rc::Rc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct VariableAssignment {
+    base: Object,
     variableIdentifier: Option<crate::ParsedHierarchy::Identifier::Identifier>,
     expression: Option<Expression>,
     listDefinition: Option<Box<ListDefinition>>,
@@ -24,7 +26,11 @@ impl VariableAssignment {
         identifier: crate::ParsedHierarchy::Identifier::Identifier,
         assignedExpression: Expression,
     ) -> Self {
+        let mut base = Object::new();
+        base.AddContent(Object::from_expression(assignedExpression.clone()));
+
         Self {
+            base,
             variableIdentifier: Some(identifier),
             expression: Some(assignedExpression),
             ..Default::default()
@@ -36,7 +42,9 @@ impl VariableAssignment {
         identifier: crate::ParsedHierarchy::Identifier::Identifier,
         listDef: ListDefinition,
     ) -> Self {
+        let base = Object::new();
         let mut assignment = Self {
+            base,
             variableIdentifier: Some(identifier),
             listDefinition: Some(Box::new(listDef)),
             isGlobalDeclaration: true,
@@ -46,6 +54,9 @@ impl VariableAssignment {
         let self_clone = assignment.clone();
         if let Some(list_definition) = &mut assignment.listDefinition {
             list_definition.variableAssignment = Some(self_clone);
+            assignment
+                .base
+                .AddContent(Object::from_list_definition((**list_definition).clone()));
         }
 
         assignment
@@ -75,12 +86,24 @@ impl VariableAssignment {
 
     // C# signature: public override void ResolveReferences (Story context)
     pub fn ResolveReferences(&mut self, context: &mut Story) {
+        if let Some(expression) = &self.expression {
+            self.base.content.clear();
+            self.base
+                .AddContent(Object::from_expression(expression.clone()));
+        } else if let Some(list_definition) = &self.listDefinition {
+            self.base.content.clear();
+            self.base
+                .AddContent(Object::from_list_definition((**list_definition).clone()));
+        }
+
         if self.listDefinition.is_some() {
             let self_clone = self.clone();
             if let Some(list_definition) = &mut self.listDefinition {
                 list_definition.variableAssignment = Some(self_clone);
             }
         }
+
+        self.base.ResolveReferences(context);
 
         if self.isDeclaration() && self.listDefinition.is_none() {
             context.CheckForNamingCollisions(
@@ -210,6 +233,10 @@ impl VariableAssignment {
             "variable assignment".to_string()
         }
     }
+
+    pub fn get_base(&self) -> &Object {
+        &self.base
+    }
 }
 
 #[cfg(test)]
@@ -306,5 +333,49 @@ mod tests {
                 .map(|backref| backref.get_variableName().to_string()),
             Some("food".to_string())
         );
+    }
+
+    #[test]
+    fn expression_assignment_embeds_expression_in_base_tree() {
+        let identifier = Identifier {
+            name: Some("score".to_string()),
+            debugMetadata: None,
+        };
+        let expression =
+            Expression::from_kind(ExpressionKind::Number(Number::new(NumberValue::Int(3))));
+
+        let assignment = VariableAssignment::new(identifier, expression);
+
+        assert_eq!(assignment.get_base().content.len(), 1);
+        assert!(matches!(
+            assignment.get_base().content[0].payload.as_ref(),
+            Some(crate::ParsedHierarchy::Object::ObjectPayload::Expression(_))
+        ));
+    }
+
+    #[test]
+    fn list_assignment_embeds_list_definition_in_base_tree() {
+        let list_definition = ListDefinition::new(vec![ListElementDefinition::new(
+            Identifier {
+                name: Some("item".to_string()),
+                debugMetadata: None,
+            },
+            true,
+            None,
+        )]);
+
+        let assignment = VariableAssignment::new_overload_2(
+            Identifier {
+                name: Some("food".to_string()),
+                debugMetadata: None,
+            },
+            list_definition,
+        );
+
+        assert_eq!(assignment.get_base().content.len(), 1);
+        assert!(matches!(
+            assignment.get_base().content[0].payload.as_ref(),
+            Some(crate::ParsedHierarchy::Object::ObjectPayload::ListDefinition(_))
+        ));
     }
 }

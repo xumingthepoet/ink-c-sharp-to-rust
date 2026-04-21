@@ -11,6 +11,7 @@ use crate::ParsedHierarchy::Gather::Gather;
 use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::IncludedFile::IncludedFile;
 use crate::ParsedHierarchy::Knot::Knot;
+use crate::ParsedHierarchy::ListDefinition::ListDefinition;
 use crate::ParsedHierarchy::Return::Return;
 use crate::ParsedHierarchy::Stitch::Stitch;
 use crate::ParsedHierarchy::VariableAssignment::VariableAssignment;
@@ -51,6 +52,7 @@ pub enum ObjectPayload {
     Gather(Box<Gather>),
     IncludedFile(Box<IncludedFile>),
     Knot(Box<Knot>),
+    ListDefinition(Box<ListDefinition>),
     Return(Box<Return>),
     Stitch(Box<Stitch>),
     VariableAssignment(Box<VariableAssignment>),
@@ -177,6 +179,13 @@ impl Object {
         object
     }
 
+    pub fn from_list_definition(list_definition: ListDefinition) -> Self {
+        let mut object = Object::with_kind(ObjectKind::Plain);
+        object.set_identifier(list_definition.identifier.clone());
+        object.payload = Some(ObjectPayload::ListDefinition(Box::new(list_definition)));
+        object
+    }
+
     pub fn from_knot(knot: Knot) -> Self {
         let mut object = Object::with_kind(ObjectKind::Knot);
         object.isFunction = knot.get_base().get_isFunction();
@@ -218,6 +227,7 @@ impl Object {
             .and_then(Self::container_from_content_item);
         let mut object = Object::with_kind(ObjectKind::Plain);
         object.set_identifier(assignment.get_variableIdentifier().cloned());
+        object.content = assignment.get_base().content.clone();
         object.set_runtimeObject(runtimeObject);
         object.payload = Some(ObjectPayload::VariableAssignment(Box::new(assignment)));
         object
@@ -402,6 +412,10 @@ impl Object {
                 None
             }
             Some(ObjectPayload::Knot(knot)) => Some(knot.GenerateRuntimeObject()),
+            Some(ObjectPayload::ListDefinition(list_definition)) => {
+                let _ = list_definition.GenerateRuntimeObject();
+                None
+            }
             Some(ObjectPayload::Return(returned)) => Some(returned.GenerateRuntimeObject()),
             Some(ObjectPayload::Stitch(stitch)) => Some(stitch.GenerateRuntimeObject()),
             Some(ObjectPayload::VariableAssignment(assignment)) => assignment
@@ -450,6 +464,10 @@ impl Object {
             Some(ObjectPayload::IncludedFile(_)) => true,
             Some(ObjectPayload::Knot(knot)) => {
                 knot.ResolveReferences(context);
+                true
+            }
+            Some(ObjectPayload::ListDefinition(list_definition)) => {
+                list_definition.ResolveReferences(context);
                 true
             }
             Some(ObjectPayload::Return(_)) => true,
@@ -546,19 +564,22 @@ impl Object {
     }
 
     pub fn get_typeName(&self) -> String {
-        match self.kind {
-            ObjectKind::Plain => "Object",
-            ObjectKind::Story => "Story",
-            ObjectKind::FlowBase => "FlowBase",
-            ObjectKind::WeavePoint => "Weave point",
-            ObjectKind::Weave => "Weave",
-            ObjectKind::Knot => "Knot",
-            ObjectKind::Stitch => "Stitch",
-            ObjectKind::Sequence => "Sequence",
-            ObjectKind::Conditional => "Conditional",
-            ObjectKind::ConditionalSingleBranch => "Conditional branch",
+        match self.payload.as_ref() {
+            Some(ObjectPayload::ListDefinition(_)) => "List definition".to_string(),
+            _ => match self.kind {
+                ObjectKind::Plain => "Object",
+                ObjectKind::Story => "Story",
+                ObjectKind::FlowBase => "FlowBase",
+                ObjectKind::WeavePoint => "Weave point",
+                ObjectKind::Weave => "Weave",
+                ObjectKind::Knot => "Knot",
+                ObjectKind::Stitch => "Stitch",
+                ObjectKind::Sequence => "Sequence",
+                ObjectKind::Conditional => "Conditional",
+                ObjectKind::ConditionalSingleBranch => "Conditional branch",
+            }
+            .to_string(),
         }
-        .to_string()
     }
 
     pub fn get_parent(&self) -> Option<&Object> {

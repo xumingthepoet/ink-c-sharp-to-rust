@@ -17,8 +17,8 @@ These totals are derived from the annotations below and replace the deleted symb
 | Area | Total | Ported | Partial | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Runtime | 34 | 34 | 0 | 0 |
-| Compiler | 64 | 44 | 17 | 3 |
-| Total | 98 | 78 | 17 | 3 |
+| Compiler | 64 | 45 | 16 | 3 |
+| Total | 98 | 79 | 16 | 3 |
 
 ## Continuation Plan For Future Agents
 
@@ -93,7 +93,7 @@ Source area: `ink-c-sharp/compiler/`
 22. `ParsedHierarchy/Sequence.cs` (`deps=6`) [partial: reason=flat sequence runtime generation is ported, but nested weave-backed branch ownership and multiline sequence reconstruction still depend on the unported weave/tree model; missing=Weave integration, nested loose-end routing, and exact multiline branch conversion; next=finish ParsedHierarchy/Weave or the remaining flow-tree hierarchy]
 23. `ParsedHierarchy/ConditionalSingleBranch.cs` (`deps=7`) [partial: reason=branch runtime generation is real, but the weave-based nesting model and parser ownership are still incomplete; missing=weave nesting, exact else/branch recovery, and parser integration; next=port ParsedHierarchy/Weave and InkParser_Conditional]
 24. `ParsedHierarchy/Knot.cs` (`deps=7`) [ported]
-25. `ParsedHierarchy/VariableAssignment.cs` (`deps=7`) [partial: variable declarations now generate runtime assignments and list-definition ownership is threaded through ResolveReferences, and list-definition backrefs are initialized when the declaration is constructed, but the exact list-definition content/parent ownership still differs from the C# object tree; missing=full content-tree parity for list-backed declarations and exact declaration-tree ownership; next=finish the remaining parsed-object ownership wiring]
+25. `ParsedHierarchy/VariableAssignment.cs` (`deps=7`) [ported]
 26. `ParsedHierarchy/Object.cs` (`deps=8`) [partial: reason=the shared parsed-object base now tracks ancestry, identifiers, runtime storage, and typed payloads for key concrete nodes including knots/stitches; missing=reference-identity parent ownership, full concrete-node composition, and exact Story-root lookup; next=wire FlowBase/Weave choices through the typed payload model]
 27. `ParsedHierarchy/Path.cs` (`deps=8`) [ported]
 28. `ParsedHierarchy/FunctionCall.cs` (`deps=9`) [ported]
