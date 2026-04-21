@@ -1,6 +1,7 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/DivertTarget.cs
 
 use crate::ParsedHierarchy::Divert::Divert;
+use crate::ParsedHierarchy::FlowBase::FlowBase;
 use crate::ParsedHierarchy::Story::Story;
 use ink_runtime::Container::ContentItem;
 use ink_runtime::Value::{DivertTargetValue, Value};
@@ -83,6 +84,42 @@ impl DivertTarget {
         if let Some(target_value) = &mut self.runtimeDivertTargetValue {
             if let Some(runtime_divert) = &self.runtimeDivert {
                 target_value.value = runtime_divert.get_targetPath();
+            }
+        }
+
+        if let Some(target_content) = self.divert.get_targetContent() {
+            if let Some(target_flow) = match target_content.kind {
+                crate::ParsedHierarchy::Object::ObjectKind::Knot
+                | crate::ParsedHierarchy::Object::ObjectKind::Stitch
+                | crate::ParsedHierarchy::Object::ObjectKind::Story => {
+                    Some(FlowBase::from_object(target_content))
+                }
+                _ => None,
+            } {
+                if target_flow
+                    .get_arguments()
+                    .iter()
+                    .any(|argument| argument.isByReference)
+                {
+                    context.Error(
+                        format!(
+                            "Can't store a divert target to a knot or function that has by-reference arguments ('{}' has 'ref {}').",
+                            target_flow
+                                .get_identifier()
+                                .and_then(|identifier| identifier.name.as_deref())
+                                .unwrap_or_default(),
+                            target_flow
+                                .get_arguments()
+                                .iter()
+                                .find(|argument| argument.isByReference)
+                                .and_then(|argument| argument.identifier.as_ref())
+                                .and_then(|identifier| identifier.name.as_deref())
+                                .unwrap_or_default()
+                        ),
+                        Default::default(),
+                        false,
+                    );
+                }
             }
         }
     }
