@@ -116,6 +116,9 @@ impl Story {
         &mut self,
         errorHandler: Option<Rc<RefCell<ErrorHandler>>>,
     ) -> Option<RuntimeStory> {
+        if std::env::var_os("INK_DEBUG_STORY_EXPORT").is_some() {
+            eprintln!("export start self.content.len()={}", self.content.len());
+        }
         self.errorHandler = errorHandler;
         self.ResetError();
 
@@ -139,6 +142,16 @@ impl Story {
         if self.hadError {
             self.content = content;
             return None;
+        }
+
+        if std::env::var_os("INK_DEBUG_STORY_EXPORT").is_some() {
+            eprintln!(
+                "export top-level kinds={:?}",
+                content
+                    .iter()
+                    .map(|obj| format!("{:?}:{:?}", obj.kind, obj.payload.as_ref().map(|_| "payload")))
+                    .collect::<Vec<_>>()
+            );
         }
 
         let mut rootContainer = Container::new();

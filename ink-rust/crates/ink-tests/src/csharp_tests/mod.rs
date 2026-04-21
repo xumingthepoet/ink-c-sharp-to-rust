@@ -637,7 +637,7 @@ mod tests {
     // { 10 - 2 }
     // { 2 * (5-1) }
     // ");
-    // 
+    //
     //             Assert.AreEqual("36\n2\n3\n2\n2"+System.Globalization.NumberFormatInfo.CurrentInfo.NumberDecimalSeparator+"3333333\n8\n8\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -658,6 +658,7 @@ mod tests {
                     false,
                 )
                 .expect("compile should succeed");
+            eprintln!("arith hierarchy=\n{}", story.BuildStringOfHierarchy());
             eprintln!(
                 "arith pre can_continue={} choices={} text='{}'",
                 story.can_continue(),
@@ -666,11 +667,12 @@ mod tests {
             );
             let first = story.cont();
             eprintln!(
-                "arith first='{}' after choices={} can_continue={} text='{}'",
+                "arith first='{}' after choices={} can_continue={} text='{}' out={:?}",
                 first,
                 story.current_choices_len(),
                 story.can_continue(),
-                story.current_text()
+                story.current_text(),
+                story.get_state().get_outputStream()
             );
             assert_eq!(
                 "36\n2\n3\n2\n2.3333333\n8\n8\n",
@@ -691,7 +693,7 @@ mod tests {
     //             Assert.AreEqual("false\n", CompileString("{not 1}").Continue());
     //             Assert.AreEqual("false\n", CompileString("{not true}").Continue());
     //             Assert.AreEqual("true\n", CompileString("{3 > 1}").Continue());
-    // 
+    //
     //             var listHasntStory = @"
     //                 LIST list = a, (b), c, (d), e
     //                 {list !? (c)}
@@ -787,9 +789,9 @@ mod tests {
     //     - 3: y
     // }
     //         ");
-    // 
+    //
     //             story.Continue ();
-    // 
+    //
     //         	Assert.IsTrue (story.state.evaluationStack.Count == 0);
     //         }
     #[test]
@@ -817,23 +819,23 @@ mod tests {
     //         {
     //             CompileStringWithoutRuntime(@"
     // VAR global_var = 5
-    // 
+    //
     // ~ pass_divert(-> knot_name)
     // {variable_param_test(10)}
-    // 
+    //
     // === function aTarget() ===
     //    ~ return true
-    // 
+    //
     // === function pass_divert(aTarget) ===
     //     Should be a divert target, but is a read count:- {aTarget}
-    // 
+    //
     // === function variable_param_test(global_var) ===
     //     ~ return global_var
-    // 
+    //
     // === knot_name ===
     //     -> END
     // ", testingErrors: true);
-    // 
+    //
     //             Assert.AreEqual(2, _errorMessages.Count);
     //             Assert.IsTrue(HadError("name has already been used for a function"));
     //             Assert.IsTrue(HadError("name has already been used for a var"));
@@ -877,7 +879,7 @@ VAR global_var = 5
     //             CompileStringWithoutRuntime(@"
     // == knot ==
     // - (x) -> DONE
-    // 
+    //
     // == function f(x) ==
     // Nothing
     // ");
@@ -906,21 +908,21 @@ Nothing
     //             Story story = CompileString(@"
     // -> one (1) -> two (2) ->
     // three (3)
-    // 
+    //
     // == one(num) ==
     // one ({num})
     // -> oneAndAHalf (1.5) ->
     // ->->
-    // 
+    //
     // == oneAndAHalf(num) ==
     // one and a half ({num})
     // ->->
-    // 
+    //
     // == two (num) ==
     // two ({num})
     // ->->
     // ");
-    // 
+    //
     //             Assert.AreEqual("one (1)\none and a half (1"+ System.Globalization.NumberFormatInfo.CurrentInfo.NumberDecimalSeparator+"5)\ntwo (2)\nthree (3)\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -1033,24 +1035,24 @@ VAR x = 3
     //             Story story = CompileString("Hello world", false, true);
     //             story.ContinueMaximally();
     //             Assert.IsFalse(HadError());
-    // 
+    //
     //             story = CompileString("== test ==\nContent\n-> END");
     //             story.ContinueMaximally();
-    // 
+    //
     //             // Should have runtime error due to running out of content
     //             // (needs a -> END)
     //             story = CompileString("== test ==\nContent", false, true);
     //             story.ContinueMaximally();
     //             Assert.IsTrue(HadWarning());
-    // 
+    //
     //             // Should have warning that there's no "-> END"
     //             CompileStringWithoutRuntime("== test ==\nContent", true);
     //             Assert.IsFalse(HadError());
     //             Assert.IsTrue(HadWarning());
-    // 
+    //
     //             CompileStringWithoutRuntime("== test ==\n~return", testingErrors: true);
     //             Assert.IsTrue(HadError("Return statements can only be used in knots that are declared as functions"));
-    // 
+    //
     //             CompileStringWithoutRuntime("== function test ==\n-> END", testingErrors: true);
     //             Assert.IsTrue(HadError("Functions may not contain diverts"));
     //         }
@@ -1098,9 +1100,9 @@ VAR x = 3
     //         public void TestEscapeCharacter()
     //         {
     //             var storyStr = @"{true:this is a '\|' character|this isn't}";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("this is a '|' character\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -1129,17 +1131,17 @@ VAR x = 3
     // {times(3, ""knock "")}
     // ");
     //             string message = null;
-    // 
+    //
     //             story.BindExternalFunction("message", (string arg) =>
     //             {
     //                 message = "MESSAGE: " + arg;
     //             });
-    // 
+    //
     //             story.BindExternalFunction("multiply", (float arg1, int arg2) =>
     //             {
     //                 return arg1 * arg2;
     //             });
-    // 
+    //
     //             story.BindExternalFunction("times", (int numberOfTimes, string str) =>
     //             {
     //                 string result = "";
@@ -1149,11 +1151,11 @@ VAR x = 3
     //                 }
     //                 return result;
     //             });
-    // 
+    //
     //             Assert.AreEqual("15\n", story.Continue());
-    // 
+    //
     //             Assert.AreEqual("knock knock knock\n", story.Continue());
-    // 
+    //
     //             Assert.AreEqual("MESSAGE: hello world", message);
     //         }
     #[test]
@@ -1223,39 +1225,39 @@ EXTERNAL times(i,str)
     //         {
     //             var story = CompileString(@"
     // EXTERNAL myAction()
-    // 
+    //
     // One
     // ~ myAction()
     // Two
     // ");
-    // 
+    //
     //             // Lookahead SAFE - should get multiple calls to the ext function,
     //             // one for lookahead on first line, one "for real" on second line.
     //             int callCount = 0;
     //             story.BindExternalFunction("myAction", () => callCount++, lookaheadSafe:true);
-    // 
+    //
     //             story.ContinueMaximally();
     //             Assert.AreEqual(2, callCount);
-    // 
+    //
     //             // Lookahead UNSAFE - when it sees the function, it should break out early
     //             // and stop lookahead, making sure that the action is only called for the second line.
     //             callCount = 0;
     //             story.ResetState();
     //             story.UnbindExternalFunction("myAction");
     //             story.BindExternalFunction("myAction", () => callCount++, lookaheadSafe:false);
-    // 
+    //
     //             story.ContinueMaximally();
     //             Assert.AreEqual(1, callCount);
-    // 
+    //
     //             // Lookahead SAFE but breaks glue intentionally
     //             var storyWithPostGlue = CompileString(@"
     // EXTERNAL myAction()
-    // 
+    //
     // One
     // ~ myAction()
     // <> Two
     // ");
-    // 
+    //
     //             storyWithPostGlue.BindExternalFunction("myAction", () => {});
     //             var result = storyWithPostGlue.ContinueMaximally();
     //             Assert.AreEqual("One\nTwo\n", result);
@@ -1339,7 +1341,7 @@ One
     // VAR result = 0
     // ~ factorialByRef(result, 5)
     // { result }
-    // 
+    //
     // == function factorialByRef(ref r, n) ==
     // { r == 0:
     //     ~ r = 1
@@ -1350,9 +1352,9 @@ One
     // }
     // ~ return
     // ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("120\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -1388,7 +1390,7 @@ VAR result = 0
     //         {
     //             var storyStr = @"
     // { factorial(5) }
-    // 
+    //
     // == function factorial(n) ==
     //  { n == 1:
     //     ~ return 1
@@ -1396,9 +1398,9 @@ VAR result = 0
     //     ~ return (n * factorial(n-1))
     //  }
     // ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("120\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -1430,22 +1432,22 @@ VAR result = 0
     //             CompileStringWithoutRuntime(@"
     // // Allowed to do this
     // ~ myFunc()
-    // 
+    //
     // // Not allowed to to this
     // ~ aKnot()
-    // 
+    //
     // // Not allowed to do this
     // -> myFunc
-    // 
+    //
     // == function myFunc ==
     // This is a function.
     // ~ return
-    // 
+    //
     // == aKnot ==
     // This is a normal knot.
     // -> END
     // ", testingErrors: true);
-    // 
+    //
     //             Assert.AreEqual(2, _errorMessages.Count);
     //             Assert.IsTrue(_errorMessages[0].Contains("hasn't been marked as a function"));
     //             Assert.IsTrue(_errorMessages[1].Contains("can only be called as a function"));
@@ -1493,13 +1495,13 @@ This is a normal knot.
     //         {
     //             CompileStringWithoutRuntime(@"
     // -> test
-    // 
+    //
     // == test ==
     // ~ myFunc()
     // = function myBadInnerFunc
     // Not allowed!
     // ~ return
-    // 
+    //
     // == function myFunc ==
     // Hello world
     // * a choice
@@ -1510,7 +1512,7 @@ This is a normal knot.
     //     This is a stitch
     // ~ return
     // ", testingErrors: true);
-    // 
+    //
     //             Assert.AreEqual(7, _errorMessages.Count);
     //             Assert.IsTrue(_errorMessages[0].Contains("Return statements can only be used in knots that"));
     //             Assert.IsTrue(_errorMessages[1].Contains("Functions cannot be stitches"));
@@ -1575,7 +1577,7 @@ Hello world
     //         public void TestDisallowEmptyDiverts()
     //         {
     //             CompileStringWithoutRuntime ("->", testingErrors: true);
-    // 
+    //
     //             Assert.IsTrue (HadError ("Empty diverts (->) are only valid on choices"));
     //         }
     #[test]
@@ -1596,9 +1598,9 @@ Hello world
     // -> DONE
     // This content is inaccessible.
     // ";
-    // 
+    //
     //             Story story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual (string.Empty, story.ContinueMaximally ());
     //         }
     #[test]
@@ -1627,26 +1629,26 @@ This content is inaccessible.
     // knot 1 line 1
     // knot 1 line 2
     // -> END
-    // 
+    //
     // === knot2
     // knot 2 line 1
     // knot 2 line 2
     // -> END
     // ";
-    // 
+    //
     //             var story = CompileString(storyStr);
-    // 
+    //
     //             story.SwitchFlow("First");
     //             story.ChoosePathString("knot1");
     //             Assert.AreEqual("knot 1 line 1\n", story.Continue());
-    // 
+    //
     //             story.SwitchFlow("Second");
     //             story.ChoosePathString("knot2");
     //             Assert.AreEqual("knot 2 line 1\n", story.Continue());
-    // 
+    //
     //             story.SwitchFlow("First");
     //             Assert.AreEqual("knot 1 line 2\n", story.Continue());
-    // 
+    //
     //             story.SwitchFlow("Second");
     //             Assert.AreEqual("knot 2 line 2\n", story.Continue());
     //         }
@@ -1690,86 +1692,86 @@ knot 2 line 2
     //         @"
     // Default line 1
     // Default line 2
-    // 
+    //
     // == red ==
     // Hello I'm red
     // <- thread1(""red"")
     // <- thread2(""red"")
     // -> DONE
-    // 
+    //
     // == blue ==
     // Hello I'm blue
     // <- thread1(""blue"")
     // <- thread2(""blue"")
     // -> DONE
-    // 
+    //
     // == thread1(name) ==
     // + Thread 1 {name} choice
     //     -> thread1Choice(name)
-    // 
+    //
     // == thread2(name) ==
     // + Thread 2 {name} choice
     //     -> thread2Choice(name)
-    // 
+    //
     // == thread1Choice(name) ==
     // After thread 1 choice ({name})
     // -> END
-    // 
+    //
     // == thread2Choice(name) ==
     // After thread 2 choice ({name})
     // -> END
     // ";
-    // 
+    //
     //             var story = CompileString(storyStr);
-    // 
+    //
     //             // Default flow
     //             Assert.AreEqual("Default line 1\n", story.Continue());
-    // 
+    //
     //             story.SwitchFlow("Blue Flow");
     //             story.ChoosePathString("blue");
     //             Assert.AreEqual("Hello I'm blue\n", story.Continue());
-    // 
+    //
     //             story.SwitchFlow("Red Flow");
     //             story.ChoosePathString("red");
     //             Assert.AreEqual("Hello I'm red\n", story.Continue());
-    // 
+    //
     //             // Test existing state remains after switch (blue)
     //             story.SwitchFlow("Blue Flow");
     //             Assert.AreEqual("Hello I'm blue\n", story.currentText);
     //             Assert.AreEqual("Thread 1 blue choice", story.currentChoices[0].text);
-    // 
+    //
     //             // Test existing state remains after switch (red)
     //             story.SwitchFlow("Red Flow");
     //             Assert.AreEqual("Hello I'm red\n", story.currentText);
     //             Assert.AreEqual("Thread 1 red choice", story.currentChoices[0].text);
-    // 
+    //
     //             // Save/load test
     //             var saved = story.state.ToJson();
-    // 
+    //
     //             // Test choice before reloading state before resetting
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("Thread 1 red choice\nAfter thread 1 choice (red)\n", story.ContinueMaximally());
     //             story.ResetState();
-    // 
+    //
     //             // Load to pre-choice: still red, choose second choice
     //             story.state.LoadJson(saved);
-    // 
+    //
     //             story.ChooseChoiceIndex(1);
     //             Assert.AreEqual("Thread 2 red choice\nAfter thread 2 choice (red)\n", story.ContinueMaximally());
-    // 
-    // 
+    //
+    //
     //             // Load: switch to blue, choose 1
     //             story.state.LoadJson(saved);
     //             story.SwitchFlow("Blue Flow");
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("Thread 1 blue choice\nAfter thread 1 choice (blue)\n", story.ContinueMaximally());
-    // 
+    //
     //             // Load: switch to blue, choose 2
     //             story.state.LoadJson(saved);
     //             story.SwitchFlow("Blue Flow");
     //             story.ChooseChoiceIndex(1);
     //             Assert.AreEqual("Thread 2 blue choice\nAfter thread 2 choice (blue)\n", story.ContinueMaximally());
-    // 
+    //
     //             // Remove active blue flow, should revert back to global flow
     //             story.RemoveFlow("Blue Flow");
     //             Assert.AreEqual("Default line 2\n", story.Continue());
@@ -1871,19 +1873,19 @@ After thread 2 choice ({name})
     //             var ranges = InkParser.ListAllCharacterRanges();
     //             for (int i = 0; i < ranges.Length; i++)
     //             {
-    // 
+    //
     //                 var range = ranges[i];
-    // 
+    //
     //                 var identifier = GenerateIdentifierFromCharacterRange(range);
-    // 
+    //
     //                 var storyStr = string.Format(@"
     // CONST pi{0} = 3.1415
     // CONST a{0} = ""World""
     // CONST b{0} = 3
     // ", identifier);
-    // 
+    //
     //                 var compiledStory = CompileStringWithoutRuntime(storyStr);
-    // 
+    //
     //                 Assert.IsNotNull(compiledStory);
     //             }
     //         }
@@ -1911,19 +1913,19 @@ After thread 2 choice ({name})
     //             var ranges = InkParser.ListAllCharacterRanges();
     //             for (int i = 0; i < ranges.Length; i++)
     //             {
-    // 
+    //
     //                 var range = ranges[i];
-    // 
+    //
     //                 var identifier = GenerateIdentifierFromCharacterRange(range);
-    // 
+    //
     //                 var storyStr = string.Format(@"
     // CONST {0}pi = 3.1415
     // CONST {0}a = ""World""
     // CONST {0}b = 3
     // ", identifier);
-    // 
+    //
     //                 var compiledStory = CompileStringWithoutRuntime(storyStr);
-    // 
+    //
     //                 Assert.IsNotNull(compiledStory);
     //             }
     //         }
@@ -1951,19 +1953,19 @@ After thread 2 choice ({name})
     //             var ranges = InkParser.ListAllCharacterRanges();
     //             for (int i = 0; i < ranges.Length; i++)
     //             {
-    // 
+    //
     //                 var range = ranges[i];
-    // 
+    //
     //                 var identifier = GenerateIdentifierFromCharacterRange(range);
-    // 
+    //
     //                 var storyStr = string.Format(@"
     // VAR pi{0} = 3.1415
     // VAR a{0} = ""World""
     // VAR b{0} = 3
     // ", identifier);
-    // 
+    //
     //                 var compiledStory = CompileStringWithoutRuntime(storyStr);
-    // 
+    //
     //                 Assert.IsNotNull(compiledStory);
     //             }
     //         }
@@ -1991,19 +1993,19 @@ After thread 2 choice ({name})
     //             var ranges = InkParser.ListAllCharacterRanges();
     //             for (int i = 0; i < ranges.Length; i++)
     //             {
-    // 
+    //
     //                 var range = ranges[i];
-    // 
+    //
     //                 var identifier = GenerateIdentifierFromCharacterRange(range);
-    // 
+    //
     //                 var storyStr = string.Format(@"
     // VAR {0}pi = 3.1415
     // VAR {0}a = ""World""
     // VAR {0}b = 3
     // ", identifier);
-    // 
+    //
     //                 var compiledStory = CompileStringWithoutRuntime(storyStr);
-    // 
+    //
     //                 Assert.IsNotNull(compiledStory);
     //             }
     //         }
@@ -2030,20 +2032,20 @@ After thread 2 choice ({name})
     //         {
     //             var ranges = InkParser.ListAllCharacterRanges();
     //             for (int i = 0; i < ranges.Length; i++) {
-    // 
+    //
     //                 var range = ranges[i];
     //                 var rangeString = GenerateIdentifierFromCharacterRange(range);
-    // 
-    // 
+    //
+    //
     //                 var storyStr = string.Format(@"
     // VAR z{0} = -> divert{0}
-    // 
+    //
     // == divert{0} ==
     // -> END
     // ", rangeString);
-    // 
+    //
     //                 var compiledStory = CompileStringWithoutRuntime (storyStr);
-    // 
+    //
     //                 Assert.IsNotNull (compiledStory);
     //             }
     //         }
@@ -2071,20 +2073,20 @@ After thread 2 choice ({name})
     //             var ranges = InkParser.ListAllCharacterRanges();
     //             for (int i = 0; i < ranges.Length; i++)
     //             {
-    // 
+    //
     //                 var range = ranges[i];
     //                 var rangeString = GenerateIdentifierFromCharacterRange(range);
-    // 
-    // 
+    //
+    //
     //                 var storyStr = string.Format(@"
     // VAR {0}z = -> {0}divert
-    // 
+    //
     // == {0}divert ==
     // -> END
     // ", rangeString);
-    // 
+    //
     //                 var compiledStory = CompileStringWithoutRuntime(storyStr);
-    // 
+    //
     //                 Assert.IsNotNull(compiledStory);
     //             }
     //         }
@@ -2140,12 +2142,12 @@ Hello {"world"} 2.
     //             Story story = CompileString(@"
     // -> f ->
     // <> world
-    // 
+    //
     // == f ==
     // Hello
     // ->->
     // ");
-    // 
+    //
     //             Assert.AreEqual("Hello world\n", story.Continue());
     //         }
     #[test]
@@ -2175,15 +2177,15 @@ Hello
     //             Story story = CompileString(@"
     // <- choices
     // { CHOICE_COUNT() }
-    // 
+    //
     // = end
     // -> END
-    // 
+    //
     // = choices
     // * one -> end
     // * two -> end
     // ");
-    // 
+    //
     //             Assert.AreEqual("2\n", story.Continue());
     //         }
     #[test]
@@ -2214,12 +2216,12 @@ Hello
     //         public void TestChoiceDivertsToDone()
     //         {
     //             var story = CompileString(@"* choice -> DONE");
-    // 
+    //
     //             story.Continue();
-    // 
+    //
     //             Assert.AreEqual(1, story.currentChoices.Count);
     //             story.ChooseChoiceIndex(0);
-    // 
+    //
     //             Assert.AreEqual("choice", story.Continue());
     //         }
     #[test]
@@ -2239,15 +2241,15 @@ Hello
     //         public void TestChoiceWithBracketsOnly()
     //         {
     //             var storyStr = "*   [Option]\n    Text";
-    // 
+    //
     //             Story story = CompileString(storyStr);
     //             story.Continue();
-    // 
+    //
     //             Assert.AreEqual(1, story.currentChoices.Count);
     //             Assert.AreEqual("Option", story.currentChoices[0].text);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
-    // 
+    //
     //             Assert.AreEqual("Text\n", story.Continue());
     //         }
     #[test]
@@ -2270,24 +2272,24 @@ Hello
     //             var storyStr = @"
     // VAR to_one = -> one
     // VAR to_two = -> two
-    // 
+    //
     // {to_one == to_two:same knot|different knot}
     // {to_one == to_one:same knot|different knot}
     // {to_two == to_two:same knot|different knot}
     // { -> one == -> two:same knot|different knot}
     // { -> one == to_one:same knot|different knot}
     // { to_one == -> one:same knot|different knot}
-    // 
+    //
     // == one
     //     One
     //     -> DONE
-    // 
+    //
     // === two
     //     Two
     //     -> DONE";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("different knot\nsame knot\nsame knot\ndifferent knot\nsame knot\nsame knot\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -2345,23 +2347,23 @@ VAR to_two = -> two
     // 1. -> seq4 ->
     // 2. -> seq4 ->
     // 3. -> seq4 ->
-    // 
+    //
     // == seq1 ==
     // {a||b}
     // ->->
-    // 
+    //
     // == seq2 ==
     // {|a}
     // ->->
-    // 
+    //
     // == seq3 ==
     // {a|}
     // ->->
-    // 
+    //
     // == seq4 ==
     // {|}
     // ->->".Replace("\r", ""));
-    // 
+    //
     //             Assert.AreEqual(
     // @"1. a
     // 2.
@@ -2454,7 +2456,7 @@ VAR to_two = -> two
     //             var storyStr =
     //                 @"
     // ~ SEED_RANDOM(1)
-    // 
+    //
     // Once: {f_once()} {f_once()} {f_once()} {f_once()}
     // Stopping: {f_stopping()} {f_stopping()} {f_stopping()} {f_stopping()}
     // Default: {f_default()} {f_default()} {f_default()} {f_default()}
@@ -2462,48 +2464,48 @@ VAR to_two = -> two
     // Shuffle: {f_shuffle()} {f_shuffle()} {f_shuffle()} {f_shuffle()}
     // Shuffle stopping: {f_shuffle_stopping()} {f_shuffle_stopping()} {f_shuffle_stopping()} {f_shuffle_stopping()}
     // Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()}
-    // 
+    //
     // == function f_once ==
     // {once:
     //     - one
     //     - two
     // }
-    // 
+    //
     // == function f_stopping ==
     // {stopping:
     //     - one
     //     - two
     // }
-    // 
+    //
     // == function f_default ==
     // {one|two}
-    // 
+    //
     // == function f_cycle ==
     // {cycle:
     //     - one
     //     - two
     // }
-    // 
+    //
     // == function f_shuffle ==
     // {shuffle:
     //     - one
     //     - two
     // }
-    // 
+    //
     // == function f_shuffle_stopping ==
     // {stopping shuffle:
     //     - one
     //     - two
     //     - final
     // }
-    // 
+    //
     // == function f_shuffle_once ==
     // {shuffle once:
     //     - one
     //     - two
     // }
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
     //             Assert.AreEqual("Once: one two\nStopping: one two two two\nDefault: one two two two\nCycle: one two one two\nShuffle: two one two one\nShuffle stopping: one two final final\nShuffle once: two one\n", story.ContinueMaximally());
     //         }
@@ -2582,17 +2584,17 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
     //                 @"
     //                    { six() + two() }
     //                     -> END
-    // 
+    //
     //                 === function six
     //                     ~ return four() + two()
-    // 
+    //
     //                 === function four
     //                     ~ return two() + two()
-    // 
+    //
     //                 === function two
     //                     ~ return 2
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
     //             Assert.AreEqual("8\n", story.Continue());
     //         }
@@ -2633,19 +2635,19 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
     //  }
     // - gather should be seen
     // -> DONE
-    // 
+    //
     // = a_stitch
     //     result
     //     -> END
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("start\ngather should be seen\n", story.ContinueMaximally());
     //             Assert.AreEqual(1, story.currentChoices.Count);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
-    // 
+    //
     //             Assert.AreEqual("result\n", story.Continue());
     //         }
     #[test]
@@ -2690,15 +2692,15 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
     //     * unreachable option -> END
     // }
     // - bottom gather";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("first gather\n", story.Continue());
-    // 
+    //
     //             Assert.AreEqual(2, story.currentChoices.Count);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
-    // 
+    //
     //             Assert.AreEqual("the main gather\nbottom gather\n", story.ContinueMaximally());
     //             Assert.AreEqual(0, story.currentChoices.Count);
     //         }
@@ -2745,10 +2747,10 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
     // * { true }
     //   four
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
     //             story.ContinueMaximally();
-    // 
+    //
     //             Assert.AreEqual(4, story.currentChoices.Count);
     //             Assert.AreEqual("one", story.currentChoices[0].text);
     //             Assert.AreEqual("two", story.currentChoices[1].text);
@@ -2818,9 +2820,9 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
     //     right?
     // }
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("true\ntrue\ntrue\ntrue\ntrue\ngreat\nright?\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -2873,9 +2875,9 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
     //         {
     //             var story = CompileString(@"
     // VAR x = c
-    // 
+    //
     // CONST c = 5
-    // 
+    //
     // {x}
     // ");
     //             Assert.AreEqual("5\n", story.Continue());
@@ -2911,20 +2913,20 @@ CONST c = 5
     //  * -> default
     //  - After choice
     //  -> start
-    // 
+    //
     // == default ==
     // This is default.
     // -> DONE
     // ");
-    // 
+    //
     //             Assert.AreEqual("", story.Continue());
     //             Assert.AreEqual(2, story.currentChoices.Count);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("After choice\n", story.Continue());
-    // 
+    //
     //             Assert.AreEqual(1, story.currentChoices.Count);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("After choice\nThis is default.\n", story.ContinueMaximally());
     //         }
@@ -2968,7 +2970,7 @@ This is default.
     // * ->
     // - x
     // -> DONE");
-    // 
+    //
     //             Assert.AreEqual("x\n", story.Continue());
     //         }
     #[test]
@@ -3002,7 +3004,7 @@ This is default.
     // = done
     //     -> END
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
     //             Assert.AreEqual("", story.ContinueMaximally());
     //         }
@@ -3033,12 +3035,12 @@ This is default.
     //         {
     //             CompileStringWithoutRuntime(@"
     // -> knot
-    // 
+    //
     // == knot ==
     // Knot.
     // -> next
     // ", testingErrors: true);
-    // 
+    //
     //             Assert.IsTrue(HadError("not found"));
     //         }
     #[test]
@@ -3064,7 +3066,7 @@ Knot.
     //             var storyStr =
     //                 @"
     // -> knot.stitch.gather
-    // 
+    //
     // == knot ==
     // = stitch
     // - hello
@@ -3072,17 +3074,17 @@ Knot.
     //         choice content
     // - (gather)
     //   gather
-    // 
+    //
     //   {stopping:
     //     - -> knot.stitch.choice
     //     - second time round
     //   }
-    // 
+    //
     // -> END
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("gather\ntest\nchoice content\ngather\nsecond time round\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -3122,7 +3124,7 @@ Knot.
     //         public void TestEmpty()
     //         {
     //             Story story = CompileString(@"");
-    // 
+    //
     //             Assert.AreEqual(string.Empty, story.currentText);
     //         }
     #[test]
@@ -3151,9 +3153,9 @@ Knot.
     //                     Assert.Fail("Shouldn't have had any errors");
     //                 }
     //             });
-    // 
+    //
     //             parser.Parse();
-    // 
+    //
     //             Assert.AreEqual(1, warningCount);
     //         }
     #[test]
@@ -3186,17 +3188,17 @@ Knot.
     //             var testContent =
     // @"A// C
     // A /* C */ A
-    // 
+    //
     // A * A * /* * C *// A/*
     // C C C
-    // 
+    //
     // */";
-    // 
+    //
     //             CommentEliminator p = new CommentEliminator(testContent);
     //             var result = p.Process();
-    // 
+    //
     //             var expected = "A\nA  A\n\nA * A * / A\n\n\n";
-    // 
+    //
     //             Assert.AreEqual(expected.Replace("\r", ""), result.Replace("\r", "")); //Windows perculiarity
     //         }
     #[test]
@@ -3214,13 +3216,13 @@ Knot.
     //         {
     //             var testContent =
     //                 "A B\nC D // comment\nA B\r\nC D // comment\r\n/* block comment\r\nsecond line\r\n */ ";
-    // 
+    //
     //             CommentEliminator p = new CommentEliminator(testContent);
     //             var result = p.Process();
-    // 
+    //
     //             var expected =
     //                 "A B\nC D \nA B\nC D \n\n\n ";
-    // 
+    //
     //             Assert.AreEqual(expected, result);
     //         }
     #[test]
@@ -3241,7 +3243,7 @@ Knot.
     //             var results = p.Interleave<string>(
     //                 () => p.ParseString("A"),
     //                 () => p.ParseString("B"));
-    // 
+    //
     //             var expected = new[] { "A" };
     //             Assert.AreEqual(expected, results);
     //         }
@@ -3264,7 +3266,7 @@ Knot.
     //             var results = p.Interleave<string>(
     //                 () => p.ParseString("A"),
     //                 () => p.ParseString("B"));
-    // 
+    //
     //             var expected = new[] { "A", "B", "A", "B" };
     //             Assert.AreEqual(expected, results);
     //         }
@@ -3295,7 +3297,7 @@ Knot.
     //             var results = p.Interleave<string>(
     //                 () => p.ParseString("A"),
     //                 p.Optional(() => p.ParseString("B")));
-    // 
+    //
     //             var expected = new[] { "A", "B", "A", "A" };
     //             Assert.AreEqual(expected, results);
     //         }
@@ -3327,7 +3329,7 @@ Knot.
     //             var results = p.Interleave<string>(
     //                 p.Optional(() => p.ParseString("A")),
     //                 () => p.ParseString("B"));
-    // 
+    //
     //             var expected = new[] { "B", "A", "B", "B" };
     //             Assert.AreEqual(expected, results);
     //         }
@@ -3359,7 +3361,7 @@ Knot.
     //             var result = p.Interleave<string>(
     //                 () => p.ParseString("A"),
     //                 () => p.ParseString("B"));
-    // 
+    //
     //             Assert.IsNull(result);
     //         }
     #[test]
@@ -3384,7 +3386,7 @@ Knot.
     //         txt
     // }
     // ");
-    // 
+    //
     //             Assert.AreEqual("", story.Continue());
     //         }
     #[test]
@@ -3418,7 +3420,7 @@ Knot.
     // -> thing ->
     // -> thing ->
     // Done.
-    // 
+    //
     // == thing ==
     // {once:
     //   - Wait for it....
@@ -3472,7 +3474,7 @@ Done.
     // world
     // -> END
     // ");
-    // 
+    //
     //             Assert.AreEqual("hello\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -3499,14 +3501,14 @@ world
     //         {
     //             Story story = CompileString(@"
     // -> test
-    // 
+    //
     // == test ==
     // hello
     // -> END
     // world
     // -> END
     // ");
-    // 
+    //
     //             Assert.AreEqual("hello\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -3537,14 +3539,14 @@ world
     //             // Different instances should ensure different instances of individual components
     //             var path1 = new Path("hello.1.world");
     //             var path2 = new Path("hello.1.world");
-    // 
+    //
     //             var path3 = new Path(".hello.1.world");
     //             var path4 = new Path(".hello.1.world");
-    // 
+    //
     //             Assert.AreEqual(path1, path2);
-    // 
+    //
     //             Assert.AreEqual(path3, path4);
-    // 
+    //
     //             Assert.AreNotEqual(path1, path3);
     //         }
     #[test]
@@ -3566,7 +3568,7 @@ world
     // - (dododo)
     // -> tunnel ->
     // -> dododo
-    // 
+    //
     // == tunnel
     // + A
     // ->->
@@ -3617,7 +3619,7 @@ world
     // . {print_num(101)} .
     // . {print_num(222)} .
     // . {print_num(1234)} .
-    // 
+    //
     // === function print_num(x) ===
     // {
     //     - x >= 1000:
@@ -3668,7 +3670,7 @@ world
     //         }
     // }
     // ");
-    // 
+    //
     //             Assert.AreEqual(
     // @". four .
     // . fifteen .
@@ -3778,13 +3780,13 @@ world
     //         {
     //             var story = CompileString(@"
     // -> first
-    // 
+    //
     // == first ==
     // 1) Seen first {first} times.
     // -> second ->
     // 2) Seen first {first} times.
     // -> DONE
-    // 
+    //
     // == second ==
     // In second.
     // ->->
@@ -3825,13 +3827,13 @@ In second.
     //         {
     //             var story = CompileString(@"
     //     -> top
-    // 
+    //
     // = top
     //     {top}
     //     <- aside
     //     {top}
     //     -> DONE
-    // 
+    //
     // = aside
     //     * {false} DONE
     // 	- -> DONE
@@ -3871,15 +3873,15 @@ In second.
     // -> hi ->
     // -> hi ->
     // -> hi ->
-    // 
+    //
     // { hi.stitch_to_count }
-    // 
+    //
     // == hi ==
     // = stitch_to_count
     // hi
     // ->->
     // ");
-    // 
+    //
     //             Assert.AreEqual("hi\nhi\nhi\n3\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -3919,7 +3921,7 @@ hi
     //                         throw new TestWarningException();
     //                     }
     //                 });
-    // 
+    //
     //             Assert.Throws<TestWarningException>(() => parser.Parse());
     //         }
     #[test]
@@ -3949,12 +3951,12 @@ hi
     // -> hurry_home
     // === hurry_home ===
     // We hurried home to Savile Row -> as_fast_as_we_could
-    // 
+    //
     // === as_fast_as_we_could ===
     // as fast as we could.
     // -> DONE
     // ");
-    // 
+    //
     //             Assert.AreEqual("We hurried home to Savile Row as fast as we could.\n", story.Continue());
     //         }
     #[test]
@@ -3991,10 +3993,10 @@ as fast as we could.
     //     * * {false} impossible
     //     * * -> END
     // - gather");
-    // 
+    //
     //             story.ContinueMaximally();
     //             story.ChooseChoiceIndex(0);
-    // 
+    //
     //             // Shouldn't go to "gather"
     //             Assert.AreEqual("opt\ntext\n", story.ContinueMaximally());
     //         }
@@ -4023,9 +4025,9 @@ as fast as we could.
     //         public void TestSimpleGlue()
     //         {
     //             var storyStr = "Some <> \ncontent<> with glue.\n";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("Some content with glue.\n", story.Continue());
     //         }
     #[test]
@@ -4050,10 +4052,10 @@ as fast as we could.
     // + Choice 2
     // - -> test
     // ");
-    // 
+    //
     //             story.ContinueMaximally();
     //             Assert.AreEqual(2, story.currentChoices.Count);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             story.ContinueMaximally();
     //             Assert.AreEqual(2, story.currentChoices.Count);
@@ -4092,7 +4094,7 @@ Second line.
     // VAR x = kX
     // CONST kX = ""hi""
     // ");
-    // 
+    //
     //             Assert.AreEqual("hi\n", story.Continue());
     //         }
     #[test]
@@ -4121,10 +4123,10 @@ CONST kX = "hi"
     // -> DONE
     // ");
     //             story.ContinueMaximally();
-    // 
+    //
     //             Assert.AreEqual(1, story.currentChoices.Count);
     //             Assert.AreEqual(@"test1 ""test2 test3""", story.currentChoices[0].text);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("test1 test4\n", story.Continue());
     //         }
@@ -4156,7 +4158,7 @@ CONST kX = "hi"
     // {""5"" == 5:same|different}
     // {""blah"" == 5:same|different}
     // ");
-    // 
+    //
     //             // Not sure that "5" should be equal to 5, but hmm.
     //             Assert.AreEqual("same\ndifferent\n", story.ContinueMaximally());
     //         }
@@ -4212,14 +4214,14 @@ VAR x = 5
     // This is a thread example
     // <- example_thread
     // The example is now complete.
-    // 
+    //
     // == example_thread ==
     // Hello.
     // -> DONE
     // World.
     // -> DONE
     // ");
-    // 
+    //
     //             Assert.AreEqual("This is a thread example\nHello.\nThe example is now complete.\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -4256,16 +4258,16 @@ World.
     // -> tunnel1 ->
     // The End.
     // -> END
-    // 
+    //
     // == tunnel1 ==
     // Hello...
     // -> tunnel2 ->->
-    // 
+    //
     // == tunnel2 ==
     // ...world.
     // ->->
     // ");
-    // 
+    //
     //             Assert.AreEqual("Hello...\n...world.\nThe End.\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -4300,38 +4302,38 @@ Hello...
     //             Story story = CompileString(@"
     // -> knot_with_options ->
     // Finished tunnel.
-    // 
+    //
     // Starting thread.
     // <- thread_with_options
     // * E
     // -
     // Done.
-    // 
+    //
     // == knot_with_options ==
     // * A
     // * B
     // -
     // ->->
-    // 
+    //
     // == thread_with_options ==
     // * C
     // * D
     // - -> DONE
     // ");
-    // 
+    //
     //             Assert.IsFalse(story.ContinueMaximally().Contains("Finished tunnel"));
-    // 
+    //
     //             // Choices should be A, B
     //             Assert.AreEqual(2, story.currentChoices.Count);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
-    // 
+    //
     //             // Choices should be C, D, E
     //             Assert.IsTrue(story.ContinueMaximally().Contains("Finished tunnel"));
     //             Assert.AreEqual(3, story.currentChoices.Count);
-    // 
+    //
     //             story.ChooseChoiceIndex(2);
-    // 
+    //
     //             Assert.IsTrue(story.ContinueMaximally().Contains("Done."));
     //         }
     #[test]
@@ -4385,15 +4387,15 @@ Done.
     // - { TURNS_SINCE(-> test) }
     // * [choice 2]
     // - { TURNS_SINCE(-> test) }
-    // 
+    //
     // == function test ==
     // ~ return
     // ");
     //             Assert.AreEqual("-1\n0\n", story.ContinueMaximally());
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("1\n", story.ContinueMaximally());
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("2\n", story.ContinueMaximally());
     //         }
@@ -4440,15 +4442,15 @@ Done.
     //         -> DONE
     // ");
     //             Assert.AreEqual("-1 = -1\n", story.ContinueMaximally());
-    // 
+    //
     //             Assert.AreEqual(1, story.currentChoices.Count);
     //             story.ChooseChoiceIndex(0);
-    // 
+    //
     //             Assert.AreEqual("stuff\n0 = 0\n", story.ContinueMaximally());
-    // 
+    //
     //             Assert.AreEqual(1, story.currentChoices.Count);
     //             story.ChooseChoiceIndex(0);
-    // 
+    //
     //             Assert.AreEqual("more stuff\n1 = 1\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -4486,7 +4488,7 @@ Done.
     //             // Count all visits must be switched on for variable count targets
     //             var story = CompileString(@"
     // -> start
-    // 
+    //
     // === start ===
     //     {beats(-> start)}
     //     {beats(-> start)}
@@ -4494,13 +4496,13 @@ Done.
     // = next
     //     {beats(-> start)}
     //     -> END
-    // 
+    //
     // === function beats(x) ===
     //     ~ return TURNS_SINCE(x)
     // ", countAllVisits: true);
-    // 
+    //
     //             Assert.AreEqual("0\n0\n", story.ContinueMaximally());
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("1\n", story.ContinueMaximally());
     //         }
@@ -4543,15 +4545,15 @@ Done.
     // -> END
     // ");
     //             story.ContinueMaximally();
-    // 
+    //
     //             Assert.AreEqual(1, story.currentChoices.Count);
     //             Assert.AreEqual("First", story.currentChoices[0].text);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("First\n", story.ContinueMaximally());
     //             Assert.AreEqual(1, story.currentChoices.Count);
     //             Assert.AreEqual("Very indented", story.currentChoices[0].text);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("Very indented\nEnd\n", story.ContinueMaximally());
     //             Assert.AreEqual(0, story.currentChoices.Count);
@@ -4595,9 +4597,9 @@ Done.
     // }
     // {x}
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             // Extra newline is because there's a choice object sandwiched there,
     //             // so it can't be absorbed :-/
     //             Assert.AreEqual("5\n", story.Continue());
@@ -4627,47 +4629,47 @@ VAR x = 0
     //         {
     //             var story = CompileString(@"
     // VAR x = 5
-    // 
+    //
     // {x}
-    // 
+    //
     // * [choice]
     // -
     // {x}
-    // 
+    //
     // * [choice]
     // -
-    // 
+    //
     // {x}
-    // 
+    //
     // * [choice]
     // -
-    // 
+    //
     // {x}
-    // 
+    //
     // -> DONE
     // ");
-    // 
+    //
     //             // Initial state
     //             Assert.AreEqual("5\n", story.ContinueMaximally());
     //             Assert.AreEqual(5, story.variablesState["x"]);
-    // 
+    //
     //             story.variablesState["x"] = 10;
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("10\n", story.ContinueMaximally());
     //             Assert.AreEqual(10, story.variablesState["x"]);
-    // 
+    //
     //             story.variablesState["x"] = 8.5f;
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("8"+ System.Globalization.NumberFormatInfo.CurrentInfo.NumberDecimalSeparator+"5\n", story.ContinueMaximally());
     //             Assert.AreEqual(8.5f, story.variablesState["x"]);
-    // 
+    //
     //             story.variablesState["x"] = "a string";
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("a string\n", story.ContinueMaximally());
     //             Assert.AreEqual("a string", story.variablesState["x"]);
-    // 
+    //
     //             Assert.AreEqual(null, story.variablesState["z"]);
-    // 
+    //
     //             // Not allowed arbitrary types
     //             Assert.Throws<Exception>(() =>
     //             {
@@ -4738,40 +4740,40 @@ VAR x = 5
     //             var story = CompileString(@"
     // VAR testVar = 5
     // VAR testVar2 = 10
-    // 
+    //
     // Hello world!
-    // 
+    //
     // ~ testVar = 15
     // ~ testVar2 = 100
-    // 
+    //
     // Hello world 2!
-    // 
+    //
     // * choice
-    // 
+    //
     //     ~ testVar = 25
     //     ~ testVar2 = 200
-    // 
+    //
     //     -> END
     // ");
-    // 
+    //
     //             int currentVarValue = 0;
     //             int observerCallCount = 0;
-    // 
+    //
     //             story.ObserveVariable("testVar", (string varName, object newValue) =>
     //             {
     //                 currentVarValue = (int)newValue;
     //                 observerCallCount++;
     //             });
-    // 
+    //
     //             story.ContinueMaximally();
-    // 
+    //
     //             Assert.AreEqual(15, currentVarValue);
     //             Assert.AreEqual(1, observerCallCount);
     //             Assert.AreEqual(1, story.currentChoices.Count);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             story.Continue();
-    // 
+    //
     //             Assert.AreEqual(25, currentVarValue);
     //             Assert.AreEqual(2, observerCallCount);
     //         }
@@ -4833,20 +4835,20 @@ Hello world 2!
     //         {
     //             var story = CompileString(@"
     // VAR val = 5
-    // 
+    //
     // -> knot ->
-    // 
+    //
     // -> END
-    // 
+    //
     // == knot ==
     // ~ inc(val)
     // {val}
     // ->->
-    // 
+    //
     // == function inc(ref x) ==
     //     ~ x = x + 1
     // ");
-    // 
+    //
     //             Assert.AreEqual("6\n", story.Continue());
     //         }
     #[test]
@@ -4883,7 +4885,7 @@ VAR val = 5
     //         {
     //             var storyStr = @"
     // ~ f(1, 1)
-    // 
+    //
     // == function f(x, y) ==
     // { x == 1 and y == 1:
     //   ~ x = 2
@@ -4893,9 +4895,9 @@ VAR val = 5
     // }
     // ~ return
     // ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("1 2\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -4929,18 +4931,18 @@ VAR val = 5
     //         {
     //             var story = CompileString(@"
     // -> one_then_tother(-> tunnel)
-    // 
+    //
     // === one_then_tother(-> x) ===
     //     -> x -> end
-    // 
+    //
     // === tunnel ===
     //     STUFF
     //     ->->
-    // 
+    //
     // === end ===
     //     -> END
     // ");
-    // 
+    //
     //             Assert.AreEqual("STUFF\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -4977,10 +4979,10 @@ VAR val = 5
     //                 @"
     // LIST list = a, b
     // {LIST_ALL(list)}
-    // 
+    //
     // ";
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual ("a, b\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -5012,7 +5014,7 @@ LIST list = a, b
     // {() ? list}
     // ";
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual ("false\nfalse\nfalse\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -5044,7 +5046,7 @@ LIST list = (a), b
     // {LIST_ALL(x)}
     // ";
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual ("a, b, c\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -5072,28 +5074,28 @@ LIST x = a, b, c
     //                 @"
     // LIST l1 = (a), b, (c)
     // LIST l2 = (x), y, z
-    // 
+    //
     // VAR t = ()
     // ~ t = l1 + l2
     // {t}
-    // 
+    //
     // == elsewhere ==
     // ~ t += z
     // {t}
     // -> END
     // ";
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual ("a, x, c\n", story.ContinueMaximally ());
-    // 
+    //
     //             var savedState = story.state.ToJson ();
-    // 
+    //
     //             // Compile new version of the story
     //             story = CompileString (storyStr);
-    // 
+    //
     //             // Load saved game
     //             story.state.LoadJson (savedState);
-    // 
+    //
     //             story.ChoosePathString ("elsewhere");
     //             Assert.AreEqual ("a, x, c, z\n", story.ContinueMaximally ());
     //         }
@@ -5228,13 +5230,13 @@ TODO: b
     //             var storyStr =
     //                 @"
     // VAR stitch = 0
-    // 
+    //
     // == knot ==
     // = stitch
     // ->DONE
     // ";
     //             CompileString (storyStr, countAllVisits: false, testingErrors: true);
-    // 
+    //
     //             Assert.IsTrue (HadError ("already been used for a var"));
     //         }
     #[test]
@@ -5269,7 +5271,7 @@ VAR stitch = 0
     // -> END
     // ";
     //             CompileString (storyStr, countAllVisits: false, testingErrors:true);
-    // 
+    //
     //             Assert.IsTrue(HadError ("with the same label"));
     //         }
     #[test]
@@ -5298,15 +5300,15 @@ opts1
     //             var storyStr =
     //                 @"
     // LIST someList = A, B
-    // 
+    //
     // ~temp heldItems = (A)
     // {LIST_COUNT (heldItems)}
-    // 
+    //
     // === function heldItems ()
     // ~ return (A)
     //         ";
     //             CompileString (storyStr, countAllVisits: false, testingErrors: true);
-    // 
+    //
     //             Assert.IsTrue (HadError ("name has already been used for a function"));
     //         }
     #[test]
@@ -5337,9 +5339,9 @@ LIST someList = A, B
     //             var storyStr =
     //                 @"=== function knot (a)
     //                     ~temp a = 1";
-    // 
+    //
     //             CompileString (storyStr, countAllVisits: false, testingErrors: true);
-    // 
+    //
     //             Assert.IsTrue (HadError ("has already been used"));
     //         }
     #[test]
@@ -5370,7 +5372,7 @@ LIST someList = A, B
     // - 3
     // -> END
     // ";
-    // 
+    //
     //             var story = CompileString (storyStr);
     //             Assert.AreEqual ("1\n2\n3\n", story.ContinueMaximally ());
     //         }
@@ -5403,7 +5405,7 @@ Unreachable
     //         @"
     // * [] blank
     //         ";
-    // 
+    //
     //         	CompileString (storyStr, testingErrors:true);
     //             Assert.IsTrue (HadWarning ("Blank choice"));
     //         }
@@ -5429,15 +5431,15 @@ Unreachable
     //             var storyStr =
     // @"
     // -> tunnel ->
-    // 
+    //
     // == tunnel ==
     // * ->-> elsewhere (8)
-    // 
+    //
     // == elsewhere (x) ==
     // {x}
     // -> END
     // ";
-    // 
+    //
     //             var story = CompileString (storyStr);
     //             Assert.AreEqual ("8\n", story.ContinueMaximally ());
     //         }
@@ -5470,19 +5472,19 @@ Unreachable
     //             var storyStr =
     // @"
     // -> outer ->
-    // 
+    //
     // == outer
     // This is outer
     // -> cut_to(-> the_esc)
-    // 
+    //
     // === cut_to(-> escape)
     //     ->-> escape
-    // 
+    //
     // == the_esc
     // This is the_esc
     // -> END
     // ";
-    // 
+    //
     //             var story = CompileString (storyStr);
     //             Assert.AreEqual ("This is outer\nThis is the_esc\n", story.ContinueMaximally ());
     //         }
@@ -5519,22 +5521,22 @@ This is the_esc
     //             var storyStr =
     // @"
     // VAR x = ->knot
-    // 
+    //
     // Count start: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
-    // 
+    //
     // -> x (1) ->
     // -> x (2) ->
     // -> x (3) ->
-    // 
+    //
     // Count end: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
     // -> END
-    // 
-    // 
+    //
+    //
     // == knot (a) ==
     // {a}
     // ->->
     // ";
-    // 
+    //
     //             var story = CompileString (storyStr, countAllVisits:true);
     //             Assert.AreEqual ("Count start: 0 0 0\n1\n2\n3\nCount end: 3 3 3\n", story.ContinueMaximally ());
     //         }
@@ -5577,16 +5579,16 @@ Count end: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
     //             var storyStr =
     // @"
     // VAR x = ->place
-    // 
+    //
     // ->x (5)
-    // 
+    //
     // == place (a) ==
     // {a}
     // -> DONE
     // ";
-    // 
+    //
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual ("5\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -5621,7 +5623,7 @@ VAR x = ->place
     //             var storyStr =
     //         @"
     // -> generate_choice(1) ->
-    // 
+    //
     // == generate_choice(x) ==
     // {true:
     //     + A choice
@@ -5630,21 +5632,21 @@ VAR x = ->place
     // }
     // ->->
     // ";
-    // 
+    //
     //             // Generate the choice with the forked thread
     //             var story = CompileString(storyStr);
     //             story.Continue();
-    // 
+    //
     //             // Save/reload
     //             var savedState = story.state.ToJson();
     //             story = CompileString(storyStr);
     //             story.state.LoadJson(savedState);
-    // 
+    //
     //             // Load the choice, it should have its own thread still
     //             // that still has the captured temp x
     //             story.ChooseChoiceIndex(0);
     //             story.ContinueMaximally();
-    // 
+    //
     //             // Don't want this warning:
     //             // RUNTIME WARNING: '' line 7: Variable not found: 'x'
     //             Assert.IsFalse(story.hasWarning);
@@ -5701,22 +5703,22 @@ VAR x = ->place
     //             var storyStr =
     //         @"
     // {RunAThing()}
-    // 
+    //
     // == function RunAThing ==
     // The first line.
     // The second line.
-    // 
+    //
     // == SomewhereElse ==
     // {""somewhere else""}
     // ->END
     // ";
-    // 
+    //
     //             var story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("The first line.\n", story.Continue());
-    // 
+    //
     //             story.ChoosePathString("SomewhereElse");
-    // 
+    //
     //             Assert.AreEqual("somewhere else\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -5752,24 +5754,24 @@ The second line.
     //                 @"
     // CONST pi = 3.1415
     // CONST pi = 3.1415
-    // 
+    //
     // CONST x = ""Hello""
     // CONST x = ""World""
-    // 
+    //
     // CONST y = 3
     // CONST y = 3.0
-    // 
+    //
     // CONST z = -> somewhere
     // CONST z = -> elsewhere
-    // 
+    //
     // == somewhere ==
     // -> DONE
-    // 
+    //
     // == elsewhere ==
     // -> DONE
     // ";
     //             CompileStringWithoutRuntime (storyStr, testingErrors:true);
-    // 
+    //
     //             Assert.IsFalse (HadError ("'pi' has been redefined"));
     //             Assert.IsTrue (HadError ("'x' has been redefined"));
     //             Assert.IsTrue (HadError ("'y' has been redefined"));
@@ -5815,34 +5817,34 @@ CONST z = -> elsewhere
     // -> tunnel ->
     // End
     // -> END
-    // 
+    //
     // == tunnel ==
     // In tunnel.
     // ->->
-    // 
+    //
     // === function function_to_evaluate() ===
     //     { zero_equals_(1):
     //         ~ return ""WRONG""
     //     - else:
     //         ~ return ""RIGHT""
     //     }
-    // 
+    //
     // === function zero_equals_(k) ===
     //     ~ do_nothing(0)
     //     ~ return  (0 == k)
-    // 
+    //
     // === function do_nothing(k)
     //     ~ return 0
     // ";
-    // 
+    //
     //             Story story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual ("Start\n", story.Continue ());
     //             Assert.AreEqual ("In tunnel.\n", story.Continue ());
-    // 
+    //
     //             var funcResult = story.EvaluateFunction ("function_to_evaluate");
     //             Assert.AreEqual ("RIGHT", funcResult);
-    // 
+    //
     //             Assert.AreEqual ("End\n", story.Continue ());
     //         }
     #[test]
@@ -5894,20 +5896,20 @@ In tunnel.
     //                 @"
     // Top level content
     // * choice
-    // 
+    //
     // == somewhere ==
     // = here
     // -> DONE
-    // 
+    //
     // == function test ==
     // ~ return -> somewhere.here
     // ";
-    // 
+    //
     //             Story story = CompileString (storyStr);
     //             story.Continue ();
-    // 
+    //
     //             var returnedDivertTarget = story.EvaluateFunction ("test");
-    // 
+    //
     //             // Divert target should get returned as a string
     //             Assert.AreEqual ("somewhere.here", returnedDivertTarget);
     //         }
@@ -5934,9 +5936,10 @@ Top level content
             story.cont();
             let result = story.EvaluateFunction("test".to_string(), Vec::new());
             let path_str = match result {
-                Some(Value::DivertTarget(dt)) => {
-                    dt.value.as_ref().map_or(String::new(), |p| format!("{}", p))
-                }
+                Some(Value::DivertTarget(dt)) => dt
+                    .value
+                    .as_ref()
+                    .map_or(String::new(), |p| format!("{}", p)),
                 other => format!("{:?}", other),
             };
             assert_eq!("somewhere.here", path_str);
@@ -5951,39 +5954,39 @@ Top level content
     // One
     // Two
     // Three
-    // 
+    //
     // == function func1 ==
     // This is a function
     // ~ return 5
-    // 
+    //
     // == function func2 ==
     // This is a function without a return value
     // ~ return
-    // 
+    //
     // == function add(x,y) ==
     // x = {x}, y = {y}
     // ~ return x + y
     // ";
-    // 
+    //
     //             Story story = CompileString (storyStr);
-    // 
+    //
     //             string textOutput;
     //             var funcResult = story.EvaluateFunction ("func1", out textOutput);
     //             Assert.AreEqual ("This is a function\n", textOutput);
     //             Assert.AreEqual (5, funcResult);
-    // 
+    //
     //             Assert.AreEqual ("One\n", story.Continue());
-    // 
+    //
     //             funcResult = story.EvaluateFunction ("func2", out textOutput);
     //             Assert.AreEqual ("This is a function without a return value\n", textOutput);
     //             Assert.AreEqual (null, funcResult);
-    // 
+    //
     //             Assert.AreEqual ("Two\n", story.Continue ());
-    // 
+    //
     //             funcResult = story.EvaluateFunction ("add", out textOutput, 1, 2);
     //             Assert.AreEqual ("x = 1, y = 2\n", textOutput);
     //             Assert.AreEqual (3, funcResult);
-    // 
+    //
     //             Assert.AreEqual ("Three\n", story.Continue ());
     //         }
     #[test]
@@ -6040,30 +6043,30 @@ x = {x}, y = {y}
     //         	var storyStr =
     // @"
     // {false:
-    // 
+    //
     // - else:
     //     else
     // }
-    // 
+    //
     // {6:
     // - 5: five
     // - else: else
     // }
-    // 
+    //
     // -> onceTest ->
     // -> onceTest ->
-    // 
+    //
     // == onceTest ==
     // {once:
     // - hi
     // }
     // ->->
     // ";
-    // 
+    //
     //         	var story = CompileString (storyStr);
-    // 
+    //
     //         	var result = story.ContinueMaximally ();
-    // 
+    //
     //         	Assert.AreEqual ("else\nelse\nhi\n", result);
     //             Assert.IsTrue (story.state.evaluationStack.Count == 0);
     //         }
@@ -6108,14 +6111,14 @@ x = {x}, y = {y}
     //             var storyStr =
     //         @"
     // <- knot
-    // 
+    //
     // == knot
     //    ~ temp x = 1
     //    *   ->
     //        Should be 1 not 0: {x}.
     //        -> DONE
     // ";
-    // 
+    //
     //             var story = CompileString(storyStr);
     //             Assert.AreEqual("Should be 1 not 0: 1.\n", story.Continue());
     //         }
@@ -6153,9 +6156,9 @@ x = {x}, y = {y}
     // {INT(CEILING(1.2)) / 3}
     // {FLOOR(1)}
     // ";
-    // 
+    //
     //             var story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("1\n1\n2\n0.6666667\n0\n1\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -6185,18 +6188,18 @@ x = {x}, y = {y}
     //         	var storyStr =
     //             @"
     // EXTERNAL gameInc(x)
-    // 
+    //
     // == function topExternal(x)
     // In top external
     // ~ return gameInc(x)
-    // 
+    //
     // == function inkInc(x)
     // ~ return x + 1
-    // 
+    //
     //             ";
-    // 
+    //
     //         	var story = CompileString (storyStr);
-    // 
+    //
     //             // Crazy game/ink callstack:
     //             // - Game calls "topExternal(5)" (Game -> ink)
     //             // - topExternal calls gameInc(5) (ink -> Game)
@@ -6204,16 +6207,16 @@ x = {x}, y = {y}
     //             // - gameInk calls inkInc(6) (Game -> ink)
     //             // - inkInc just increments to 7 (ink)
     //             // And the whole thing unwinds again back to game.
-    // 
+    //
     //             story.BindExternalFunction("gameInc", (int x) => {
     //                 x++;
     //                 x = (int) story.EvaluateFunction ("inkInc", x);
     //                 return x;
     //             });
-    // 
+    //
     //             string strResult;
     //             var finalResult = (int) story.EvaluateFunction ("topExternal", out strResult, 5);
-    // 
+    //
     //             Assert.AreEqual (7, finalResult);
     //             Assert.AreEqual ("In top external\n", strResult);
     //         }
@@ -6264,15 +6267,15 @@ In top external
     //         public void TestGatherChoiceSameLine()
     //         {
     //             var storyStr = "- * hello\n- * world";
-    // 
+    //
     //             Story story = CompileString(storyStr);
     //             story.Continue();
-    // 
+    //
     //             Assert.AreEqual("hello", story.currentChoices[0].text);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             story.Continue();
-    // 
+    //
     //             Assert.AreEqual("world", story.currentChoices[0].text);
     //         }
     #[test]
@@ -6298,7 +6301,7 @@ In top external
     // - (test)
     // { -> opts |}
     // ");
-    // 
+    //
     //             Assert.AreEqual("seen test\n", story.Continue());
     //         }
     #[test]
@@ -6327,14 +6330,14 @@ In top external
     //                 @"
     // * { not test } visible choice
     // * { test } visible choice
-    // 
+    //
     // == test ==
     // -> END
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
     //             story.ContinueMaximally();
-    // 
+    //
     //             Assert.AreEqual(1, story.currentChoices.Count);
     //             Assert.AreEqual("visible choice", story.currentChoices[0].text);
     //         }
@@ -6372,7 +6375,7 @@ In top external
     // 512x2p2 = {512x2p2}
     // -> DONE
     // ");
-    // 
+    //
     //             Assert.AreEqual("512x2 = 1024\n512x2p2 = 1026\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -6402,14 +6405,14 @@ In top external
     //         {
     //             var story = CompileString(@"
     // I have {five()} eggs.
-    // 
+    //
     // == function five ==
     // {false:
     //     Don't print this
     // }
     // five
     // ");
-    // 
+    //
     //             Assert.AreEqual("I have five eggs.\n", story.Continue());
     //         }
     #[test]
@@ -6440,13 +6443,13 @@ five
     //             var story = CompileString (@"
     // A {f():B}
     // X
-    // 
+    //
     // === function f() ===
     // {true:
     //     ~ return false
     // }
     // ");
-    // 
+    //
     //             Assert.AreEqual ("A\nX\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -6478,13 +6481,13 @@ X
     // A
     // {f():X}
     // C
-    // 
+    //
     // === function f()
     // { true:
     //     ~ return false
     // }
     // ");
-    // 
+    //
     //             Assert.AreEqual ("A\nC\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -6517,10 +6520,10 @@ C
     //                 @"
     // INCLUDE test_included_file.ink
     //   INCLUDE test_included_file2.ink
-    // 
+    //
     // This is the main file.
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
     //             Assert.AreEqual("This is include 1.\nThis is include 2.\nThis is the main file.\n", story.ContinueMaximally());
     //         }
@@ -6553,11 +6556,11 @@ This is the main file.
     // VAR x = 5
     // ~ x++
     // {x}
-    // 
+    //
     // ~ x--
     // {x}
     // ");
-    // 
+    //
     //             Assert.AreEqual("6\n5\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -6590,7 +6593,7 @@ VAR x = 5
     // -> knot.gather
     // - (gather) g
     // -> DONE");
-    // 
+    //
     //             Assert.AreEqual("g\n", story.Continue());
     //         }
     #[test]
@@ -6619,17 +6622,17 @@ VAR x = 5
     //         @"
     // VAR knotCount = 0
     // VAR stitchCount = 0
-    // 
+    //
     // -> gather_count_test ->
-    // 
+    //
     // ~ knotCount = 0
     // -> knot_count_test ->
-    // 
+    //
     // ~ knotCount = 0
     // -> knot_count_test ->
-    // 
+    //
     // -> stitch_count_test ->
-    // 
+    //
     // == gather_count_test ==
     // VAR gatherCount = 0
     // - (loop)
@@ -6637,31 +6640,31 @@ VAR x = 5
     // {gatherCount} {loop}
     // {gatherCount<3:->loop}
     // ->->
-    // 
+    //
     // == knot_count_test ==
     // ~ knotCount++
     // {knotCount} {knot_count_test}
     // {knotCount<3:->knot_count_test}
     // ->->
-    // 
-    // 
+    //
+    //
     // == stitch_count_test ==
     // ~ stitchCount = 0
     // -> stitch ->
     // ~ stitchCount = 0
     // -> stitch ->
     // ->->
-    // 
+    //
     // = stitch
     // ~ stitchCount++
     // {stitchCount} {stitch}
     // {stitchCount<3:->stitch}
     // ->->
     // ";
-    // 
+    //
     //             // Ensure it just compiles
     //             var story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual(
     // @"1 1
     // 2 2
@@ -6744,11 +6747,11 @@ VAR gatherCount = 0
     //             CompileStringWithoutRuntime(@"
     // === stuff ===
     // -> END
-    // 
+    //
     // VAR X = 1
     // CONST Y = 2
     // ", testingErrors: true);
-    // 
+    //
     //             Assert.IsTrue(_warningMessages.Count == 0);
     //         }
     #[test]
@@ -6777,24 +6780,24 @@ CONST Y = 2
     //     -> tunnel ->
     //     THE END
     //     -> END
-    // 
+    //
     // === tunnel
     //     - blah blah
     //     * wigwag
     //     - ->->
-    // 
+    //
     // === threadB
     //     *   option
     //     -   something
     //         -> DONE
     // ");
-    // 
+    //
     //             Assert.AreEqual("blah blah\n", story.ContinueMaximally());
-    // 
+    //
     //             Assert.AreEqual(2, story.currentChoices.Count);
     //             Assert.IsTrue(story.currentChoices[0].text.Contains("option"));
     //             Assert.IsTrue(story.currentChoices[1].text.Contains("wigwag"));
-    // 
+    //
     //             story.ChooseChoiceIndex(1);
     //             Assert.AreEqual("wigwag\n", story.Continue());
     //             Assert.AreEqual("THE END\n", story.Continue());
@@ -6845,23 +6848,23 @@ CONST Y = 2
     //     <- threadA
     //     When should this get printed?
     //     -> DONE
-    // 
+    //
     // === threadA
     //     -> tunnel ->
     //     Finishing thread.
     //     -> DONE
-    // 
+    //
     // === tunnel
     //     -   I’m in a tunnel
     //     *   I’m an option
     //     -   ->->
-    // 
+    //
     // ");
-    // 
+    //
     //             Assert.AreEqual("I’m in a tunnel\nWhen should this get printed?\n", story.ContinueMaximally());
     //             Assert.AreEqual(1, story.currentChoices.Count);
     //             Assert.AreEqual(story.currentChoices[0].text, "I’m an option");
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("I’m an option\nFinishing thread.\n", story.ContinueMaximally());
     //         }
@@ -6897,10 +6900,7 @@ CONST Y = 2
                 story.cont_maximally()
             );
             assert_eq!(1, story.current_choices().len());
-            assert_eq!(
-                story.current_choices()[0].text.clone(),
-                "I'm an option"
-            );
+            assert_eq!(story.current_choices()[0].text.clone(), "I'm an option");
             story.choose_choice_index(0);
             assert_eq!("I'm an option\nFinishing thread.\n", story.cont_maximally());
         });
@@ -6911,12 +6911,12 @@ CONST Y = 2
     //         {
     //             var story = CompileString(@"
     // {stopping:
-    // 
+    //
     // - a line after an empty line
     // - blah
     // }
     // ");
-    // 
+    //
     //             Assert.AreEqual("a line after an empty line\n", story.Continue());
     //         }
     #[test]
@@ -6948,14 +6948,14 @@ CONST Y = 2
     // { f():
     //     Another line.
     // }
-    // 
+    //
     // == function f ==
     // {false:nothing}
     // ~ return true
-    // 
+    //
     // ";
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual ("A line.\nAnother line.\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -6995,7 +6995,7 @@ A line.
     // {list !? (c)}
     // ";
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual ("b, d\na, b, c, e\nb, c\nfalse\ntrue\ntrue\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -7033,7 +7033,7 @@ LIST list = a, (b), c, (d), e
     // {list + list2}
     // ";
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual ("a, y, c\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -7071,9 +7071,9 @@ LIST list2 = x, (y), z
     // {LIST_RANDOM (l)}
     // {LIST_RANDOM (l)}
     //                     ";
-    // 
+    //
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             while (story.canContinue) {
     //                 var result = story.Continue ();
     //                 Assert.IsTrue (result == "B\n" || result == "C\n" || result == "D\n");
@@ -7125,7 +7125,7 @@ LIST l = A, (B), (C), (D), E
     // LIST Food = Pizza, Pasta, Curry, Paella
     // LIST Currency = Pound, Euro, Dollar
     // LIST Numbers = One, Two, Three, Four, Five, Six, Seven
-    // 
+    //
     // VAR all = ()
     // ~ all = LIST_ALL(Food) + LIST_ALL(Currency)
     // {all}
@@ -7134,9 +7134,9 @@ LIST l = A, (B), (C), (D), E
     // {LIST_RANGE(LIST_ALL(Numbers), Currency, Three)}
     // {LIST_RANGE((Pizza, Pasta), -1, 100)} // allow out of range
     // ";
-    // 
+    //
     //             var story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual(
     // @"Pound, Pizza, Euro, Pasta, Dollar, Curry, Paella
     // Euro, Pasta, Dollar, Curry
@@ -7181,7 +7181,7 @@ VAR all = ()
     // VAR negativeLiteral = -1
     // VAR negativeLiteral2 = not not false
     // VAR negativeLiteral3 = !(0)
-    // 
+    //
     // {negativeLiteral}
     // {negativeLiteral2}
     // {negativeLiteral3}
@@ -7216,16 +7216,16 @@ VAR negativeLiteral3 = !(0)
     //             var story = CompileString(@"
     // * 'Hello {name()}[, your name is {name()}.'],' I said, knowing full well that his name was {name()}.
     // -> DONE
-    // 
+    //
     // == function name ==
     // Joe
     // ");
-    // 
+    //
     //             story.ContinueMaximally();
-    // 
+    //
     //             Assert.AreEqual("'Hello Joe, your name is Joe.'", story.currentChoices[0].text);
     //             story.ChooseChoiceIndex(0);
-    // 
+    //
     //             Assert.AreEqual("'Hello Joe,' I said, knowing full well that his name was Joe.\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -7266,17 +7266,17 @@ Joe
     //         @"
     // ~ func ()
     // text 2
-    // 
+    //
     // ~temp tempVar = func ()
     // text 2
-    // 
+    //
     // == function func ()
     // 	text1
     // 	~ return true
     // ";
-    // 
+    //
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual("text1\ntext 2\ntext1\ntext 2\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -7308,20 +7308,20 @@ text 2
     //         {
     //         	CompileStringWithoutRuntime (
     // @"No loose ends in main content.
-    // 
+    //
     // == knot1 ==
     // * loose end choice
     // * loose end
     // 	on second line of choice
-    // 
+    //
     // == knot2 ==
     // * A
     // * B
     // TODO: Fix loose ends but don't warn
-    // 
+    //
     // == knot3 ==
     // Loose end when there's no weave
-    // 
+    //
     // == knot4 ==
     // {true:
     //     {false:
@@ -7331,7 +7331,7 @@ text 2
     // 	}
     // }
     //         ", testingErrors: true);
-    // 
+    //
     //             Assert.IsTrue (_warningMessages.Count == 3);
     //             Assert.IsTrue (HadWarning ("line 4: Apparent loose end"));
     //             Assert.IsTrue (HadWarning ("line 6: Apparent loose end"));
@@ -7381,9 +7381,9 @@ Loose end when there's no weave
     //                 @"
     // LIST list = l, m = 5, n
     // {LIST_VALUE(l)}
-    // 
+    //
     // {list(1)}
-    // 
+    //
     // ~ temp t = list()
     // ~ t += n
     // {t}
@@ -7394,7 +7394,7 @@ Loose end when there's no weave
     // {t}
     // ";
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual ("1\nl\nn\nl, m\nn\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -7434,24 +7434,24 @@ LIST list = l, m = 5, n
     // -> tunnel ->
     // The end
     // -> END
-    // 
+    //
     // == tunnel ==
     // <- place1
     // <- place2
     // -> DONE
-    // 
+    //
     // == place1 ==
     // This is place 1.
     // * choice in place 1
     // - ->->
-    // 
+    //
     // == place2 ==
     // This is place 2.
     // * choice in place 2
     // - ->->
     // ");
     //             Assert.AreEqual("This is place 1.\nThis is place 2.\n", story.ContinueMaximally());
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("choice in place 1\nThe end\n", story.ContinueMaximally());
     //         }
@@ -7486,7 +7486,10 @@ This is place 2.
                     false,
                 )
                 .expect("compile should succeed");
-            assert_eq!("This is place 1.\nThis is place 2.\n", story.cont_maximally());
+            assert_eq!(
+                "This is place 1.\nThis is place 2.\n",
+                story.cont_maximally()
+            );
             story.choose_choice_index(0);
             assert_eq!("choice in place 1\nThe end\n", story.cont_maximally());
         });
@@ -7500,8 +7503,8 @@ This is place 2.
     // {true:
     //     a
     // } <> b
-    // 
-    // 
+    //
+    //
     // {true:
     //     a
     // } <> { true:
@@ -7509,7 +7512,7 @@ This is place 2.
     // }
     // ";
     //         	var story = CompileString (storyStr);
-    // 
+    //
     //         	Assert.AreEqual ("a b\na b\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -7545,7 +7548,7 @@ This is place 2.
     // VAR varStr = CONST_STR
     // {varStr == CONST_STR:success}
     // ");
-    // 
+    //
     //             Assert.AreEqual("success\n", story.Continue());
     //         }
     #[test]
@@ -7572,12 +7575,12 @@ VAR varStr = CONST_STR
     //             var storyStr =
     //                 @"
     // INCLUDE test_included_file3.ink
-    // 
+    //
     // This is the main file
-    // 
+    //
     // -> knot_in_2
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
     //             Assert.AreEqual("The value of a variable in test file 2 is 5.\nThis is the main file\nThe value when accessed from knot_in_2 is 5.\n", story.ContinueMaximally());
     //         }
@@ -7609,24 +7612,24 @@ This is the main file
     //         {
     //             var storyStr = @"
     // VAR globalVal = 5
-    // 
+    //
     // {globalVal}
-    // 
+    //
     // ~ squaresquare(globalVal)
-    // 
+    //
     // {globalVal}
-    // 
+    //
     // == function squaresquare(ref x) ==
     //  {square(x)} {square(x)}
     //  ~ return
-    // 
+    //
     // == function square(ref x) ==
     //  ~ x = x * x
     //  ~ return
     // ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             // Bloody whitespace
     //             Assert.AreEqual("5\n625\n", story.ContinueMaximally());
     //         }
@@ -8342,7 +8345,10 @@ Stitch content
                     false,
                 )
                 .expect("compile should succeed");
-            let global_tags = vec!["author: Joe".to_string(), "title: My Great Story".to_string()];
+            let global_tags = vec![
+                "author: Joe".to_string(),
+                "title: My Great Story".to_string(),
+            ];
             let knot_tags = vec!["knot tag".to_string()];
             let knot_tag_when_continued_twice = vec!["end of knot tag".to_string()];
             let stitch_tags = vec!["stitch tag".to_string()];
@@ -8350,7 +8356,10 @@ Stitch content
             assert_eq!("This is the content\n", story.cont());
             assert_eq!(global_tags, story.current_tags());
             assert_eq!(knot_tags, story.TagsForContentAtPath("knot".to_string()));
-            assert_eq!(stitch_tags, story.TagsForContentAtPath("knot.stitch".to_string()));
+            assert_eq!(
+                stitch_tags,
+                story.TagsForContentAtPath("knot.stitch".to_string())
+            );
             story.choose_path_string_simple("knot");
             assert_eq!("Knot content\n", story.cont());
             assert_eq!(knot_tags, story.current_tags());
@@ -8371,11 +8380,7 @@ Stitch content
     fn TestTagsDynamicContent() {
         run_in_both_modes(|suite| {
             let mut story = suite
-                .compile_string(
-                    r#"tag # pic{5+3}{red|blue}.jpg"#,
-                    false,
-                    false,
-                )
+                .compile_string(r#"tag # pic{5+3}{red|blue}.jpg"#, false, false)
                 .expect("compile should succeed");
             assert_eq!("tag\n", story.cont());
             assert_eq!(vec!["pic8red.jpg"], story.current_tags());
@@ -8401,11 +8406,7 @@ Stitch content
     fn TestTagsInChoice() {
         run_in_both_modes(|suite| {
             let mut story = suite
-                .compile_string(
-                    r#"+ one #one [two #two] three #three -> END"#,
-                    false,
-                    false,
-                )
+                .compile_string(r#"+ one #one [two #two] three #three -> END"#, false, false)
                 .expect("compile should succeed");
             story.cont();
             assert_eq!(0, story.current_tags().len());
@@ -8416,7 +8417,10 @@ Stitch content
             );
             story.choose_choice_index(0);
             assert_eq!("one three", story.cont());
-            assert_eq!(vec!["one".to_string(), "three".to_string()], story.current_tags());
+            assert_eq!(
+                vec!["one".to_string(), "three".to_string()],
+                story.current_tags()
+            );
         });
     }
 
@@ -8639,10 +8643,7 @@ hello
             assert_eq!(1, story.current_choices().len());
             assert_eq!("1", story.current_choices()[0].text.clone());
             story.choose_choice_index(0);
-            assert_eq!(
-                "1\nEnd of choice\nthis another\n",
-                story.cont_maximally()
-            );
+            assert_eq!("1\nEnd of choice\nthis another\n", story.cont_maximally());
             assert_eq!(0, story.current_choices().len());
         });
     }
@@ -8756,17 +8757,17 @@ Limes
     //             var storyStr =
     // @"
     // -> a ->
-    // 
+    //
     // === a ===
     // ->-> b (5 + 3)
-    // 
+    //
     // === b (x) ===
     // {x}
     // -> END
     // ";
-    // 
+    //
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual ("8\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -8799,17 +8800,17 @@ Limes
     //                 @"
     // -> A ->
     // We will never return to here!
-    // 
+    //
     // == A ==
     // This is A
     // ->-> B
-    // 
+    //
     // == B ==
     // Now in B.
     // -> END
     // ";
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             Assert.AreEqual ("This is A\nNow in B.\n", story.ContinueMaximally());
     //         }
     #[test]
@@ -8848,9 +8849,9 @@ Now in B.
     //     {TURNS ()}
     //     -> top
     //                     ";
-    // 
+    //
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             for (int i = 0; i < 10; i++) {
     //                 Assert.AreEqual(i + "\n", story.Continue ());
     //                 story.ChooseChoiceIndex (0);
@@ -8886,11 +8887,11 @@ Now in B.
     //         @"
     // VAR x = 5
     // ~ x += one()
-    // 
+    //
     // === function one()
     // ~ return 1
     // ";
-    // 
+    //
     //             // Ensure it just compiles
     //             CompileStringWithoutRuntime(storyStr);
     //         }
@@ -8914,12 +8915,12 @@ VAR x = 5
     //         {
     //             var story = CompileString(@"
     // VAR x = -> here
-    // 
+    //
     // -> there
-    // 
+    //
     // == there ==
     // -> x
-    // 
+    //
     // == here ==
     // Here.
     // -> DONE
@@ -8959,11 +8960,11 @@ Here.
     //                 * choice
     //                 - {gather}
     //             ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             Assert.AreEqual("1\n", story.Continue());
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("choice\n1\n", story.ContinueMaximally());
     //         }
@@ -8995,37 +8996,37 @@ Here.
     // == TestKnot ==
     // this is a test
     // + [Next] -> TestKnot2
-    // 
+    //
     // == TestKnot2 ==
     // this is the end
     // -> END
     // ";
-    // 
+    //
     //             Story story = CompileString(storyStr, countAllVisits:true);
-    // 
+    //
     //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot"));
     //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot2"));
-    // 
+    //
     //             story.ChoosePathString ("TestKnot");
-    // 
+    //
     //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot"));
     //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot2"));
-    // 
+    //
     //             story.Continue ();
-    // 
+    //
     //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot"));
     //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot2"));
-    // 
+    //
     //             story.ChooseChoiceIndex (0);
-    // 
+    //
     //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot"));
-    // 
+    //
     //             // At this point, we have made the choice, but the divert *within* the choice
     //             // won't yet have been evaluated.
     //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot2"));
-    // 
+    //
     //             story.Continue ();
-    // 
+    //
     //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot"));
     //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot2"));
     //         }
@@ -9049,47 +9050,67 @@ this is the end
                 .expect("compile should succeed");
             assert_eq!(
                 0,
-                story.get_state().VisitCountAtPathString("TestKnot".to_string())
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot".to_string())
             );
             assert_eq!(
                 0,
-                story.get_state().VisitCountAtPathString("TestKnot2".to_string())
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot2".to_string())
             );
             story.choose_path_string_simple("TestKnot");
             assert_eq!(
                 1,
-                story.get_state().VisitCountAtPathString("TestKnot".to_string())
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot".to_string())
             );
             assert_eq!(
                 0,
-                story.get_state().VisitCountAtPathString("TestKnot2".to_string())
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot2".to_string())
             );
             story.cont();
             assert_eq!(
                 1,
-                story.get_state().VisitCountAtPathString("TestKnot".to_string())
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot".to_string())
             );
             assert_eq!(
                 0,
-                story.get_state().VisitCountAtPathString("TestKnot2".to_string())
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot2".to_string())
             );
             story.choose_choice_index(0);
             assert_eq!(
                 1,
-                story.get_state().VisitCountAtPathString("TestKnot".to_string())
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot".to_string())
             );
             assert_eq!(
                 0,
-                story.get_state().VisitCountAtPathString("TestKnot2".to_string())
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot2".to_string())
             );
             story.cont();
             assert_eq!(
                 1,
-                story.get_state().VisitCountAtPathString("TestKnot".to_string())
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot".to_string())
             );
             assert_eq!(
                 1,
-                story.get_state().VisitCountAtPathString("TestKnot2".to_string())
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot2".to_string())
             );
         });
     }
@@ -9107,21 +9128,21 @@ this is the end
     //    - - five
     // - six
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
-    // 
+    //
     //             story.ContinueMaximally();
-    // 
+    //
     //             Assert.AreEqual(2, story.currentChoices.Count);
     //             Assert.AreEqual("one", story.currentChoices[0].text);
     //             Assert.AreEqual("four", story.currentChoices[1].text);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             story.ContinueMaximally();
-    // 
+    //
     //             Assert.AreEqual(1, story.currentChoices.Count);
     //             Assert.AreEqual("two", story.currentChoices[0].text);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("two\nthree\nsix\n", story.ContinueMaximally());
     //         }
@@ -9166,12 +9187,12 @@ this is the end
     //                         * Hello[.], world.
     //                         -> END
     //                 ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
     //             story.Continue();
-    // 
+    //
     //             Assert.AreEqual("Hello.", story.currentChoices[0].text);
-    // 
+    //
     //             story.ChooseChoiceIndex(0);
     //             Assert.AreEqual("Hello, world.\n", story.Continue());
     //         }
@@ -9209,13 +9230,13 @@ this is the end
     // }
     // ";
     //             var story = CompileString (storyStr);
-    // 
+    //
     //             story.Continue ();
-    // 
+    //
     //             Assert.IsTrue (story.currentChoices.Count == 1);
-    // 
+    //
     //             story.ChooseChoiceIndex (0);
-    // 
+    //
     //             Assert.AreEqual ("choice\nnextline\n", story.ContinueMaximally ());
     //         }
     #[test]
@@ -9250,12 +9271,12 @@ this is the end
     // === firstKnot
     //     Hello!
     //     -> anotherKnot
-    // 
+    //
     // === anotherKnot
     //     World.
     //     -> END
     // ";
-    // 
+    //
     //             Story story = CompileString(storyStr);
     //             Assert.AreEqual("Hello!\nWorld.\n", story.ContinueMaximally());
     //         }
@@ -9288,19 +9309,19 @@ this is the end
     //             var storyStr =
     //                 @"
     // -> go_to_broken(-> SOMEWHERE)
-    // 
+    //
     // == go_to_broken(-> b)
     //  -> go_to(-> b) // INSTEAD OF: -> go_to(b)
-    // 
+    //
     // == go_to(-> a)
     //   -> a
-    // 
+    //
     // == SOMEWHERE ==
     // Should be able to get here!
     // -> DONE
     // ";
     //             CompileStringWithoutRuntime (storyStr, testingErrors:true);
-    // 
+    //
     //             Assert.IsTrue (HadError ("it shouldn't be preceded by '->'"));
     //         }
     #[test]

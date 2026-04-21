@@ -342,6 +342,18 @@ mod tests {
     }
 
     #[test]
+    fn top_level_inline_expression_statement_is_parsed() {
+        let mut parser = InkParser::new("{1}\n".to_string(), None, None, None);
+        let statements = parser.StatementsAtLevel(StatementLevel::Top).unwrap();
+
+        assert!(!statements.is_empty());
+        assert!(matches!(
+            statements[0].payload.as_ref(),
+            Some(ObjectPayload::ContentList(_))
+        ));
+    }
+
+    #[test]
     fn divert_lines_close_active_tags() {
         let mut parser = InkParser::new(String::new(), None, None, None);
         parser.set_flag(CustomFlags::TagActive, true);

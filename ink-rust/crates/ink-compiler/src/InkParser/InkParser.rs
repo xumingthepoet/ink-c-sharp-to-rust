@@ -563,4 +563,14 @@ mod tests {
         parser.set_isInclude(true);
         assert!(parser.Parse().get_isInclude());
     }
+
+    #[test]
+    fn parse_keeps_top_level_expression_content() {
+        let mut parser = InkParser::new("{1}\n".to_string(), None, None, None);
+        let story = parser.Parse();
+        assert!(!story.content.is_empty());
+        let mut obj = story.content[0].clone();
+        let runtime = obj.EnsureRuntimeObject().expect("runtime object");
+        assert!(!runtime.get_content().is_empty());
+    }
 }

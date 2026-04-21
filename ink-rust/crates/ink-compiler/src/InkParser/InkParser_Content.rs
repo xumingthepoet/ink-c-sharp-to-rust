@@ -258,8 +258,10 @@ impl InkParser {
     }
 
     pub fn InnerExpression(&mut self) -> Option<ContentListItem> {
-        self.Expression()
-            .map(|expr| ContentListItem::Expression(expr))
+        self.Expression().map(|mut expr| {
+            expr.outputWhenComplete = true;
+            ContentListItem::Expression(expr)
+        })
     }
 }
 
@@ -273,5 +275,20 @@ mod tests {
         let mut parser = InkParser::new("hello #world\n".to_string(), None, None, None);
         let line = parser.LineOfMixedTextAndLogic().expect("line");
         assert!(matches!(line[0], ContentListItem::Text(_)));
+    }
+
+    #[test]
+    fn inner_expression_marks_output_when_complete() {
+        let mut parser = InkParser::new("{1}".to_string(), None, None, None);
+        let line = parser.LineOfMixedTextAndLogic().expect("line");
+        match &line[0] {
+            ContentListItem::ContentList(list) => {
+                assert!(matches!(list.get_content()[0], ContentListItem::Expression(_)));
+                if let ContentListItem::Expression(expr) = &list.get_content()[0] {
+                    assert!(expr.get_outputWhenComplete());
+                }
+            }
+            other => panic!("unexpected line item: {other:?}"),
+        }
     }
 }
