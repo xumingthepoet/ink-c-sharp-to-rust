@@ -16,11 +16,20 @@ use ink_runtime::VariableAssignment::VariableAssignment as RuntimeVariableAssign
 use ink_runtime::VariableReference::VariableReference as RuntimeVariableReference;
 use std::cell::RefCell;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ExpressionParentContext {
+    Weave,
+    ContentList,
+    FlowBase,
+    Other,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Expression {
     pub outputWhenComplete: bool,
     pub kind: ExpressionKind,
     prototypeRuntimeConstantExpression: RefCell<Option<RuntimeContainer>>,
+    parentContext: Option<ExpressionParentContext>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -71,6 +80,7 @@ impl Expression {
             outputWhenComplete: false,
             kind: ExpressionKind::Empty,
             prototypeRuntimeConstantExpression: RefCell::new(None),
+            parentContext: None,
         }
     }
 
@@ -79,6 +89,7 @@ impl Expression {
             outputWhenComplete: false,
             kind,
             prototypeRuntimeConstantExpression: RefCell::new(None),
+            parentContext: None,
         }
     }
 
@@ -160,6 +171,7 @@ impl Expression {
                 divert_target.ResolveReferences(_context)
             }
             ExpressionKind::VariableReference(variable_reference) => {
+                variable_reference.set_parentContext(self.parentContext.clone());
                 variable_reference.ResolveReferences(_context)
             }
             ExpressionKind::List(list) => list.ResolveReferences(_context),
@@ -232,6 +244,14 @@ impl Expression {
     // C# signature: bool outputWhenComplete { get; }
     pub fn get_outputWhenComplete(&self) -> bool {
         self.outputWhenComplete
+    }
+
+    pub fn set_parentContext(&mut self, parentContext: Option<ExpressionParentContext>) {
+        self.parentContext = parentContext;
+    }
+
+    pub fn get_parentContext(&self) -> Option<&ExpressionParentContext> {
+        self.parentContext.as_ref()
     }
 
     // C# signature: List<Expression> subExpressions { get; }

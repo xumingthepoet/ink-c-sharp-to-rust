@@ -60,7 +60,7 @@ impl InkParser {
                 }
                 Some(pieces)
             })
-            .map(|pieces| Self::wrap_divert_line(pieces))
+            .map(|pieces| self.wrap_divert_line(pieces))
             .or_else(|| {
                 if level >= StatementLevel::Top {
                     self.ParseObject(|parser| parser.KnotDefinition())
@@ -246,7 +246,10 @@ impl InkParser {
         Object::from_content_list(ContentList::new(items))
     }
 
-    fn wrap_divert_line(pieces: Vec<crate::InkParser::InkParser_Divert::DivertPiece>) -> Object {
+    fn wrap_divert_line(
+        &mut self,
+        pieces: Vec<crate::InkParser::InkParser_Divert::DivertPiece>,
+    ) -> Object {
         let mut items = Vec::new();
         for piece in pieces {
             match piece {
@@ -262,6 +265,7 @@ impl InkParser {
                 }
             }
         }
+        self.EndTagIfNecessary(&mut items);
         Self::wrap_content_line(items)
     }
 }
@@ -269,7 +273,11 @@ impl InkParser {
 #[cfg(test)]
 mod tests {
     use super::StatementLevel;
+    use crate::InkParser::InkParser::CustomFlags;
     use crate::InkParser::InkParser::InkParser;
+    use crate::InkParser::InkParser_Divert::DivertPiece;
+    use crate::ParsedHierarchy::ContentList::ContentListItem;
+    use crate::ParsedHierarchy::Divert::Divert;
     use crate::ParsedHierarchy::Object::ObjectPayload;
     use std::sync::{Arc, Mutex};
 
@@ -331,5 +339,24 @@ mod tests {
                 false
             ))
         );
+    }
+
+    #[test]
+    fn divert_lines_close_active_tags() {
+        let mut parser = InkParser::new(String::new(), None, None, None);
+        parser.set_flag(CustomFlags::TagActive, true);
+
+        let object = parser.wrap_divert_line(vec![DivertPiece::Divert(Divert::default())]);
+        let content_list = match object.payload {
+            Some(ObjectPayload::ContentList(content_list)) => content_list,
+            other => panic!("unexpected object payload: {:?}", other),
+        };
+
+        assert_eq!(content_list.get_content().len(), 2);
+        assert!(matches!(
+            &content_list.get_content()[1],
+            ContentListItem::Tag(_)
+        ));
+        assert!(!parser.get_tagActive());
     }
 }

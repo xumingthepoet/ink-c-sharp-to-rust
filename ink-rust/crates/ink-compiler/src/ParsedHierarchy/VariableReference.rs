@@ -1,6 +1,6 @@
 // Source: ink-c-sharp/compiler/ParsedHierarchy/VariableReference.cs
 
-use crate::ParsedHierarchy::Expression::Expression;
+use crate::ParsedHierarchy::Expression::{Expression, ExpressionParentContext};
 use crate::ParsedHierarchy::Identifier::Identifier;
 use crate::ParsedHierarchy::Object::{Object, ObjectKind};
 use crate::ParsedHierarchy::Path::Path;
@@ -18,6 +18,7 @@ pub struct VariableReference {
     constantExpression: Option<Box<Expression>>,
     pub isConstantReference: bool,
     pub isListItemReference: bool,
+    parentContext: Option<ExpressionParentContext>,
 }
 
 impl VariableReference {
@@ -37,6 +38,7 @@ impl VariableReference {
             constantExpression: None,
             isConstantReference: false,
             isListItemReference: false,
+            parentContext: None,
         }
     }
 
@@ -94,6 +96,36 @@ impl VariableReference {
                 runtime_var_ref.set_pathForCount(Some(targetForCount.get_runtimePath()));
                 runtime_var_ref.set_name(None);
             }
+
+            if targetForCount.isFunction
+                && matches!(
+                    self.parentContext,
+                    Some(ExpressionParentContext::Weave)
+                        | Some(ExpressionParentContext::ContentList)
+                        | Some(ExpressionParentContext::FlowBase)
+                )
+            {
+                let identifier_name = targetForCount
+                    .identifier
+                    .as_ref()
+                    .map(|identifier| identifier.ToString())
+                    .unwrap_or_default();
+                let function_name = targetForCount
+                    .identifier
+                    .as_ref()
+                    .and_then(|identifier| identifier.name.as_deref())
+                    .unwrap_or("")
+                    .to_string();
+                context.Error(
+                        format!(
+                            "'{}' being used as read count rather than being called as function. Perhaps you intended to write {}()",
+                            identifier_name, function_name
+                        ),
+                        Default::default(),
+                        true,
+                    );
+            }
+
             return;
         }
 
@@ -160,6 +192,10 @@ impl VariableReference {
     // C# signature: Runtime.VariableReference runtimeVarRef { get; }
     pub fn get_runtimeVarRef(&self) -> Option<RuntimeVariableReference> {
         self.runtimeVarRef.borrow().clone()
+    }
+
+    pub fn set_parentContext(&mut self, parentContext: Option<ExpressionParentContext>) {
+        self.parentContext = parentContext;
     }
 }
 
@@ -269,5 +305,49 @@ mod tests {
             .borrow()
             .iter()
             .any(|message| message.contains("couldn't find list item with the name apple,seed")));
+    }
+
+    #[test]
+    fn warns_when_function_read_count_is_used_as_content() {
+        let captured = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+        let handler = {
+            let captured = captured.clone();
+            std::rc::Rc::new(std::cell::RefCell::new(Box::new(
+                move |message: &str, _error_type: ink_runtime::Error::ErrorType| {
+                    captured.borrow_mut().push(message.to_string());
+                },
+            )
+                as ink_runtime::Error::ErrorHandler))
+        };
+
+        let function_knot = Object::from_knot(Knot::new(
+            Identifier {
+                name: Some("tick".to_string()),
+                debugMetadata: None,
+            },
+            vec![],
+            vec![],
+            true,
+        ));
+        let mut story = Story::new(vec![function_knot], false);
+        story.ExportRuntime(Some(handler.clone()));
+
+        let reference = VariableReference::new(vec![Identifier {
+            name: Some("tick".to_string()),
+            debugMetadata: None,
+        }]);
+        let expression = crate::ParsedHierarchy::Expression::Expression::from_kind(
+            crate::ParsedHierarchy::Expression::ExpressionKind::VariableReference(Box::new(
+                reference,
+            )),
+        );
+        let mut content_list = crate::ParsedHierarchy::ContentList::ContentList::new(vec![
+            crate::ParsedHierarchy::ContentList::ContentListItem::Expression(expression),
+        ]);
+
+        content_list.ResolveReferences(&mut story);
+
+        assert!(captured.borrow().iter().any(|message| message
+            .contains("being used as read count rather than being called as function")));
     }
 }

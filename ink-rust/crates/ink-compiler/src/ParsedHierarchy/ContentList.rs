@@ -3,7 +3,7 @@
 use crate::ParsedHierarchy::AuthorWarning::AuthorWarning;
 use crate::ParsedHierarchy::ConstantDeclaration::ConstantDeclaration;
 use crate::ParsedHierarchy::Divert::Divert;
-use crate::ParsedHierarchy::Expression::Expression;
+use crate::ParsedHierarchy::Expression::{Expression, ExpressionParentContext};
 use crate::ParsedHierarchy::Gather::Gather;
 use crate::ParsedHierarchy::IncludedFile::IncludedFile;
 use crate::ParsedHierarchy::List::List;
@@ -232,7 +232,10 @@ impl ContentList {
     pub fn ResolveReferences(&mut self, context: &mut Story) {
         for content in &mut self.content {
             match content {
-                ContentListItem::Expression(expression) => expression.ResolveReferences(context),
+                ContentListItem::Expression(expression) => {
+                    expression.set_parentContext(Some(ExpressionParentContext::ContentList));
+                    expression.ResolveReferences(context)
+                }
                 ContentListItem::Divert(divert) => divert.ResolveReferences(context),
                 ContentListItem::TunnelOnwards(tunnel) => tunnel.ResolveReferences(context),
                 ContentListItem::List(list) => list.ResolveReferences(context),

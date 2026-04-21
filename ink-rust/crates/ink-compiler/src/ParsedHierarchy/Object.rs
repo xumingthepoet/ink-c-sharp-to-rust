@@ -4,7 +4,7 @@ use crate::ParsedHierarchy::AuthorWarning::AuthorWarning;
 use crate::ParsedHierarchy::Choice::Choice;
 use crate::ParsedHierarchy::ConstantDeclaration::ConstantDeclaration;
 use crate::ParsedHierarchy::ContentList::ContentList;
-use crate::ParsedHierarchy::Expression::Expression;
+use crate::ParsedHierarchy::Expression::{Expression, ExpressionParentContext};
 use crate::ParsedHierarchy::ExternalDeclaration::ExternalDeclaration;
 use crate::ParsedHierarchy::FlowLevel::FlowLevel;
 use crate::ParsedHierarchy::Gather::Gather;
@@ -453,6 +453,31 @@ impl Object {
                 true
             }
             Some(ObjectPayload::Expression(expression)) => {
+                let parent_context = match self.parent.as_deref() {
+                    Some(parent)
+                        if matches!(
+                            parent.kind,
+                            ObjectKind::Weave
+                                | ObjectKind::FlowBase
+                                | ObjectKind::Knot
+                                | ObjectKind::Stitch
+                                | ObjectKind::Story
+                        ) =>
+                    {
+                        Some(ExpressionParentContext::FlowBase)
+                    }
+                    Some(parent)
+                        if parent
+                            .payload
+                            .as_ref()
+                            .map(|payload| matches!(payload, ObjectPayload::ContentList(_)))
+                            .unwrap_or(false) =>
+                    {
+                        Some(ExpressionParentContext::ContentList)
+                    }
+                    _ => Some(ExpressionParentContext::Other),
+                };
+                expression.set_parentContext(parent_context);
                 expression.ResolveReferences(context);
                 true
             }
