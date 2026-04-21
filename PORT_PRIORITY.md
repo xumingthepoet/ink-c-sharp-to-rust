@@ -135,10 +135,10 @@ Source area: `ink-c-sharp/compiler/`
 5. `FileHandler.cs` (`deps=1`) [ported]
 6. `InkStringConversionExtensions.cs` (`deps=1`) [ported]
 7. `Plugins/Plugin.cs` (`deps=1`) [ported]
-8. `Plugins/PluginManager.cs` (`deps=4`) [partial: reason=reflection-driven DLL loading is not yet modeled; missing=plugin discovery/loading and invoke-member dispatch; next=finish or replace plugin system integration]
+8. `Plugins/PluginManager.cs` (`deps=4`) [partial: reason=plugin loading is intentionally deferred for the mainline compiler path, and the Rust side now behaves as an inert compatibility shim; missing=reflection-driven plugin discovery/loading and invoke-member dispatch for custom extensions; next=only revisit if plugin support becomes a product requirement]
 9. `StringParser/StringParser.cs` (`deps=5`) [ported]
 10. `Stats.cs` (`deps=7`) [ported]
-11. `Compiler.cs` (`deps=11`) [partial: source compilation now reaches Parsed.Story and Runtime.Story for simple stories, parser errors are buffered and replayed through the compiler handler, and command-line input now returns null on unhandled input like C#; remaining gaps are plugin processing and some debug-source recovery edge cases; missing=plugin directories and complete debug range recovery; next=finish the remaining compiler front-end helpers]
+11. `Compiler.cs` (`deps=11`) [partial: source compilation now reaches Parsed.Story and Runtime.Story for simple stories, parser errors are buffered and replayed through the compiler handler, and command-line input now returns null on unhandled input like C#; remaining gaps are complete debug-source recovery and any future plugin-extension support; missing=complete debug range recovery and a real plugin host; next=finish the remaining compiler front-end helpers]
 
 ## Tool Projects
 

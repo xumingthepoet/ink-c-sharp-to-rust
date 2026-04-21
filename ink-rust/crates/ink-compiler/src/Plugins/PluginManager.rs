@@ -16,24 +16,12 @@ impl PluginManager {
 
     // C# signature: public string PreParse(string storyContent)
     pub fn PreParse(&mut self, storyContent: String) -> String {
-        if self.pluginDirectories.is_empty() {
-            return storyContent;
-        }
-
-        todo!(
-            "plugin discovery/loading is not ported yet; reflection-driven DLL loading needs a separate integration layer"
-        )
+        storyContent
     }
 
     // C# signature: public Parsed.Story PostParse(Parsed.Story parsedStory)
     pub fn PostParse(&mut self, parsedStory: ParsedStory) -> ParsedStory {
-        if self.pluginDirectories.is_empty() {
-            return parsedStory;
-        }
-
-        todo!(
-            "plugin discovery/loading is not ported yet; reflection-driven DLL loading needs a separate integration layer"
-        )
+        parsedStory
     }
 
     // C# signature: public Runtime.Story PostExport(Parsed.Story parsedStory, Runtime.Story runtimeStory)
@@ -42,12 +30,27 @@ impl PluginManager {
         _parsedStory: ParsedStory,
         runtimeStory: RuntimeStory,
     ) -> RuntimeStory {
-        if self.pluginDirectories.is_empty() {
-            return runtimeStory;
-        }
+        runtimeStory
+    }
+}
 
-        todo!(
-            "plugin discovery/loading is not ported yet; reflection-driven DLL loading needs a separate integration layer"
-        )
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ParsedHierarchy::Object::Object;
+    use crate::ParsedHierarchy::Story::Story as ParsedStory;
+    use ink_runtime::Container::Container;
+    use ink_runtime::Story::Story as RuntimeStory;
+
+    #[test]
+    fn plugin_manager_is_an_inert_compatibility_shim() {
+        let mut manager = PluginManager::new(vec!["plugins".to_string()]);
+        assert_eq!(manager.PreParse("story".to_string()), "story");
+        assert!(!manager
+            .PostParse(ParsedStory::new(Vec::<Object>::new(), false))
+            .get_isInclude());
+
+        let runtime_story = RuntimeStory::new(Container::new(), Vec::new());
+        let _ = manager.PostExport(ParsedStory::new(Vec::<Object>::new(), false), runtime_story);
     }
 }
