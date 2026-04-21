@@ -105,19 +105,21 @@ impl InkParser {
             }
         }
 
-        if let Some(diverts) = self.MultiDivert() {
-            self.EndTagIfNecessary(&mut results);
-            self.trim_end_whitespace(&mut results, true);
-            results.extend(diverts.into_iter().map(|piece| match piece {
-                DivertPiece::Divert(divert) => ContentListItem::Divert(divert),
-                DivertPiece::TunnelOnwards(divert) => {
-                    let mut tunnel = TunnelOnwards::new();
-                    if !divert.get_isEmpty() {
-                        tunnel.set_divertAfter(Some(divert));
+        if !self.get_parsingChoice() {
+            if let Some(diverts) = self.MultiDivert() {
+                self.EndTagIfNecessary(&mut results);
+                self.trim_end_whitespace(&mut results, true);
+                results.extend(diverts.into_iter().map(|piece| match piece {
+                    DivertPiece::Divert(divert) => ContentListItem::Divert(divert),
+                    DivertPiece::TunnelOnwards(divert) => {
+                        let mut tunnel = TunnelOnwards::new();
+                        if !divert.get_isEmpty() {
+                            tunnel.set_divertAfter(Some(divert));
+                        }
+                        ContentListItem::TunnelOnwards(tunnel)
                     }
-                    ContentListItem::TunnelOnwards(tunnel)
-                }
-            }));
+                }));
+            }
         }
 
         if results.is_empty() {
