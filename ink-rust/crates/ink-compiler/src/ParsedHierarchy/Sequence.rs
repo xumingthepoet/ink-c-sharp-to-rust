@@ -121,6 +121,8 @@ impl Sequence {
         let cycle = self.sequenceType.contains(SequenceType::CYCLE);
         let stopping = self.sequenceType.contains(SequenceType::STOPPING);
         let shuffle = self.sequenceType.contains(SequenceType::SHUFFLE);
+        let mut branch_complete_diverts: Vec<Divert> = Vec::new();
+        let mut skip_shuffle_divert: Option<Divert> = None;
 
         let seqBranchCount = self.sequenceElements.len() + usize::from(once);
 
@@ -133,16 +135,6 @@ impl Sequence {
         }
 
         if shuffle {
-            let mut skip_shuffle = Container::new();
-            skip_shuffle.set_name(Some("__seq_shuffle_exit".to_string()));
-            skip_shuffle.set_path(Path::new_overload_3(
-                vec![Component::new_overload_2(
-                    skip_shuffle.get_name().to_string(),
-                )],
-                false,
-            ));
-            let shuffleExitPath = skip_shuffle.get_path().clone();
-
             if once || stopping {
                 let last_idx = if stopping {
                     self.sequenceElements.len().saturating_sub(1)
@@ -153,13 +145,10 @@ impl Sequence {
                 container.AddContent(Value::new_int(last_idx as i32));
                 container.AddContent(NativeFunctionCall::CallWithName("==".to_string()));
 
-                let mut skip_shuffle_divert = Divert::new();
-                skip_shuffle_divert.set_isConditional(true);
-                container.AddContent(skip_shuffle_divert.clone());
-                self.sequenceDivertsToResolve.push(SequenceDivertToResolve {
-                    divert: skip_shuffle_divert,
-                    targetPath: shuffleExitPath.clone(),
-                });
+                let mut divert = Divert::new();
+                divert.set_isConditional(true);
+                container.AddContent(divert.clone());
+                skip_shuffle_divert = Some(divert);
             }
 
             let mut element_count_to_shuffle = self.sequenceElements.len();
@@ -170,22 +159,27 @@ impl Sequence {
             container.AddContent(ControlCommand::SequenceShuffleIndex());
 
             // Sequence shuffle needs a place to continue after the chosen index is emitted.
-            let mut shuffle_exit = Container::new();
-            shuffle_exit.set_name(Some("__seq_shuffle_exit".to_string()));
-            shuffle_exit.set_path(shuffleExitPath);
-            container.AddToNamedContentOnly(shuffle_exit);
+            let shuffle_exit = Container::new();
+            container.AddContent(shuffle_exit);
+
+            let shuffle_exit_path = match container.get_content().last() {
+                Some(ContentItem::Container(exit_container)) => exit_container.get_path().clone(),
+                _ => Path::new(),
+            };
+
+            if once || stopping {
+                if let Some(divert) = skip_shuffle_divert.take() {
+                    self.sequenceDivertsToResolve.push(SequenceDivertToResolve {
+                        divert,
+                        targetPath: shuffle_exit_path.clone(),
+                    });
+                }
+            }
         }
 
         container.AddContent(ControlCommand::EvalEnd());
 
-        let mut postSequenceNoOp = Container::new();
-        postSequenceNoOp.set_name(Some("__seq_end".to_string()));
-        postSequenceNoOp.set_path(Path::new_overload_3(
-            vec![Component::new_overload_2(
-                postSequenceNoOp.get_name().to_string(),
-            )],
-            false,
-        ));
+        let postSequenceNoOp = Container::new();
 
         for (el_index, element) in self.sequenceElements.iter_mut().enumerate() {
             container.AddContent(ControlCommand::EvalStart());
@@ -218,13 +212,22 @@ impl Sequence {
                 divert: sequence_divert,
                 targetPath: branch_path,
             });
-            self.sequenceDivertsToResolve.push(SequenceDivertToResolve {
-                divert: seq_branch_complete_divert,
-                targetPath: postSequenceNoOp.get_path().clone(),
-            });
+            branch_complete_diverts.push(seq_branch_complete_divert);
         }
 
-        container.AddToNamedContentOnly(postSequenceNoOp);
+        container.AddContent(postSequenceNoOp);
+
+        let post_sequence_no_op_path = match container.get_content().last() {
+            Some(ContentItem::Container(end_container)) => end_container.get_path().clone(),
+            _ => Path::new(),
+        };
+
+        for divert in branch_complete_diverts {
+            self.sequenceDivertsToResolve.push(SequenceDivertToResolve {
+                divert,
+                targetPath: post_sequence_no_op_path.clone(),
+            });
+        }
 
         ContentItem::Container(Rc::new(container))
     }
