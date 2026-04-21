@@ -32,7 +32,7 @@ impl DivertTarget {
     pub fn GenerateIntoContainer(&self, container: &mut ink_runtime::Container::Container) {
         let mut divert = self.divert.clone();
         divert.GenerateRuntimeObject();
-        let runtime_divert = divert.get_runtimeDivert().cloned();
+        let runtime_divert = divert.get_runtimeDivert();
         let runtime_divert_target_value = DivertTargetValue::new(
             runtime_divert
                 .as_ref()

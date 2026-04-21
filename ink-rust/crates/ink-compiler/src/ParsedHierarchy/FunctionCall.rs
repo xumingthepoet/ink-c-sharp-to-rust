@@ -12,12 +12,13 @@ use ink_runtime::ControlCommand::ControlCommand;
 use ink_runtime::InkList::InkList;
 use ink_runtime::NativeFunctionCall::NativeFunctionCall as RuntimeNativeFunctionCall;
 use ink_runtime::Value::{ListValue, Value};
+use std::cell::RefCell;
 
 #[derive(Clone, Debug, Default)]
 pub struct FunctionCall {
     proxyDivert: Divert,
     arguments: Vec<Expression>,
-    runtimeDivert: Option<ink_runtime::Divert::Divert>,
+    runtimeDivert: RefCell<Option<ink_runtime::Divert::Divert>>,
     resolvedList: Option<ListDefinition>,
     divertTargetToCount: Option<Box<DivertTarget>>,
     variableReferenceToCount: Option<Box<VariableReference>>,
@@ -44,7 +45,7 @@ impl FunctionCall {
         Self {
             proxyDivert,
             arguments,
-            runtimeDivert: None,
+            runtimeDivert: RefCell::new(None),
             resolvedList: None,
             divertTargetToCount: None,
             variableReferenceToCount: None,
@@ -71,6 +72,7 @@ impl FunctionCall {
         let foundList = self.resolvedList.clone();
         let mut usingProxyDivert = false;
         let mut proxyDivert = self.proxyDivert.clone();
+        *self.runtimeDivert.borrow_mut() = None;
 
         if self.get_isChoiceCount() {
             if !self.arguments.is_empty() {
@@ -178,6 +180,7 @@ impl FunctionCall {
             }
         } else {
             let runtime_object = proxyDivert.GenerateRuntimeObject();
+            *self.runtimeDivert.borrow_mut() = proxyDivert.get_runtimeDivert().cloned();
             container.AddContent(runtime_object);
             usingProxyDivert = true;
         }
@@ -333,8 +336,8 @@ impl FunctionCall {
     }
 
     // C# signature: Runtime.Divert runtimeDivert { get; }
-    pub fn get_runtimeDivert(&self) -> Option<&ink_runtime::Divert::Divert> {
-        self.runtimeDivert.as_ref()
+    pub fn get_runtimeDivert(&self) -> Option<ink_runtime::Divert::Divert> {
+        self.runtimeDivert.borrow().clone()
     }
 
     // C# signature: bool isChoiceCount { get; }
@@ -402,5 +405,22 @@ mod tests {
 
         assert_eq!(call.get_name(), "FOO");
         assert_eq!(call.ToString(), "FOO()");
+    }
+
+    #[test]
+    fn stores_runtime_divert_when_generating_proxy_call() {
+        let call = FunctionCall::new(
+            Identifier {
+                name: Some("FOO".to_string()),
+                debugMetadata: None,
+            },
+            Vec::new(),
+        );
+        let mut container = ink_runtime::Container::Container::new();
+
+        call.GenerateIntoContainer(&mut container);
+
+        assert!(call.get_runtimeDivert().is_some());
+        assert!(!container.get_content().is_empty());
     }
 }
