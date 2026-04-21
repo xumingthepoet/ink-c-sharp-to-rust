@@ -32,12 +32,15 @@ impl DivertTarget {
     pub fn GenerateIntoContainer(&self, container: &mut ink_runtime::Container::Container) {
         let mut divert = self.divert.clone();
         divert.GenerateRuntimeObject();
-        let runtime_divert = divert.get_runtimeDivert();
-        let runtime_divert_target_value = DivertTargetValue::new(
-            runtime_divert
-                .as_ref()
-                .and_then(|runtime_divert| runtime_divert.get_targetPath()),
-        );
+        let runtime_divert_target_value =
+            self.runtimeDivertTargetValue.clone().unwrap_or_else(|| {
+                DivertTargetValue::new(
+                    divert
+                        .get_runtimeDivert()
+                        .as_ref()
+                        .and_then(|runtime_divert| runtime_divert.get_targetPath()),
+                )
+            });
 
         container.AddContent(ContentItem::Value(Value::DivertTarget(
             runtime_divert_target_value,
@@ -166,5 +169,38 @@ mod tests {
 
         assert_eq!(a.GetHashCode(), b.GetHashCode());
         assert_ne!(a.GetHashCode(), c.GetHashCode());
+    }
+
+    #[test]
+    fn generate_uses_resolved_target_cache_when_available() {
+        use ink_runtime::Path::Path as RuntimePath;
+        use ink_runtime::Value::{DivertTargetValue, Value};
+
+        let mut target = DivertTarget::new(Divert::new(
+            Path::new_overload_2(vec![Identifier {
+                name: Some("knot".to_string()),
+                debugMetadata: None,
+            }]),
+            Vec::new(),
+        ));
+        target.runtimeDivertTargetValue = Some(DivertTargetValue::new(None));
+        if let Some(value) = &mut target.runtimeDivertTargetValue {
+            value.value = Some(RuntimePath::new_overload_4("resolved".to_string()));
+        }
+
+        let mut container = Container::new();
+        target.GenerateIntoContainer(&mut container);
+
+        match &container.get_content()[0] {
+            ContentItem::Value(Value::DivertTarget(value)) => {
+                assert_eq!(
+                    value
+                        .get_targetPath()
+                        .map(|path: &RuntimePath| path.ToString()),
+                    Some("resolved".to_string())
+                );
+            }
+            other => panic!("unexpected content: {other:?}"),
+        }
     }
 }
