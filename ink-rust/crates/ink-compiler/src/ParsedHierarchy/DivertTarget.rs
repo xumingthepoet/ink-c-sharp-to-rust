@@ -97,11 +97,17 @@ impl DivertTarget {
 
     // C# signature: public override int GetHashCode ()
     pub fn GetHashCode(&self) -> i32 {
-        self.divert
+        let mut hash = 0i32;
+        for byte in self
+            .divert
             .get_target()
             .map(|path| path.get_dotSeparatedComponents())
             .unwrap_or_default()
-            .len() as i32
+            .bytes()
+        {
+            hash = hash.wrapping_mul(31).wrapping_add(byte as i32);
+        }
+        hash
     }
 
     pub fn ToString(&self) -> String {
@@ -132,5 +138,33 @@ mod tests {
         target.GenerateIntoContainer(&mut container);
 
         assert!(matches!(container.get_content()[0], ContentItem::Value(_)));
+    }
+
+    #[test]
+    fn hash_code_depends_on_target_text() {
+        let a = DivertTarget::new(Divert::new(
+            Path::new_overload_2(vec![Identifier {
+                name: Some("knot".to_string()),
+                debugMetadata: None,
+            }]),
+            Vec::new(),
+        ));
+        let b = DivertTarget::new(Divert::new(
+            Path::new_overload_2(vec![Identifier {
+                name: Some("knot".to_string()),
+                debugMetadata: None,
+            }]),
+            Vec::new(),
+        ));
+        let c = DivertTarget::new(Divert::new(
+            Path::new_overload_2(vec![Identifier {
+                name: Some("elsewhere".to_string()),
+                debugMetadata: None,
+            }]),
+            Vec::new(),
+        ));
+
+        assert_eq!(a.GetHashCode(), b.GetHashCode());
+        assert_ne!(a.GetHashCode(), c.GetHashCode());
     }
 }
